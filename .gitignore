@@ -1,1 +1,10 @@
 graphify-out
+CLAUDE.md
+node_modules/
+dist/
+*.jks
+*.keystore
+*.p12
+*.mobileprovision
+.env*
+keystore.properties
