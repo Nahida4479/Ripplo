@@ -1,5 +1,7 @@
 apply plugin: 'com.android.application'
 
+def ripploKeystore = System.getenv('RIPPLO_KEYSTORE_FILE')
+
 android {
     namespace = "io.github.nahida4479.ripplo"
     compileSdk = rootProject.ext.compileSdkVersion
@@ -7,8 +9,8 @@ android {
         applicationId "io.github.nahida4479.ripplo"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 1
-        versionName "1.0"
+        versionCode (project.findProperty("versionCode") ?: "1").toInteger()
+        versionName project.findProperty("versionName") ?: "0.1.0"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
@@ -16,8 +18,19 @@ android {
             ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
         }
     }
+    signingConfigs {
+        if (ripploKeystore) {
+            release {
+                storeFile file(ripploKeystore)
+                storePassword System.getenv('RIPPLO_KEYSTORE_PASSWORD')
+                keyAlias System.getenv('RIPPLO_KEY_ALIAS')
+                keyPassword System.getenv('RIPPLO_KEY_PASSWORD')
+            }
+        }
+    }
     buildTypes {
         release {
+            if (ripploKeystore) signingConfig signingConfigs.release
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }

@@ -1,0 +1,190 @@
+name: Build
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  android:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: 21
+      - run: npm ci
+      - run: npm test
+      - run: npm run build
+      - run: npx cap sync android
+
+      - name: Compute version
+        id: ver
+        run: |
+          set -euo pipefail
+          if [[ "$GITHUB_REF_TYPE" == "tag" ]]; then
+            tag="$GITHUB_REF_NAME"
+            [[ "$tag" =~ ^v([0-9]+)\.([0-9]+)\.([0-9]+)(-[A-Za-z0-9.]+)?$ ]] || { echo "Bad tag: $tag"; exit 1; }
+            name="${BASH_REMATCH[1]}.${BASH_REMATCH[2]}.${BASH_REMATCH[3]}"
+            code=$(( BASH_REMATCH[1] * 10000 + BASH_REMATCH[2] * 100 + BASH_REMATCH[3] ))
+          else
+            tag="v$(node -p "require('./package.json').version")-dev${GITHUB_RUN_NUMBER}"
+            name="$(node -p "require('./package.json').version")"
+            code="$GITHUB_RUN_NUMBER"
+          fi
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "name=$name" >> "$GITHUB_OUTPUT"
+          echo "code=$code" >> "$GITHUB_OUTPUT"
+
+      - name: Prepare signing
+        env:
+          KS_B64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          KS_PASS: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KEY_PASS: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          if [[ -z "$KS_B64" ]]; then
+            if [[ "$GITHUB_REF_TYPE" == "tag" ]]; then
+              echo "::error::ANDROID_KEYSTORE_BASE64 secret missing; refusing to build an unsigned release"
+              exit 1
+            fi
+            echo "::warning::No keystore secret; building unsigned APK"
+            exit 0
+          fi
+          echo "$KS_B64" | base64 -d > "$RUNNER_TEMP/ripplo.jks"
+          {
+            echo "RIPPLO_KEYSTORE_FILE=$RUNNER_TEMP/ripplo.jks"
+            echo "RIPPLO_KEYSTORE_PASSWORD=$KS_PASS"
+            echo "RIPPLO_KEY_ALIAS=$KEY_ALIAS"
+            echo "RIPPLO_KEY_PASSWORD=$KEY_PASS"
+          } >> "$GITHUB_ENV"
+          echo "::add-mask::$KS_PASS"
+          echo "::add-mask::$KEY_PASS"
+
+      - name: Assemble release APK
+        working-directory: android
+        env:
+          VER_NAME: ${{ steps.ver.outputs.name }}
+          VER_CODE: ${{ steps.ver.outputs.code }}
+        run: |
+          set -euo pipefail
+          ./gradlew assembleRelease \
+            -PversionName="$VER_NAME" \
+            -PversionCode="$VER_CODE"
+
+      - name: Verify signature and collect
+        env:
+          tag: ${{ steps.ver.outputs.tag }}
+        run: |
+          set -euo pipefail
+          mkdir out
+          src=$(ls android/app/build/outputs/apk/release/*.apk | head -n1)
+          cp "$src" "out/Ripplo-$tag.apk"
+          if [[ -n "${RIPPLO_KEYSTORE_FILE:-}" ]]; then
+            bt="$ANDROID_HOME/build-tools/$(ls "$ANDROID_HOME/build-tools" | sort -V | tail -n1)"
+            "$bt/apksigner" verify --print-certs "out/Ripplo-$tag.apk" | tee "$RUNNER_TEMP/certs.txt"
+            grep -m1 'certificate SHA-256 digest' "$RUNNER_TEMP/certs.txt" | awk '{print $NF}' > out/apk-cert-sha256.txt
+          fi
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: android
+          path: out/*
+
+  ios:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - run: npx cap sync ios
+
+      - name: Compute version
+        id: ver
+        run: |
+          set -euo pipefail
+          if [[ "$GITHUB_REF_TYPE" == "tag" ]]; then
+            tag="$GITHUB_REF_NAME"
+            [[ "$tag" =~ ^v([0-9]+)\.([0-9]+)\.([0-9]+)(-[A-Za-z0-9.]+)?$ ]] || { echo "Bad tag: $tag"; exit 1; }
+            name="${BASH_REMATCH[1]}.${BASH_REMATCH[2]}.${BASH_REMATCH[3]}"
+            code=$(( BASH_REMATCH[1] * 10000 + BASH_REMATCH[2] * 100 + BASH_REMATCH[3] ))
+          else
+            name="$(node -p "require('./package.json').version")"
+            tag="v${name}-dev${GITHUB_RUN_NUMBER}"
+            code="$GITHUB_RUN_NUMBER"
+          fi
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "name=$name" >> "$GITHUB_OUTPUT"
+          echo "code=$code" >> "$GITHUB_OUTPUT"
+
+      - name: Archive (unsigned)
+        env:
+          VER_NAME: ${{ steps.ver.outputs.name }}
+          VER_CODE: ${{ steps.ver.outputs.code }}
+        run: |
+          set -euo pipefail
+          xcodebuild -project ios/App/App.xcodeproj -scheme App -configuration Release \
+            -sdk iphoneos -archivePath "$RUNNER_TEMP/App.xcarchive" archive \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO \
+            MARKETING_VERSION="$VER_NAME" \
+            CURRENT_PROJECT_VERSION="$VER_CODE"
+
+      - name: Build unsigned IPA
+        env:
+          tag: ${{ steps.ver.outputs.tag }}
+        run: |
+          set -euo pipefail
+          mkdir -p out "$RUNNER_TEMP/ipa/Payload"
+          cp -R "$RUNNER_TEMP/App.xcarchive/Products/Applications/App.app" "$RUNNER_TEMP/ipa/Payload/"
+          (cd "$RUNNER_TEMP/ipa" && zip -qry "$GITHUB_WORKSPACE/out/Ripplo-${tag}-unsigned.ipa" Payload)
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: ios
+          path: out/*
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [android, ios]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          path: dl
+          merge-multiple: true
+
+      - name: Create release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          cd dl
+          [[ -s apk-cert-sha256.txt ]] || { echo "::error::missing APK cert digest"; exit 1; }
+          sha256sum Ripplo-* > SHA256SUMS
+          {
+            echo "APK signing certificate SHA-256: \`$(cat apk-cert-sha256.txt)\`"
+            echo
+            echo "SHA256SUMS:"
+            echo '```'
+            cat SHA256SUMS
+            echo '```'
+            echo
+          } > ../notes.md
+          gh release create "$GITHUB_REF_NAME" --generate-notes --notes-file ../notes.md \
+            Ripplo-*.apk Ripplo-*.ipa SHA256SUMS
