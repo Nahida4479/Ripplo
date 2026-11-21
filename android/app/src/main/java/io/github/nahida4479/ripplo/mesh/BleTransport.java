@@ -284,7 +284,7 @@ final class BleTransport extends Transport {
         final Awaiter notifyDone = new Awaiter();
 
         ServerLink(BluetoothDevice device) {
-            super(engine, "ble", false);
+            super(BleTransport.this.engine, "ble", false);
             this.device = device;
         }
 
@@ -332,7 +332,7 @@ final class BleTransport extends Transport {
         BluetoothGattCharacteristic psmChar;
 
         ClientLink(BluetoothDevice device) {
-            super(engine, "ble", true);
+            super(BleTransport.this.engine, "ble", true);
             this.device = device;
             mine.add(this);
         }
