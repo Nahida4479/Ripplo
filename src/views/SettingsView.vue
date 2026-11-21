@@ -101,7 +101,7 @@ const initials = l => l.slice(0, 2).toUpperCase()
     <div class="card">
       <div class="row"><span class="grow"><span class="label">Ripplo</span><br /><span class="hint">{{ t('tagline') }}</span></span><span class="val">{{ __APP_VERSION__ }}</span></div>
       <a class="row" :href="REPO" target="_blank" rel="noopener"><span class="grow label">GitHub</span><ExternalLink :size="18" /></a>
-      <div class="row"><span class="grow label">{{ t('license') }}</span><span class="val">MIT</span></div>
+      <div class="row"><span class="grow label">{{ t('license') }}</span><span class="val">AGPL-3.0</span></div>
     </div>
     <h2 class="section">{{ t('contributors') }}</h2>
     <a v-for="c in contributors" :key="c.login" class="card pad contrib" :href="'https://github.com/' + c.login" target="_blank" rel="noopener">
