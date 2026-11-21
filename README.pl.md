@@ -192,5 +192,5 @@ Używaj tego samego keystore przy każdym wydaniu: Android instaluje tylko aktua
 - [Nahida4479](https://github.com/Nahida4479)
 
 # Licencja
-Udostępniono na [licencji MIT](./LICENSE) © 2026 [Nahida4479](https://github.com/Nahida4479).
-Można swobodnie używać, modyfikować i udostępniać, pod warunkiem zachowania informacji o licencji. Dostarczane „tak jak jest”, bez gwarancji.
+Udostępniono na licencji [GNU General Public License v3.0](./LICENSE) (GPL-3.0-only) © 2026 [Nahida4479](https://github.com/Nahida4479).
+Możesz używać, modyfikować i udostępniać Ripplo, ale wszystko, co rozpowszechniasz na jego podstawie, również musi być na GPL-3.0 z udostępnionym kodem źródłowym. Dostarczane „tak jak jest”, bez gwarancji. Ripplo korzysta z biblioteki protokołu Signal na licencji GPL-3.0: [libsignal-protocol-typescript](https://github.com/privacyresearchgroup/libsignal-protocol-typescript).

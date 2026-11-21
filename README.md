@@ -192,5 +192,5 @@ Keep the same keystore for every release: Android only installs updates signed w
 - [Nahida4479](https://github.com/Nahida4479)
 
 # License
-Released under the [MIT License](./LICENSE) © 2026 [Nahida4479](https://github.com/Nahida4479).
-Free to use, modify and share, as long as the license notice is kept. Provided "as is", without warranty.
+Released under the [GNU General Public License v3.0](./LICENSE) (GPL-3.0-only) © 2026 [Nahida4479](https://github.com/Nahida4479).
+You may use, modify and share Ripplo, but anything you distribute that is based on it must also be GPL-3.0 with its source code available. Provided "as is", without warranty. Ripplo uses the GPL-3.0 Signal protocol library [libsignal-protocol-typescript](https://github.com/privacyresearchgroup/libsignal-protocol-typescript).
