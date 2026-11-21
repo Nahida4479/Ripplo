@@ -16,6 +16,7 @@ abstract class Link {
     volatile long kbps;
     volatile long rttMs;
     volatile long lastRx = System.nanoTime();
+    int strikes;
     volatile long pingNonce;
     volatile long pingStartNanos;
     volatile int pingBits;

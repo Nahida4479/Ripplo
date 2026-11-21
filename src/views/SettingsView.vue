@@ -121,7 +121,7 @@ const initials = l => l.slice(0, 2).toUpperCase()
       <div v-if="state.update.error" class="row hint">{{ state.update.error }}</div>
       <div v-if="state.update.progress != null" class="row"><progress class="grow" max="1" :value="state.update.progress" /></div>
       <div class="row">
-        <button class="btn sm" :disabled="state.update.checking" @click="checkUpdate">{{ t(state.update.checking ? 'checking' : 'checkNow') }}</button>
+        <button class="btn sm" :disabled="state.update.checking" @click="checkUpdate(true)">{{ t(state.update.checking ? 'checking' : 'checkNow') }}</button>
         <span class="grow" />
         <button v-if="state.update.available && android && state.update.apkUrl" class="btn sm" :disabled="state.update.installing || state.update.checking" @click="install()">{{ t('install') }}</button>
         <a v-else-if="state.update.available" class="btn sm" :href="state.update.url" target="_blank" rel="noopener">{{ t('openRelease') }}</a>

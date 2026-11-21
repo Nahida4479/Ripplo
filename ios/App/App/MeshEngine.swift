@@ -93,6 +93,7 @@ final class MeshEngine {
         var kbps: Double
         var rttMs = 0
         var lastRx = Date()
+        var strikes = 0
         var pings = [Data: (Date, Int)]()
         init(_ link: MeshLink) {
             self.link = link
@@ -340,7 +341,10 @@ final class MeshEngine {
         tickCount += 1
         transports.forEach { $0.tick() }
         guard tickCount % 4 == 0 else { return }
-        let dead = states.values.filter { Date().timeIntervalSince($0.lastRx) > 150 }
+        for s in states.values {
+            if Date().timeIntervalSince(s.lastRx) > 90 { s.strikes += 1 } else { s.strikes = 0 }
+        }
+        let dead = states.values.filter { $0.strikes >= 2 }
         for s in dead {
             states.removeValue(forKey: ObjectIdentifier(s.link))
             s.link.close(block: false)

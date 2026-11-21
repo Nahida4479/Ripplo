@@ -197,8 +197,9 @@ PING with filler (16 KiB on Wi-Fi/L2CAP media, 2 KiB on BLE GATT) and measures
 back to the next on failure. Before the first measurement, nominal kbps: lan 20000,
 wifi-aware 20000, wifi-direct 20000, multipeer 10000, l2cap 300, ble 50.
 
-A link that delivers no byte for 150 s is closed (every 60 s PING keeps a healthy idle link talking, any received byte counts, so a
-long transfer never trips it). Without this a link whose peer vanished without closing the socket stayed in the neighbor list, the
+A link is closed only when it has proved silent twice in a row: our PING has been unanswered for more than 90 s and no byte at all has arrived for
+more than 90 s, on two consecutive 60 s checks (the first strike keeps the ping outstanding instead of sending a new one). Any received byte counts, so a
+long transfer never trips it, and a phone that merely dozed (no ping was outstanding) is not cut off. Without this a link whose peer vanished without closing the socket stayed in the neighbor list, the
 router kept unicasting along the route learned from an earlier ACK, and messages ended as "out of range" with the phones side by side.
 Closing it clears the routes through it, so the next DATA floods again.
 
@@ -454,6 +455,11 @@ and shows a content-free notification *"New message"* for `0x01` payloads.
   removed on the next resume.
 - Only one install runs at a time: native rejects a second `installUpdate` with `busy`, and the UI disables
   Install while checking or installing (two parallel downloads shared `update.apk` and made the progress jump).
+- The GitHub API allows only 60 unauthenticated requests per hour per IP, shared by every phone on the same network, so the app keeps each
+  answer in `localStorage` (`gh:<url>`, fresh for 30 min; "Check now" accepts a minute-old answer; the integrity lookup is fresh for a day)
+  and revalidates stale ones with `If-None-Match` (a 304 costs nothing against the limit). On a 403 or 429 it stores a back-off until
+  `x-ratelimit-reset` (at least a minute), serves the cached answer meanwhile and, if there is none, shows "GitHub is limiting requests from this
+  network. Try again after HH:MM." instead of the bare status.
 - Native install errors carry the `PackageInstaller` status message, shown in Settings → Updates.
 - Self-check: on Android the app hashes its own installed APK and compares it with `SHA256SUMS` of
   the release matching its version — so copies shared with Nearby Share / Quick Share are verified

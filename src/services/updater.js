@@ -3,7 +3,8 @@ import { App } from '@capacitor/app'
 import { Capacitor } from '@capacitor/core'
 import { state } from '../core/state.js'
 import { mesh } from '../mesh/bridge.js'
-import { t } from '../i18n.js'
+import { t, locale } from '../i18n.js'
+import { createGithub } from '../lib/githubCache.js'
 import { ui } from '../components/ui.js'
 
 const REPO = 'https://api.github.com/repos/Nahida4479/Ripplo/releases'
@@ -16,11 +17,12 @@ export function newer(a, b) {
   return false
 }
 
-const getJson = async url => {
-  const r = await fetch(url, { headers: { Accept: 'application/vnd.github+json' } })
-  if (!r.ok) throw new Error(String(r.status))
-  return r.json()
-}
+const storage = (() => { try { return localStorage } catch { return { getItem: () => null, setItem() {} } } })()
+const getJson = createGithub({ storage })
+const DAY = 24 * 3600e3
+const explain = e => e.code === 'rate'
+  ? t('err_rate_limit', { time: new Date(e.until).toLocaleTimeString(locale.value, { hour: '2-digit', minute: '2-digit' }) })
+  : e.message
 const hashOf = (rel, name) => {
   const digest = rel.assets.find(x => x.name === name)?.digest
   if (digest?.startsWith('sha256:')) return digest.slice(7)
@@ -31,14 +33,14 @@ let current
 const version = () => current ??= (Capacitor.isNativePlatform() ? App.getInfo().then(i => i.version) : Promise.resolve(__APP_VERSION__))
   .catch(() => __APP_VERSION__).then(v => (state.update.current = v))
 
-export async function checkUpdate() {
+export async function checkUpdate(manual) {
   const u = state.update
   const cur = await version()
   if (!navigator.onLine || u.checking) return
   u.checking = true; u.error = null
   const t0 = Date.now()
   try {
-    const rel = await getJson(`${REPO}/latest`)
+    const rel = await getJson(`${REPO}/latest`, manual === true ? { maxAge: 60e3 } : undefined)
     u.latest = rel.tag_name.replace(/^v/, '')
     u.url = rel.html_url
     u.available = newer(u.latest, cur)
@@ -48,7 +50,7 @@ export async function checkUpdate() {
     u.checkedAt = Date.now()
     if (u.available) promptUpdate()
   } catch (e) {
-    u.error = e.message
+    u.error = explain(e)
   } finally {
     await new Promise(r => setTimeout(r, Math.max(0, 800 - (Date.now() - t0))))
     u.checking = false
@@ -86,7 +88,7 @@ export async function checkIntegrity() {
     if (!mine) { i.status = 'unsupported'; return }
     if (!navigator.onLine) { i.status = 'offline'; return }
     const tag = `v${await version()}`
-    const hash = hashOf(await getJson(`${REPO}/tags/${tag}`), `Ripplo-${tag}.apk`)
+    const hash = hashOf(await getJson(`${REPO}/tags/${tag}`, { maxAge: DAY }), `Ripplo-${tag}.apk`)
     const ok = !!hash && hash.toLowerCase() === mine.toLowerCase()
     Object.assign(i, { status: ok ? 'ok' : 'mismatch', checkedAt: Date.now() })
   } catch {

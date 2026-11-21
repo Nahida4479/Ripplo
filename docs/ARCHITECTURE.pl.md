@@ -196,8 +196,9 @@ PING z wypełnieniem (16 KiB dla mediów Wi-Fi/L2CAP, 2 KiB dla BLE GATT) i mier
 przełącza się na następne. Przed pierwszym pomiarem nominalne kbps: lan 20000,
 wifi-aware 20000, wifi-direct 20000, multipeer 10000, l2cap 300, ble 50.
 
-Łącze, które przez 150 s nie dostarczy żadnego bajtu, jest zamykane (co 60 s PING podtrzymuje rozmowę zdrowego, bezczynnego łącza, liczy się każdy
-odebrany bajt, więc długi transfer go nie wyzwoli). Bez tego łącze, którego druga strona zniknęła bez zamknięcia gniazda, zostawało na liście
+Łącze jest zamykane dopiero, gdy dwa razy z rzędu okazało się ciche: nasz PING jest bez odpowiedzi dłużej niż 90 s i przez ponad 90 s nie dotarł żaden bajt, w dwóch
+kolejnych kontrolach co 60 s (pierwsze uderzenie zostawia ping jako niepotwierdzony zamiast wysyłać nowy). Liczy się każdy odebrany bajt, więc długi transfer go nie
+wyzwoli, a telefon, który tylko przysnął (bez niepotwierdzonego pinga), nie jest odcinany. Bez tego łącze, którego druga strona zniknęła bez zamknięcia gniazda, zostawało na liście
 sąsiadów, router dalej wysyłał jednoadresowo trasą nauczoną z wcześniejszego ACK, a wiadomości kończyły jako „poza zasięgiem” przy telefonach obok siebie.
 Zamknięcie czyści trasy przez nie, więc następny DATA znów zalewa sieć.
 
@@ -451,6 +452,11 @@ i pokazuje pozbawione treści powiadomienie *„Nowa wiadomość”* dla payload
   usuwane przy następnym wznowieniu.
 - Naraz działa tylko jedna instalacja: warstwa natywna odrzuca drugie `installUpdate` jako `busy`, a UI blokuje
   Zainstaluj podczas sprawdzania i instalacji (dwa równoległe pobrania współdzieliły `update.apk` i skakał pasek).
+- API GitHuba pozwala tylko na 60 niezalogowanych zapytań na godzinę z jednego IP, wspólnych dla wszystkich telefonów w tej samej sieci, więc aplikacja
+  trzyma każdą odpowiedź w `localStorage` (`gh:<url>`, świeża przez 30 min; „Sprawdź teraz” akceptuje odpowiedź sprzed minuty; sprawdzenie integralności jest
+  świeże przez dobę) i odświeża nieświeże przez `If-None-Match` (304 nie liczy się do limitu). Przy 403 lub 429 zapisuje przerwę do `x-ratelimit-reset` (co najmniej
+  minutę), w międzyczasie podaje odpowiedź z pamięci, a gdy jej nie ma, pokazuje „GitHub ogranicza liczbę zapytań z tej sieci. Spróbuj ponownie po GG:MM.” zamiast
+  samego kodu.
 - Błędy natywnej instalacji niosą komunikat statusu `PackageInstaller`, widoczny w Ustawienia → Aktualizacje.
 - Autokontrola: na Androidzie aplikacja liczy skrót własnego zainstalowanego APK i porównuje go z `SHA256SUMS`
   wydania odpowiadającego jej wersji — więc kopie udostępnione przez Nearby Share / Quick Share są również weryfikowane.
