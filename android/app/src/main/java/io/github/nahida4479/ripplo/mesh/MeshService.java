@@ -1,0 +1,46 @@
+package io.github.nahida4479.ripplo.mesh;
+
+import android.app.Service;
+import android.content.Context;
+import android.content.Intent;
+import android.content.pm.ServiceInfo;
+import android.os.IBinder;
+import androidx.core.app.ServiceCompat;
+import androidx.core.content.ContextCompat;
+
+public class MeshService extends Service {
+    static void launch(Context ctx) {
+        try {
+            ContextCompat.startForegroundService(ctx, new Intent(ctx, MeshService.class));
+        } catch (RuntimeException ignored) {
+        }
+    }
+
+    @Override
+    public int onStartCommand(Intent intent, int flags, int startId) {
+        try {
+            ServiceCompat.startForeground(this, Notifier.ID_RELAY, Notifier.relay(this), ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE);
+        } catch (RuntimeException e) {
+            stopSelf();
+            return START_NOT_STICKY;
+        }
+        MeshEngine engine = MeshEngine.get(this);
+        if (!engine.isRunning() && !engine.resumeFromPrefs()) {
+            stopSelf();
+            return START_NOT_STICKY;
+        }
+        return START_STICKY;
+    }
+
+    @Override
+    public void onTaskRemoved(Intent rootIntent) {
+        MeshEngine engine = MeshEngine.get(this);
+        if (!engine.background()) {
+            engine.stop();
+            stopSelf();
+        }
+    }
+
+    @Override
+    public IBinder onBind(Intent intent) { return null; }
+}
