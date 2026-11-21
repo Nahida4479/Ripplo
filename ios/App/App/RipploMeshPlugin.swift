@@ -21,7 +21,14 @@ public class RipploMeshPlugin: CAPPlugin, CAPBridgedPlugin {
         CAPPluginMethod(name: "installUpdate", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "requestBatteryExemption", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "checkPermissions", returnType: CAPPluginReturnPromise),
-        CAPPluginMethod(name: "requestPermissions", returnType: CAPPluginReturnPromise)
+        CAPPluginMethod(name: "requestPermissions", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "signalInit", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "signalAddContact", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "signalSeal", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "signalOpen", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "signalProof", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "signalSafetyNumber", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "signalForget", returnType: CAPPluginReturnPromise)
     ]
 
     private var btProbe: CBCentralManager?
@@ -183,5 +190,74 @@ public class RipploMeshPlugin: CAPPlugin, CAPBridgedPlugin {
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
             self.waitForBluetooth(until: deadline, done)
         }
+    }
+
+    private func signalRun<T>(_ call: CAPPluginCall, _ work: @escaping (SignalCore) throws -> T, _ ok: @escaping (T) -> [String: Any]) {
+        SignalCore.shared.perform(work) { result in
+            switch result {
+            case .success(let v): call.resolve(ok(v))
+            case .failure(let e): call.reject(e.code, e.code)
+            }
+        }
+    }
+
+    private static func b64(_ call: CAPPluginCall, _ key: String) -> Data? {
+        call.getString(key).flatMap { Data(base64Encoded: $0) }
+    }
+
+    @objc func signalInit(_ call: CAPPluginCall) {
+        signalRun(call, { try $0.initIdentity() }) { ["bundle": $0.bundle.base64EncodedString(), "ik": $0.ik.base64EncodedString()] }
+    }
+
+    @objc func signalAddContact(_ call: CAPPluginCall) {
+        guard let bundle = RipploMeshPlugin.b64(call, "bundle") else {
+            call.reject("bad_bundle", "bad_bundle")
+            return
+        }
+        signalRun(call, { try $0.addContact(bundle) }) { ["tag": $0.hex] }
+    }
+
+    @objc func signalSeal(_ call: CAPPluginCall) {
+        guard let t = call.getString("tag"), let tag = Data(hex: t), let plain = RipploMeshPlugin.b64(call, "plaintext") else {
+            call.reject("bad_message", "bad_message")
+            return
+        }
+        signalRun(call, { try $0.seal(tag: tag, plaintext: plain) }) { ["payload": $0.base64EncodedString()] }
+    }
+
+    @objc func signalOpen(_ call: CAPPluginCall) {
+        guard let payload = RipploMeshPlugin.b64(call, "payload") else {
+            call.reject("bad_message", "bad_message")
+            return
+        }
+        signalRun(call, { try $0.open(payload) }) {
+            ["tag": $0.tag.hex, "ik": $0.ik.base64EncodedString(), "plaintext": $0.plaintext.base64EncodedString()]
+        }
+    }
+
+    @objc func signalProof(_ call: CAPPluginCall) {
+        guard let ik = RipploMeshPlugin.b64(call, "ik"), let n = RipploMeshPlugin.b64(call, "n"),
+              let c = call.getString("challengerTag"), let ct = Data(hex: c), ct.count == 16,
+              let p = call.getString("proverTag"), let pt = Data(hex: p), pt.count == 16 else {
+            call.reject("bad_message", "bad_message")
+            return
+        }
+        signalRun(call, { try $0.proof(ik: ik, n: n, challengerTag: ct, proverTag: pt) }) { ["mac": $0.base64EncodedString()] }
+    }
+
+    @objc func signalSafetyNumber(_ call: CAPPluginCall) {
+        guard let ik = RipploMeshPlugin.b64(call, "ik") else {
+            call.reject("bad_message", "bad_message")
+            return
+        }
+        signalRun(call, { try $0.safetyNumber(ik: ik) }) { ["digits": $0] }
+    }
+
+    @objc func signalForget(_ call: CAPPluginCall) {
+        guard let t = call.getString("tag"), let tag = Data(hex: t), tag.count == 16 else {
+            call.reject("bad_message", "bad_message")
+            return
+        }
+        signalRun(call, { $0.forget(tag: tag) }) { _ in [:] }
     }
 }

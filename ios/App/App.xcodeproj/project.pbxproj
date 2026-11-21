@@ -25,6 +25,8 @@
 		7E100000000000000000B007 /* MultipeerTransport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E100000000000000000F007 /* MultipeerTransport.swift */; };
 		7E100000000000000000B008 /* RipploMeshPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E100000000000000000F008 /* RipploMeshPlugin.swift */; };
 		7E100000000000000000B009 /* RipploBridgeViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E100000000000000000F009 /* RipploBridgeViewController.swift */; };
+		7E100000000000000000B010 /* SignalCore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E100000000000000000F010 /* SignalCore.swift */; };
+		7E100000000000000000B011 /* RipploSignal in Frameworks */ = {isa = PBXBuildFile; productRef = 7E100000000000000000D002 /* RipploSignal */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -48,6 +50,7 @@
 		7E100000000000000000F007 /* MultipeerTransport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MultipeerTransport.swift; sourceTree = "<group>"; };
 		7E100000000000000000F008 /* RipploMeshPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RipploMeshPlugin.swift; sourceTree = "<group>"; };
 		7E100000000000000000F009 /* RipploBridgeViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RipploBridgeViewController.swift; sourceTree = "<group>"; };
+		7E100000000000000000F010 /* SignalCore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SignalCore.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -56,6 +59,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				4D22ABE92AF431CB00220026 /* CapApp-SPM in Frameworks */,
+				7E100000000000000000B011 /* RipploSignal in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -92,6 +96,7 @@
 				7E100000000000000000F007 /* MultipeerTransport.swift */,
 				7E100000000000000000F008 /* RipploMeshPlugin.swift */,
 				7E100000000000000000F009 /* RipploBridgeViewController.swift */,
+				7E100000000000000000F010 /* SignalCore.swift */,
 				50379B222058CBB4000EE86E /* capacitor.config.json */,
 				504EC3071FED79650016851F /* AppDelegate.swift */,
 				504EC30B1FED79650016851F /* Main.storyboard */,
@@ -122,6 +127,7 @@
 			name = App;
 			packageProductDependencies = (
 				4D22ABE82AF431CB00220026 /* CapApp-SPM */,
+				7E100000000000000000D002 /* RipploSignal */,
 			);
 			productName = App;
 			productReference = 504EC3041FED79650016851F /* App.app */;
@@ -154,6 +160,7 @@
 			mainGroup = 504EC2FB1FED79650016851F;
 			packageReferences = (
 				D4C12C0A2AAA248700AAC8A2 /* XCLocalSwiftPackageReference "CapApp-SPM" */,
+				7E100000000000000000D001 /* XCLocalSwiftPackageReference "RipploSignal" */,
 			);
 			productRefGroup = 504EC3051FED79650016851F /* Products */;
 			projectDirPath = "";
@@ -196,6 +203,7 @@
 				7E100000000000000000B007 /* MultipeerTransport.swift in Sources */,
 				7E100000000000000000B008 /* RipploMeshPlugin.swift in Sources */,
 				7E100000000000000000B009 /* RipploBridgeViewController.swift in Sources */,
+				7E100000000000000000B010 /* SignalCore.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -402,6 +410,10 @@
 			isa = XCLocalSwiftPackageReference;
 			relativePath = "CapApp-SPM";
 		};
+		7E100000000000000000D001 /* XCLocalSwiftPackageReference "RipploSignal" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = RipploSignal;
+		};
 /* End XCLocalSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
@@ -409,6 +421,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = D4C12C0A2AAA248700AAC8A2 /* XCLocalSwiftPackageReference "CapApp-SPM" */;
 			productName = "CapApp-SPM";
+		};
+		7E100000000000000000D002 /* RipploSignal */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 7E100000000000000000D001 /* XCLocalSwiftPackageReference "RipploSignal" */;
+			productName = RipploSignal;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

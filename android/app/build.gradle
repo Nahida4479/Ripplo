@@ -12,8 +12,19 @@ android {
         versionCode = (project.findProperty("versionCode") ?: "1").toString().toInteger()
         versionName = (project.findProperty("versionName") ?: "0.1.0").toString()
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+        ndk {
+            abiFilters 'arm64-v8a', 'armeabi-v7a'
+        }
         aaptOptions {
             ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
+        }
+    }
+    compileOptions {
+        coreLibraryDesugaringEnabled true
+    }
+    packaging {
+        jniLibs {
+            excludes += ['**/libsignal_jni*.dylib', '**/signal_jni*.dll', '**/libsignal_jni_testing.so']
         }
     }
     signingConfigs {
@@ -47,7 +58,10 @@ dependencies {
     implementation "androidx.coordinatorlayout:coordinatorlayout:$androidxCoordinatorLayoutVersion"
     implementation "androidx.core:core-splashscreen:$coreSplashScreenVersion"
     implementation project(':capacitor-android')
+    implementation "org.signal:libsignal-android:0.108.5"
+    coreLibraryDesugaring "com.android.tools:desugar_jdk_libs:2.1.5"
     testImplementation "junit:junit:$junitVersion"
+    testImplementation "org.signal:libsignal-client:0.108.5"
     androidTestImplementation "androidx.test.ext:junit:$androidxJunitVersion"
     androidTestImplementation "androidx.test.espresso:espresso-core:$androidxEspressoCoreVersion"
     implementation project(':capacitor-cordova-android-plugins')

@@ -38,6 +38,8 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import javax.crypto.Cipher;
 import javax.crypto.KeyGenerator;
 import javax.crypto.SecretKey;
@@ -64,6 +66,12 @@ public class RipploMeshPlugin extends Plugin implements MeshEngine.Listener {
     private static final String ACTION_INSTALL = "io.github.nahida4479.ripplo.INSTALL_RESULT";
     private static volatile PluginCall installCall;
 
+    private interface SignalOp {
+        JSObject run(SignalCore core) throws Exception;
+    }
+
+    private final ExecutorService signalExec = Executors.newSingleThreadExecutor();
+    private SignalCore signalCore;
     private MeshEngine engine;
     private boolean drained;
 
@@ -184,43 +192,47 @@ public class RipploMeshPlugin extends Plugin implements MeshEngine.Listener {
         call.resolve(r);
     }
 
+    private synchronized byte[] loadDbKey() throws Exception {
+        SharedPreferences sp = getContext().getSharedPreferences("ripplo_keys", Context.MODE_PRIVATE);
+        KeyStore ks = KeyStore.getInstance("AndroidKeyStore");
+        ks.load(null);
+        if (!ks.containsAlias(KEY_ALIAS)) {
+            KeyGenerator kg = KeyGenerator.getInstance(KeyProperties.KEY_ALGORITHM_AES, "AndroidKeyStore");
+            kg.init(new KeyGenParameterSpec.Builder(KEY_ALIAS, KeyProperties.PURPOSE_ENCRYPT | KeyProperties.PURPOSE_DECRYPT)
+                    .setBlockModes(KeyProperties.BLOCK_MODE_GCM)
+                    .setEncryptionPaddings(KeyProperties.ENCRYPTION_PADDING_NONE)
+                    .setKeySize(256)
+                    .build());
+            kg.generateKey();
+        }
+        SecretKey wrap = (SecretKey) ks.getKey(KEY_ALIAS, null);
+        String stored = sp.getString("dbkey", null);
+        byte[] key;
+        if (stored == null) {
+            key = new byte[32];
+            new SecureRandom().nextBytes(key);
+            Cipher c = Cipher.getInstance("AES/GCM/NoPadding");
+            c.init(Cipher.ENCRYPT_MODE, wrap);
+            byte[] iv = c.getIV();
+            byte[] ct = c.doFinal(key);
+            byte[] blob = new byte[iv.length + ct.length];
+            System.arraycopy(iv, 0, blob, 0, iv.length);
+            System.arraycopy(ct, 0, blob, iv.length, ct.length);
+            sp.edit().putString("dbkey", Base64.encodeToString(blob, Base64.NO_WRAP)).apply();
+        } else {
+            byte[] blob = Base64.decode(stored, Base64.NO_WRAP);
+            Cipher c = Cipher.getInstance("AES/GCM/NoPadding");
+            c.init(Cipher.DECRYPT_MODE, wrap, new GCMParameterSpec(128, blob, 0, 12));
+            key = c.doFinal(blob, 12, blob.length - 12);
+        }
+        return key;
+    }
+
     @PluginMethod
     public void getDbKey(PluginCall call) {
         try {
-            SharedPreferences sp = getContext().getSharedPreferences("ripplo_keys", Context.MODE_PRIVATE);
-            KeyStore ks = KeyStore.getInstance("AndroidKeyStore");
-            ks.load(null);
-            if (!ks.containsAlias(KEY_ALIAS)) {
-                KeyGenerator kg = KeyGenerator.getInstance(KeyProperties.KEY_ALGORITHM_AES, "AndroidKeyStore");
-                kg.init(new KeyGenParameterSpec.Builder(KEY_ALIAS, KeyProperties.PURPOSE_ENCRYPT | KeyProperties.PURPOSE_DECRYPT)
-                        .setBlockModes(KeyProperties.BLOCK_MODE_GCM)
-                        .setEncryptionPaddings(KeyProperties.ENCRYPTION_PADDING_NONE)
-                        .setKeySize(256)
-                        .build());
-                kg.generateKey();
-            }
-            SecretKey wrap = (SecretKey) ks.getKey(KEY_ALIAS, null);
-            String stored = sp.getString("dbkey", null);
-            byte[] key;
-            if (stored == null) {
-                key = new byte[32];
-                new SecureRandom().nextBytes(key);
-                Cipher c = Cipher.getInstance("AES/GCM/NoPadding");
-                c.init(Cipher.ENCRYPT_MODE, wrap);
-                byte[] iv = c.getIV();
-                byte[] ct = c.doFinal(key);
-                byte[] blob = new byte[iv.length + ct.length];
-                System.arraycopy(iv, 0, blob, 0, iv.length);
-                System.arraycopy(ct, 0, blob, iv.length, ct.length);
-                sp.edit().putString("dbkey", Base64.encodeToString(blob, Base64.NO_WRAP)).apply();
-            } else {
-                byte[] blob = Base64.decode(stored, Base64.NO_WRAP);
-                Cipher c = Cipher.getInstance("AES/GCM/NoPadding");
-                c.init(Cipher.DECRYPT_MODE, wrap, new GCMParameterSpec(128, blob, 0, 12));
-                key = c.doFinal(blob, 12, blob.length - 12);
-            }
             JSObject r = new JSObject();
-            r.put("key", Base64.encodeToString(key, Base64.NO_WRAP));
+            r.put("key", Base64.encodeToString(loadDbKey(), Base64.NO_WRAP));
             call.resolve(r);
         } catch (Exception e) {
             call.reject("key unavailable");
@@ -244,6 +256,99 @@ public class RipploMeshPlugin extends Plugin implements MeshEngine.Listener {
         } catch (Exception e) {
             call.reject("hash failed");
         }
+    }
+
+    private static String enc(byte[] b) {
+        return Base64.encodeToString(b, Base64.NO_WRAP);
+    }
+
+    private static byte[] arg(PluginCall call, String name) {
+        String v = call.getString(name);
+        if (v == null) throw new IllegalArgumentException("bad_message");
+        return b64(v);
+    }
+
+    private void signal(PluginCall call, SignalOp op) {
+        signalExec.execute(() -> {
+            try {
+                if (signalCore == null) {
+                    signalCore = new SignalCore(new SignalFileStore(getContext().getFilesDir(), loadDbKey()));
+                }
+                call.resolve(op.run(signalCore));
+            } catch (Exception e) {
+                String m = e.getMessage();
+                boolean known = SignalCore.BAD_BUNDLE.equals(m) || SignalCore.NO_SESSION.equals(m)
+                        || SignalCore.UNTRUSTED.equals(m);
+                String code = known ? m : SignalCore.BAD_MESSAGE;
+                call.reject(code, code);
+            }
+        });
+    }
+
+    @PluginMethod
+    public void signalInit(PluginCall call) {
+        signal(call, c -> {
+            JSObject r = new JSObject();
+            r.put("bundle", enc(c.init()));
+            r.put("ik", enc(c.identityKey()));
+            return r;
+        });
+    }
+
+    @PluginMethod
+    public void signalAddContact(PluginCall call) {
+        signal(call, c -> {
+            JSObject r = new JSObject();
+            r.put("tag", SignalCore.hex(c.addContact(arg(call, "bundle"))));
+            return r;
+        });
+    }
+
+    @PluginMethod
+    public void signalSeal(PluginCall call) {
+        signal(call, c -> {
+            JSObject r = new JSObject();
+            r.put("payload", enc(c.seal(SignalCore.unhex(call.getString("tag")), arg(call, "plaintext"))));
+            return r;
+        });
+    }
+
+    @PluginMethod
+    public void signalOpen(PluginCall call) {
+        signal(call, c -> {
+            SignalCore.Opened o = c.open(arg(call, "payload"));
+            JSObject r = new JSObject();
+            r.put("tag", SignalCore.hex(o.tag));
+            r.put("ik", enc(o.ik));
+            r.put("plaintext", enc(o.plaintext));
+            return r;
+        });
+    }
+
+    @PluginMethod
+    public void signalProof(PluginCall call) {
+        signal(call, c -> {
+            JSObject r = new JSObject();
+            r.put("mac", enc(c.proof(arg(call, "ik"), arg(call, "n"), arg(call, "challengerTag"), arg(call, "proverTag"))));
+            return r;
+        });
+    }
+
+    @PluginMethod
+    public void signalSafetyNumber(PluginCall call) {
+        signal(call, c -> {
+            JSObject r = new JSObject();
+            r.put("digits", c.safetyNumber(arg(call, "ik")));
+            return r;
+        });
+    }
+
+    @PluginMethod
+    public void signalForget(PluginCall call) {
+        signal(call, c -> {
+            c.forget(SignalCore.unhex(call.getString("tag")));
+            return new JSObject();
+        });
     }
 
     @PluginMethod
