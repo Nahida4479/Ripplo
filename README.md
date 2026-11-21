@@ -12,7 +12,7 @@
 <img src="https://img.shields.io/badge/iOS-000000?logo=apple&logoColor=white" alt="iOS">
 <img src="https://img.shields.io/badge/Vue-3-4FC08D?logo=vue.js&logoColor=white" alt="Vue 3">
 <img src="https://img.shields.io/badge/Capacitor-8-119EFF?logo=capacitor&logoColor=white" alt="Capacitor 8">
-<img src="https://img.shields.io/badge/Signal-protocol-3A76F0?logo=signal&logoColor=white" alt="Signal protocol">
+<img src="https://img.shields.io/badge/libsignal-PQXDH-3A76F0?logo=signal&logoColor=white" alt="libsignal PQXDH">
 <a href="./LICENSE"><img src="https://img.shields.io/github/license/Nahida4479/Ripplo"></a>
 <img src="https://github.com/Nahida4479/Ripplo/actions/workflows/build.yml/badge.svg">
 </div>
@@ -24,7 +24,8 @@
 
 - No servers, no accounts, no phone numbers, no internet connection needed.
 - Phones form a mesh: every phone in range can relay messages for others.
-- End-to-end encryption with the Signal protocol (X3DH + Double Ratchet) for chats, groups, voice notes, photos and videos.
+- End-to-end encryption with Signal's official `libsignal` for chats, groups, voice notes, photos and videos. Post-quantum protection: PQXDH (X25519 + Kyber-1024 / ML-KEM) key exchange and the SPQR triple ratchet.
+- Private keys live in native code (Java / Swift) and never enter the WebView.
 - Sealed sender: relays cannot see who wrote a message.
 - Encrypted local database, key held by the Android Keystore / iOS Keychain.
 - Several transports at once (BLE, Bluetooth L2CAP, LAN, Wi-Fi Direct, Wi-Fi Aware, Apple Multipeer). The fastest live link is always used.
@@ -65,7 +66,7 @@ Classic Bluetooth RFCOMM is not used (iOS cannot use it without MFi); L2CAP is t
 
 ## Encryption
 
-- **Signal protocol** (X3DH + Double Ratchet) for every message: text, attachments, group updates. Groups are encrypted pairwise for every member.
+- **Signal protocol** via Signal's official `libsignal` 0.108.5, used natively (Java on Android, Swift on iOS): PQXDH (X25519 + Kyber-1024 / ML-KEM) for session setup and the SPQR triple ratchet (Double Ratchet + post-quantum ratchet) for every message: text, attachments, group updates. Groups are encrypted pairwise for every member. Private keys never enter the WebView.
 - **Sealed sender**: the sender identity is wrapped in an extra layer only the recipient can open, so relays do not learn who is talking to whom.
 - **Attachments** (voice notes, photos, videos) are encrypted once with a random key, split into 32 KiB chunks and sent separately. The key travels in a Signal-encrypted message after all chunks were acknowledged, and the recipient verifies the hash before decrypting.
 - **At rest**: the local database is AES-GCM encrypted with a key held by the OS keystore.
@@ -75,7 +76,7 @@ Relays only forward opaque packets. They cannot read, decrypt or attribute anyth
 ## Adding friends
 
 - **QR code**: scan the code shown in **My code**.
-- **Invite link**: `ripplo://add/...` contains your name and public keys. It is shared like any text, no server ever sees it.
+- **Invite link**: `ripplo://add/...` contains your name and public keys (a binary v2 contact card, about 2.4 KB; the QR code uses error correction level L). It is shared like any text, no server ever sees it.
 - **People tab**: asks the whole mesh who is around. This floods the mesh, so it refreshes automatically once a day between 02:00 and 05:00, or when you tap refresh.
 
 People added from the People tab or an invite link are unverified (a relay could have swapped the card) and get a warning until you verify them.
@@ -148,11 +149,11 @@ npx cap sync       # copy the build into the native projects
 
 Then open the native project in Android Studio (`android/`) or Xcode (`ios/App`) and run it.
 
-In the web build (`npm run dev`) there is no native layer: open the app in several browser tabs and they form a mesh over `BroadcastChannel`. The database key is then stored in localStorage, which the UI flags as insecure.
+In the web build (`npm run dev`) there is no native layer: open the app in several browser tabs and they form a mesh over `BroadcastChannel`. That build uses a plaintext stand-in (`src/mesh/devSignal.js`) instead of libsignal, so it is **not encrypted** (the UI shows a red warning), and the database key is stored in localStorage. Use it for UI development only.
 
 # Releases
 
-Pushing a tag `vX.Y.Z` starts the GitHub Actions workflow (`.github/workflows/build.yml`), which builds a signed APK, an unsigned IPA and `SHA256SUMS`, and publishes them in a GitHub release.
+Pushing a tag `vX.Y.Z` starts the GitHub Actions workflow (`.github/workflows/build.yml`), which runs the JVM unit tests of the Android Signal core, builds a signed APK (arm64-v8a and armeabi-v7a only), an unsigned IPA and `SHA256SUMS`, and publishes them in a GitHub release.
 
 ```bash
 git tag v0.1.0
@@ -186,6 +187,8 @@ Keep the same keystore for every release: Android only installs updates signed w
 - **Android <-> iOS** talk to each other over BLE, L2CAP and LAN.
 - Wi-Fi Aware on iOS needs a paid-developer entitlement and is not implemented yet.
 - The native transports are not yet field-tested.
+- The APK contains only `arm64-v8a` and `armeabi-v7a` libraries (no x86 / x86_64).
+- The web dev build has no native layer and no real encryption.
 
 # Contributors
 

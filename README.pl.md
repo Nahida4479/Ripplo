@@ -12,7 +12,7 @@
 <img src="https://img.shields.io/badge/iOS-000000?logo=apple&logoColor=white" alt="iOS">
 <img src="https://img.shields.io/badge/Vue-3-4FC08D?logo=vue.js&logoColor=white" alt="Vue 3">
 <img src="https://img.shields.io/badge/Capacitor-8-119EFF?logo=capacitor&logoColor=white" alt="Capacitor 8">
-<img src="https://img.shields.io/badge/Signal-protocol-3A76F0?logo=signal&logoColor=white" alt="Signal protocol">
+<img src="https://img.shields.io/badge/libsignal-PQXDH-3A76F0?logo=signal&logoColor=white" alt="libsignal PQXDH">
 <a href="./LICENSE"><img src="https://img.shields.io/github/license/Nahida4479/Ripplo"></a>
 <img src="https://github.com/Nahida4479/Ripplo/actions/workflows/build.yml/badge.svg">
 </div>
@@ -24,7 +24,8 @@
 
 - Bez serwerów, kont i numerów telefonu, nie potrzeba połączenia z internetem.
 - Telefony tworzą sieć mesh: każdy telefon w zasięgu może przekazywać wiadomości innym.
-- Szyfrowanie end-to-end protokołem Signal (X3DH + Double Ratchet) dla czatów, grup, wiadomości głosowych, zdjęć i filmów.
+- Szyfrowanie end-to-end oficjalną biblioteką Signal `libsignal` dla czatów, grup, wiadomości głosowych, zdjęć i filmów. Ochrona postkwantowa: wymiana kluczy PQXDH (X25519 + Kyber-1024 / ML-KEM) i potrójny ratchet SPQR.
+- Klucze prywatne żyją w kodzie natywnym (Java / Swift) i nigdy nie trafiają do WebView.
 - Sealed sender: przekaźniki nie widzą, kto napisał wiadomość.
 - Zaszyfrowana lokalna baza danych, klucz przechowywany w Android Keystore / iOS Keychain.
 - Kilka transportów naraz (BLE, Bluetooth L2CAP, LAN, Wi-Fi Direct, Wi-Fi Aware, Apple Multipeer). Zawsze używane jest najszybsze działające łącze.
@@ -65,7 +66,7 @@ Klasyczny Bluetooth RFCOMM nie jest używany (iOS nie pozwala na niego bez MFi);
 
 ## Szyfrowanie
 
-- **Protokół Signal** (X3DH + Double Ratchet) dla każdej wiadomości: tekstu, załączników, aktualizacji grup. Grupy są szyfrowane parami dla każdego członka.
+- **Protokół Signal** w oficjalnej bibliotece `libsignal` 0.108.5, używanej natywnie (Java na Androidzie, Swift na iOS): PQXDH (X25519 + Kyber-1024 / ML-KEM) do nawiązywania sesji i potrójny ratchet SPQR (Double Ratchet + ratchet postkwantowy) dla każdej wiadomości: tekstu, załączników, aktualizacji grup. Grupy są szyfrowane parami dla każdego członka. Klucze prywatne nigdy nie trafiają do WebView.
 - **Sealed sender**: tożsamość nadawcy jest zapakowana w dodatkową warstwę, którą może otworzyć tylko odbiorca, więc przekaźniki nie dowiadują się, kto z kim rozmawia.
 - **Załączniki** (wiadomości głosowe, zdjęcia, filmy) są szyfrowane raz losowym kluczem, dzielone na fragmenty po 32 KiB i wysyłane osobno. Klucz podróżuje w wiadomości zaszyfrowanej protokołem Signal po potwierdzeniu odbioru wszystkich fragmentów, a odbiorca przed odszyfrowaniem sprawdza skrót.
 - **Dane w spoczynku**: lokalna baza danych jest szyfrowana AES-GCM kluczem przechowywanym w systemowym magazynie kluczy.
@@ -75,7 +76,7 @@ Przekaźniki tylko przekazują nieprzezroczyste pakiety. Nie mogą niczego odczy
 ## Dodawanie znajomych
 
 - **Kod QR**: zeskanuj kod widoczny w **Mój kod**.
-- **Link zaproszenia**: `ripplo://add/...` zawiera twoje imię i klucze publiczne. Udostępnia się go jak zwykły tekst, żaden serwer go nie widzi.
+- **Link zaproszenia**: `ripplo://add/...` zawiera twoje imię i klucze publiczne (binarna wizytówka v2, około 2,4 KB; kod QR używa poziomu korekcji błędów L). Udostępnia się go jak zwykły tekst, żaden serwer go nie widzi.
 - **Zakładka Ludzie**: pyta całą sieć mesh, kto jest w pobliżu. To zalewa sieć mesh pakietami (flood), więc odświeża się automatycznie raz dziennie między 02:00 a 05:00 albo po stuknięciu odśwież.
 
 Osoby dodane z zakładki Ludzie lub z linku zaproszenia są niezweryfikowane (przekaźnik mógł podmienić wizytówkę) i dostają ostrzeżenie, dopóki ich nie zweryfikujesz.
@@ -148,11 +149,11 @@ npx cap sync       # copy the build into the native projects
 
 Następnie otwórz projekt natywny w Android Studio (`android/`) lub Xcode (`ios/App`) i uruchom go.
 
-W wersji webowej (`npm run dev`) nie ma warstwy natywnej: otwórz aplikację w kilku kartach przeglądarki, a utworzą one sieć mesh przez `BroadcastChannel`. Klucz bazy danych jest wtedy przechowywany w localStorage, co interfejs oznacza jako niebezpieczne.
+W wersji webowej (`npm run dev`) nie ma warstwy natywnej: otwórz aplikację w kilku kartach przeglądarki, a utworzą one sieć mesh przez `BroadcastChannel`. Ta wersja używa jawnego zamiennika (`src/mesh/devSignal.js`) zamiast libsignal, więc **nie jest szyfrowana** (interfejs pokazuje czerwone ostrzeżenie), a klucz bazy danych jest przechowywany w localStorage. Używaj jej tylko do rozwoju interfejsu.
 
 # Wydania
 
-Wypchnięcie tagu `vX.Y.Z` uruchamia workflow GitHub Actions (`.github/workflows/build.yml`), który buduje podpisany APK, niepodpisany IPA i `SHA256SUMS`, a następnie publikuje je w wydaniu na GitHubie.
+Wypchnięcie tagu `vX.Y.Z` uruchamia workflow GitHub Actions (`.github/workflows/build.yml`), który uruchamia testy jednostkowe JVM rdzenia Signal na Androidzie, buduje podpisany APK (tylko arm64-v8a i armeabi-v7a), niepodpisany IPA i `SHA256SUMS`, a następnie publikuje je w wydaniu na GitHubie.
 
 ```bash
 git tag v0.1.0
@@ -186,6 +187,8 @@ Używaj tego samego keystore przy każdym wydaniu: Android instaluje tylko aktua
 - **Android <-> iOS** komunikują się przez BLE, L2CAP i LAN.
 - Wi-Fi Aware na iOS wymaga uprawnienia (entitlement) dla płatnego konta deweloperskiego i nie jest jeszcze zaimplementowane.
 - Natywne transporty nie były jeszcze testowane w terenie.
+- APK zawiera tylko biblioteki `arm64-v8a` i `armeabi-v7a` (bez x86 / x86_64).
+- Wersja webowa do developmentu nie ma warstwy natywnej ani prawdziwego szyfrowania.
 
 # Współtwórcy
 

@@ -3,68 +3,94 @@
 [🇬🇧 English](ARCHITECTURE.md) | 🇵🇱 Polski
 
 Ripplo to komunikator mesh typu offline-first, z szyfrowaniem end-to-end.
-Interfejs Vue 3 (JS) i kryptografia działają w WebView Capacitor 8; transporty i router przekaźnikowy
-są natywne (Kotlin / Swift), dzięki czemu telefony przekazują wiadomości także przy wyłączonym ekranie.
+Interfejs Vue 3 (JS) działa w WebView Capacitor 8. Kryptografia Signal (oficjalna `libsignal`), transporty i router
+przekaźnikowy są natywne (Java / Swift), więc klucze prywatne nigdy nie trafiają do WebView, a telefony przekazują
+wiadomości także przy wyłączonym ekranie.
 
 ```
-┌──────────────── WebView (JS) ────────────────┐      ┌──────── native (Kotlin / Swift) ────────┐
-│ Vue UI ── core/api.js ── crypto/* (Signal)   │      │ MeshEngine (foreground service on Android)│
-│                  │                           │ base64│  Router  (dedupe, reverse paths)        │
-│            mesh/bridge.js ───────────────────┼──────►│  Links   (best link per neighbor)        │
-│  (web dev fallback: mesh/router.js +         │◄──────┤  Transports: BLE GATT, BLE L2CAP, LAN,   │
-│   BroadcastChannel between browser tabs)     │events │  Wi-Fi Direct*, Wi-Fi Aware*, Multipeer** │
+┌──────────────── WebView (JS) ────────────────┐      ┌──────── native (Java / Swift) ──────────┐
+│ Vue UI ── core/api.js ── core/messenger.js   │      │ SignalCore (libsignal 0.108.5: PQXDH +   │
+│   (cards, chats, attachments, at-rest DB)    │ base64│   SPQR triple ratchet, sealed, proofs)  │
+│            mesh/bridge.js ───────────────────┼──────►│ MeshEngine: Router + Links + Transports │
+│  web dev fallback: devSignal.js (NO crypto)  │◄──────┤  BLE GATT, L2CAP, LAN, Wi-Fi Direct*,   │
+│   + mesh/router.js over BroadcastChannel     │events │  Wi-Fi Aware*, Multipeer**              │
 └──────────────────────────────────────────────┘      └──────────────────────────────────────────┘
                                                         * Android only   ** iOS only
 ```
 
 Przekaźniki nigdy nie widzą treści, nigdy nie odszyfrowują i nigdy nie powiadamiają swojego użytkownika.
-Odszyfrowuje wyłącznie JS odbiorcy.
 
 ## 1. Tożsamość
 
-- Para kluczy tożsamości Signal (Curve25519, format libsignal: klucz publiczny 33 bajty, prefiks `0x05`).
+- Para kluczy tożsamości Signal z `IdentityKeyPair.generate()` (Curve25519; klucz publiczny 33 bajty, prefiks `0x05`).
 - `tag` = `SHA-256(identityPub33)[0..16]` — 16-bajtowy adres routingu używany w polu `dest` pakietu.
 - `ripploId` = Crockford base32 z `tag[0..10]` → 16 znaków, wyświetlane jako `XXXX-XXXX-XXXX-XXXX`.
-- Adres Signal = `new SignalProtocolAddress(ripploId, 1)` (jedno urządzenie na tożsamość).
-- `ripploId` kontaktu MUSI być równy temu wyliczonemu z jego klucza tożsamości. Wszystko inne jest odrzucane.
+- Adres Signal = `SignalProtocolAddress(hex(tag), 1)` (małe litery hex, jedno urządzenie na tożsamość).
+- `IdentityKeyStore.isTrustedIdentity` / `saveIdentity` odrzucają każdą tożsamość, której `SHA-256(ik)[0..16]`
+  różni się od tagu adresu. Poza tym trust-on-first-use; zmiana klucza dla znanego tagu jest niemożliwa
+  z konstrukcji (tag jest skrótem klucza).
+- Tworzone raz przy pierwszym uruchomieniu: registration id (14-bitowy losowy), signed prekey o id 1 (EC),
+  ostatniej szansy (last-resort) prekey Kyber-1024 o id 1 (`KEMKeyPair.generate(KYBER_1024)`, podpis =
+  `identityPriv.calculateSignature(kyberPub.serialize())`). Brak jednorazowych prekeyów: nie ma serwera,
+  który by je wydawał. `markKyberPreKeyUsed` nic nie robi (klucz last-resort jest wielokrotnego użytku, jak w Signal).
 
-### Wizytówka kontaktu
+### Pakiet kluczy (bundle; natywny, binarny, big-endian) — 1776 bajtów
 
-```json
-{ "v": 1, "n": "Alice", "ik": "<b64 identity pub 33>", "rid": 1234,
-  "spk": { "id": 1, "pub": "<b64>", "sig": "<b64>" } }
-```
-Wizytówka = imię + pakiet kluczy (prekey bundle) Signal bez jednorazowych prekeyów (X3DH działa bez nich).
+| size | field |
+|------|-------|
+| 1    | version `0x02` |
+| 4    | registrationId u32 |
+| 33   | identity public key |
+| 4    | signedPreKeyId u32 |
+| 33   | signedPreKey public |
+| 64   | signedPreKey signature |
+| 4    | kyberPreKeyId u32 |
+| 1569 | kyber public key (`KEMPublicKey.serialize()`, type byte `0x08` + 1568) |
+| 64   | kyber signature |
 
-### Link zaproszenia / zawartość kodu QR
+### Wizytówka kontaktu (JS) i link zaproszenia / QR
 
-`ripplo://add/<base64url(cardJSON)>.<base64url(SHA-256(cardJSON)[0..6])>`
+`card = 0x02 | nameLen u8 | name UTF-8 (≤ 120 bytes, ≤ 40 chars) | bundle(1776)`
+
+`ripplo://add/<base64url(card)>.<base64url(SHA-256(card)[0..6])>` — około 2,4 KB. Kod QR zawiera ten sam
+ciąg znaków, z poziomem korekcji błędów **L** (przy M się nie mieści).
 
 Przyrostek to suma kontrolna integralności (wychwytuje obcięcie / uszkodzenie). NIE jest to uwierzytelnienie —
 każdy może ją przeliczyć. Autentyczność zapewnia weryfikacja (sekcja 5). Żaden serwer nigdy nie widzi
-linku. Kod QR zawiera ten sam ciąg znaków.
+linku.
 
 ## 2. Warstwy szyfrowania
 
-1. **Protokół Signal** (`@privacyresearch/libsignal-protocol-typescript`): X3DH + Double Ratchet.
-   Każda wiadomość aplikacji (tekst, wskaźnik załącznika, aktualizacja grupy, ...) to obiekt JSON szyfrowany
-   przez `SessionCipher` dla odbiorcy. Grupy = fan-out po stronie klienta: ta sama wiadomość aplikacji jest
-   szyfrowana parami dla każdego członka (jak we wczesnych grupach Signal). Wiadomości głosowe, zdjęcia i filmy
-   są załącznikami.
-2. **Sealed sender** (ukrywa nadawcę przed przekaźnikami):
+1. **Protokół Signal — oficjalna `libsignal` 0.108.5** (AGPL-3.0, autorstwa Signal). PQXDH (X25519 +
+   Kyber-1024 / ML-KEM) do nawiązywania sesji oraz potrójny ratchet SPQR (Double Ratchet + rzadki ratchet
+   postkwantowy), zawsze włączone. Każda wiadomość aplikacji (tekst, wskaźnik załącznika, aktualizacja grupy)
+   to obiekt JSON szyfrowany przez `SessionCipher` dla odbiorcy. Grupy = fan-out po stronie klienta
+   (szyfrowanie parami dla każdego członka). Wiadomości głosowe, zdjęcia i filmy są załącznikami.
+2. **Sealed sender** (ukrywa nadawcę przed przekaźnikami), realizowany natywnie:
    `sealed = 0x01 | ephPub(32) | nonce(12) | AES-256-GCM(key, inner)`
-   `key = HKDF-SHA256(ikm = X25519(ephPriv, recipientIdentityPub32), salt = recipientTag, info = "ripplo-sealed-v1", 32)`
-   `inner = UTF-8 JSON { "f": senderRipploId, "t": signalMsgType (1 | 3), "b": "<b64 signal body>" }`
-   Odbiorca odszyfrowuje przez `X25519(identityPriv, ephPub)`, a następnie uruchamia deszyfrowanie Signal dla
-   adresu `f`. Dla wiadomości PreKey sprawdza, czy zawarty w niej klucz tożsamości jest tym, z którego
-   wyprowadzono `f`.
-3. **Załączniki** (w stylu Signal): plik jest szyfrowany raz losowym kluczem AES-256-GCM
+   `key = HKDF-SHA256(ikm = X25519(ephPriv, recipientIdentityPub32), salt = recipientTag, info = "ripplo-sealed-v2", 32)`
+   `inner = 0x02 | senderTag(16) | msgType u8 (2 = SignalMessage, 3 = PreKeySignalMessage) | body`
+   `ephPub` = 32 bajty klucza bez prefiksu `0x05` (X25519 przez `ECPrivateKey.calculateAgreement` z libsignal).
+   Odbiorca odszyfrowuje swoim kluczem prywatnym tożsamości, a następnie uruchamia deszyfrowanie Signal dla
+   adresu `hex(senderTag)`. Wiadomość PreKey, której klucz tożsamości nie daje skrótu równego `senderTag`,
+   jest odrzucana przed deszyfrowaniem.
+3. **Załączniki** (w stylu Signal, w JS): plik jest szyfrowany raz losowym kluczem AES-256-GCM
    (`ct = nonce(12) | GCM(file)`). `ct` jest dzielony na fragmenty po 32 KiB wysyłane jako osobne pakiety DATA.
    Klucz, `SHA-256(ct)`, typ mime, rozmiar i liczba fragmentów podróżują w wiadomości-wskaźniku zaszyfrowanej
    protokołem Signal, wysyłanej **po** potwierdzeniu (ACK) każdego fragmentu. Odbiorca weryfikuje skrót przed odszyfrowaniem.
-4. **Dane w spoczynku**: wartości w IndexedDB są szyfrowane AES-GCM 256-bitowym kluczem bazy danych, który przechowuje system
-   (opakowany Android Keystore / iOS Keychain, przez `RipploMesh.getDbKey()`). W wersji webowej do developmentu: klucz w
-   localStorage, oznaczony w interfejsie jako niebezpieczny.
+4. **Dane w spoczynku**: stan Signal (tożsamość, prekeye, sesje, tożsamości) jest przechowywany natywnie jako pliki,
+   każdy zaszyfrowany AES-256-GCM kluczem trzymanym w Android Keystore / iOS Keychain
+   (`AfterFirstUnlockThisDeviceOnly`). IndexedDB w JS (wiadomości, kontakty, czaty) jest szyfrowane AES-GCM
+   kluczem bazy danych z `RipploMesh.getDbKey()`.
+5. **Wersja webowa do developmentu**: `src/mesh/devSignal.js` zastępuje natywne wywołania Signal jawnym
+   zamiennikiem, aby dwie karty przeglądarki mogły ćwiczyć interfejs. NIE zapewnia żadnego bezpieczeństwa,
+   a interfejs to komunikuje.
+
+Numer bezpieczeństwa (safety number): `NumericFingerprintGenerator(5200).createFor(1, myTag, myIk, theirTag, theirIk)`,
+wyświetlane 60 cyfr (identyczne po obu stronach, na obu platformach).
+
+Klucz dowodu bliskości: `K = HKDF-SHA256(X25519(myIdentityPriv, otherIk32), salt = n, info = "ripplo-proof-v1", 32)`,
+`mac = HMAC-SHA256(K, "ripplo-proof-v1" | n | challengerTag | proverTag)` (natywnie, zob. §5).
 
 Limity: tekst ≤ 1000 znaków, załącznik ≤ 20 MiB (przed szyfrowaniem).
 
@@ -204,13 +230,13 @@ Numer bezpieczeństwa (safety number): w stylu Signal, 60 cyfr z obu kluczy toż
 
 ## 6. Wiadomości APP link-local (JSON)
 
-- `{ "t": "hello", "card": <card> }` — wysyłana do każdego nowego sąsiada; wypełnia sekcję „W pobliżu” w zakładce Ludzie
+- `{ "t": "hello", "card": "<b64 card bytes>" }` — wysyłana do każdego nowego sąsiada; wypełnia sekcję „W pobliżu” w zakładce Ludzie
   i umożliwia dowód bliskości.
 - `{ "t": "challenge" ... }`, `{ "t": "proof" ... }` — sekcja 5.
 
 ## 7. Zakładka Ludzie (wykrywanie w całej sieci mesh)
 
-Payload DISCOVER = `{ "t": "who" }`; każdy węzeł odpowiada payloadem REPLY = JSON swojej wizytówki.
+Payload DISCOVER = `{ "t": "who" }`; każdy węzeł odpowiada payloadem REPLY = bajty swojej wizytówki (§1).
 Odświeżane automatycznie raz na 24 h między 02:00 a 05:00 czasu lokalnego albo gdy użytkownik stuknie
 odśwież. DISCOVER zalewa całą sieć mesh, stąd nocny harmonogram. Osoba dodana stąd jest
 niezweryfikowana (przekaźnik mógł podmienić wizytówkę) i dostaje to samo ostrzeżenie co przy linku zaproszenia.
@@ -240,6 +266,16 @@ Wartości binarne to ciągi base64 (standardowego); tagi węzłów to małe lite
 | `installUpdate` | `{ url, sha256 }` → `{ status }` — download, verify SHA-256 + signing cert, install |
 | `requestBatteryExemption` | – (Android) |
 | `checkPermissions` / `requestPermissions` | aliases `bluetooth`, `wifi`, `notifications` |
+| `signalInit` | → `{ bundle, ik }` — creates the identity on first call, then returns the same bundle (§1) |
+| `signalAddContact` | `{ bundle }` → `{ tag }` — verifies both prekey signatures, runs `processPreKeyBundle` (PQXDH), saves the identity |
+| `signalSeal` | `{ tag, plaintext }` → `{ payload }` — Signal-encrypt for `hex(tag)` then seal (§2); `payload` is the sealed bytes, used directly as the DATA payload (its leading `0x01` is the DATA kind) |
+| `signalOpen` | `{ payload }` → `{ tag, ik, plaintext }` — unseal + Signal-decrypt; rejects on any mismatch |
+| `signalProof` | `{ ik, n, challengerTag, proverTag }` → `{ mac }` — §2 nearby proof MAC with the own identity key |
+| `signalSafetyNumber` | `{ ik }` → `{ digits }` — 60 digits (§2) |
+| `signalForget` | `{ tag }` — delete the session and stored identity for that contact |
+
+Wszystkie wywołania `signal*` działają na jednej kolejce szeregowej w natywnym `SignalCore`. Błędy odrzucają z kodem:
+`bad_bundle`, `no_session`, `bad_message`, `untrusted_identity`.
 
 Zdarzenia (`addListener`): `packet` `{ packet, from }` (from = węzeł w hex, `"self"` dla dostarczeń
 ruchu pochodzącego z JS), `neighbor` `{ node, up, medium, kbps }`, `updateProgress` `{ progress }`.
