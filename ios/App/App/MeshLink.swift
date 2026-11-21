@@ -6,7 +6,7 @@ protocol MeshTransport: AnyObject {
     func tick()
 }
 
-class MeshLink {
+class MeshLink: NSObject {
     let medium: String
     let initiated: Bool
     var closed = false
@@ -16,6 +16,7 @@ class MeshLink {
     init(medium: String, initiated: Bool) {
         self.medium = medium
         self.initiated = initiated
+        super.init()
     }
 
     var queuedBytes: Int {
