@@ -26,12 +26,14 @@ function nativeMesh() {
     send: (packet) => P.send({ packet: b64(packet) }),
     sendApp: (node, payload) => P.sendApp({ node, payload: b64(payload) }),
     getNeighbors: async () => (await P.getNeighbors()).neighbors,
-    drainInbox: async () => (await P.drainInbox()).packets.map(inbound),
+    drainInbox: async () => (await P.drainInbox()).packets.map((e) => (e.opened ? { opened: e.opened } : inbound(e))),
+    takeOpen: async () => { try { return (await P.takeOpen()).open || null } catch { return null } },
     getDbKey: async () => ({ key: unb64((await P.getDbKey()).key), insecure: false }),
     selfHash: async () => (await P.selfHash()).sha256,
     installUpdate: (url, sha256, prompt) => P.installUpdate({ url, sha256, prompt }),
     requestBatteryExemption: () => P.requestBatteryExemption(),
     setAutoUpdate: (enabled) => P.setAutoUpdate({ enabled }),
+    requestFullScreen: () => P.requestFullScreen(),
     startRing: () => P.startRing(),
     stopRing: () => P.stopRing().catch(() => {}),
     takeShare: async () => { try { return (await P.takeShare()).share || null } catch { return null } },
@@ -124,6 +126,7 @@ function webMesh() {
       return router.neighbors().map((node) => ({ node, medium: 'lan', kbps: 20000, rttMs: 1, links: [{ medium: 'lan', kbps: 20000 }] }))
     },
     drainInbox: async () => [],
+    takeOpen: async () => null,
     async getDbKey() {
       let k = localStorage.getItem('ripplo-dbkey')
       if (!k) localStorage.setItem('ripplo-dbkey', (k = b64(crypto.getRandomValues(new Uint8Array(32)))))
@@ -143,6 +146,7 @@ function webMesh() {
     installUpdate: async () => { throw new Error('unsupported') },
     requestBatteryExemption: async () => {},
     setAutoUpdate: async () => {},
+    requestFullScreen: async () => {},
     startRing: () => Promise.reject(new Error('unsupported')),
     stopRing: async () => {},
     takeShare: async () => null,

@@ -1,6 +1,6 @@
 <script setup>
 import { ref, computed } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { MessageCircle, Users, Settings } from 'lucide-vue-next'
 import { state } from './core/state.js'
 import { init } from './core/api.js'
@@ -11,6 +11,7 @@ import { startScheduler } from './services/scheduler.js'
 import { startLock, lock } from './services/lock.js'
 import { startBackup } from './services/backup.js'
 import { startShare } from './services/share.js'
+import { startOpen } from './services/openIntent.js'
 import LockOverlay from './components/LockOverlay.vue'
 import GateView from './views/GateView.vue'
 import OnboardingView from './views/OnboardingView.vue'
@@ -21,6 +22,7 @@ import ShareSheet from './components/ShareSheet.vue'
 import CallOverlay from './components/CallOverlay.vue'
 
 const route = useRoute()
+const router = useRouter()
 const granted = ref(false)
 const alert = computed(() => state.update.available || state.integrity.status === 'mismatch')
 const tabs = [['/', MessageCircle, 'chats'], ['/people', Users, 'people'], ['/settings', Settings, 'settings']]
@@ -33,6 +35,7 @@ async function onGranted() {
   startLock()
   startBackup()
   startShare()
+  startOpen(router)
 }
 </script>
 <template>

@@ -29,7 +29,7 @@ export async function notify({ title, body, chatId }) {
   try {
     if (Capacitor.isNativePlatform()) {
       const ln = await native()
-      if (ln) await ln.schedule({ notifications: [{ id: nextId++ % 2147483647, title, body, extra: { chatId } }] })
+      if (ln) await ln.schedule({ notifications: [{ id: nextId++ % 2147483647, title, body, largeIcon: 'ic_notification_large', extra: { chatId } }] })
     } else if (typeof Notification !== 'undefined') {
       if (Notification.permission === 'default') await Notification.requestPermission()
       if (Notification.permission === 'granted') {

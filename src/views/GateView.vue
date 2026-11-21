@@ -1,21 +1,35 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
-import { Bluetooth, Wifi, Bell, Mic, BatteryCharging, Check } from 'lucide-vue-next'
+import { Bluetooth, Wifi, Bell, Mic, PhoneIncoming, BatteryCharging, Check } from 'lucide-vue-next'
 import { checkPermissions, requestPermissions, allGranted } from '../services/permissions.js'
 import { mesh } from '../mesh/bridge.js'
 import { t } from '../i18n.js'
 
 const emit = defineEmits(['granted'])
 const perms = ref({})
-const all = [['bluetooth', Bluetooth, 'permBluetooth'], ['wifi', Wifi, 'permWifi'], ['notifications', Bell, 'permNotifications'], ['microphone', Mic, 'permMicrophone']]
-const rows = computed(() => all.filter(([k]) => k !== 'microphone' || perms.value.microphone))
+const all = [['bluetooth', Bluetooth, 'permBluetooth'], ['wifi', Wifi, 'permWifi'], ['notifications', Bell, 'permNotifications'], ['microphone', Mic, 'permMicrophone'], ['fullscreen', PhoneIncoming, 'permFullScreen']]
+const rows = computed(() => all.filter(([k]) => !['microphone', 'fullscreen'].includes(k) || perms.value[k]))
 
-async function apply(p) { perms.value = p; if (allGranted(p)) emit('granted') }
-onMounted(async () => apply(await checkPermissions()))
+const ASKED = 'ripplo.optionalAsked'
+const optionalMissing = p => ['microphone', 'fullscreen', 'battery'].some(k => p[k] !== undefined && p[k] !== 'granted')
+const asked = () => { try { return localStorage.getItem(ASKED) === '1' } catch { return false } }
+const markAsked = () => { try { localStorage.setItem(ASKED, '1') } catch {} }
+
+function apply(p, force) {
+  perms.value = p
+  if (allGranted(p) && (force || !optionalMissing(p) || asked())) emit('granted')
+}
+onMounted(async () => apply(await checkPermissions(), false))
 async function grant() {
   const p = await requestPermissions()
   if (p.battery === 'prompt') await mesh.requestBatteryExemption()
-  apply(p.battery === 'prompt' ? await checkPermissions() : p)
+  if (p.fullscreen === 'prompt') await mesh.requestFullScreen()
+  markAsked()
+  apply(p.battery === 'prompt' || p.fullscreen === 'prompt' ? await checkPermissions() : p, true)
+}
+function skip() {
+  markAsked()
+  emit('granted')
 }
 </script>
 <template>
@@ -40,5 +54,6 @@ async function grant() {
       </button>
     </div>
     <button class="btn" style="width: 100%; max-width: 420px" @click="grant">{{ t('grantPermissions') }}</button>
+    <button v-if="allGranted(perms)" class="btn ghost" style="width: 100%; max-width: 420px" @click="skip">{{ t('notNow') }}</button>
   </main>
 </template>

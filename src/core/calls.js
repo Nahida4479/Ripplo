@@ -22,7 +22,7 @@ export function createCalls({ state, signal, sendMedia, hasNeighbor, supported, 
 
   const open = (peer, role, id) => ({
     peer, role, id, idB64: b64(id), key: null, audio: null, seq: 0, live: false, done: false, heard: false,
-    replay: createReplay(), lastRx: 0, liveAt: 0, ringTimer: null, watch: null, micQuiet: 0, outQuiet: 0, lastRecv: 0,
+    replay: createReplay(), lastRx: 0, liveAt: 0, ringTimer: null, watch: null, micQuiet: 0, outQuiet: 0, lastRecv: 0, fellBack: false,
   })
 
   function finish(c, reason, tell) {
@@ -73,6 +73,11 @@ export function createCalls({ state, signal, sendMedia, hasNeighbor, supported, 
       if (c.audio.stats) {
         const st = c.audio.stats()
         c.micQuiet = !state.call?.muted && st.mic < QUIET ? c.micQuiet + 1 : 0
+        if (c.micQuiet >= T.warn && c.audio.fallback && !c.fellBack) {
+          c.fellBack = true
+          c.micQuiet = 0
+          c.audio.fallback().catch(() => {})
+        }
         c.outQuiet = st.recv > c.lastRecv && st.out < QUIET ? c.outQuiet + 1 : 0
         c.lastRecv = st.recv
         const warn = c.micQuiet >= T.warn ? 'mic' : c.outQuiet >= T.warn ? 'out' : !c.heard && Date.now() - c.liveAt > T.warn * 1000 ? 'none' : ''

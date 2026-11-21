@@ -21,6 +21,7 @@ final class Ringer {
     private static Ringtone tone;
     private static Vibrator vibrator;
     private static Runnable replay;
+    private static Runnable limit;
 
     private Ringer() { }
 
@@ -86,7 +87,15 @@ final class Ringer {
         }
     }
 
+    static synchronized void startFor(Context ctx, long ms) {
+        start(ctx);
+        limit = Ringer::stop;
+        HANDLER.postDelayed(limit, ms);
+    }
+
     static synchronized void stop() {
+        if (limit != null) HANDLER.removeCallbacks(limit);
+        limit = null;
         if (replay != null) HANDLER.removeCallbacks(replay);
         replay = null;
         if (tone != null) {

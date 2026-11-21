@@ -44,7 +44,7 @@ Safe areas: `env(safe-area-inset-*)` on header and tab bar.
   when an update is available or the integrity check failed.
 - Permission gate (blocking, full screen before anything else): logo, one-line why, list of
   required permissions with status chips (Bluetooth, Nearby Wi-Fi / location, Notifications) and
-  one **Grant permissions** button, which also opens the system battery-exemption prompt after the other permissions (the "Allow background relay" row shows its state but never blocks). The list also has a Microphone row (Android) that the same button requests; it never blocks either.
+  one **Grant permissions** button, which also opens the system battery-exemption prompt after the other permissions (the "Allow background relay" row shows its state but never blocks). The list also has a Microphone row and, on Android 14+, an "Incoming call screen on the lock screen" row (the full-screen-intent special access); the same button requests them, and none of them blocks. The screen also appears once at the next start for people who already have the required permissions but lack one of these extras; then a "Not now" button lets them continue, and after that it is not shown again for the extras.
 - Onboarding: name field + generate identity ("Your keys are created on this phone and never leave it").
 
 ## Chats tab
@@ -128,3 +128,11 @@ monospace) + QR of it, actions: Verify with QR, Retry nearby, I'm sure it's them
 - **About**: app name + tagline, version, GitHub link, License, **Contributors** cards: avatar
   (GitHub avatar when online, initials offline), login bold, "GitHub profile" sub-text, external-link
   icon on the right; card = `--surface`, 1 px border, radius 14.
+
+## Notifications
+
+Android: the status-bar glyph is the monochrome `ic_stat_ripplo` tinted with the accent color, and the full-color app icon (`ic_notification_large`,
+rendered from `public/icon.svg` by `scripts/icons.sh`) is the large icon of every notification, native and local. iOS always shows the app icon
+(`AppIcon`, the same artwork as `public/icon_ios.png`), which cannot be changed per notification.
+Titles are the sender's name (groups: "group: name"), the body is the message text, "Sent a photo" or "Sent an attachment"; invitations read
+"Contact invitation"; incoming calls are full-screen with Answer and Decline. On the lock screen messages show only "New message".

@@ -328,12 +328,18 @@ public final class MeshEngine implements Router.Host {
     @Override
     public boolean persist(Packet p, String from) {
         if (jsAttached && listener != null) return true;
+        if (p.payload.length > 0 && p.payload[0] == 1) {
+            Opener.Result r = Opener.process(ctx, p.payload);
+            if (r != null) return inbox.addOpened(r.sealed, r.callId);
+        }
         if (!inbox.add(p.encode(), from)) return false;
         if (p.payload.length > 0 && p.payload[0] == 1) Notifier.newMessage(ctx);
         return true;
     }
 
     public List<Inbox.Item> drainInbox() { return inbox.drain(); }
+
+    public void dropCall(String callId) { inbox.removeCall(callId); }
 
     public int sendFromJs(byte[] bytes) {
         Router r = router;

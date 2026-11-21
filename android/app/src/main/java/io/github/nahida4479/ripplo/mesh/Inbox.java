@@ -14,10 +14,15 @@ import java.util.List;
 final class Inbox {
     static final int MAX = 2000;
 
+    static final String OPENED = "~";
+    private static final int MAX_ITEM = 1 << 20;
+
     static final class Item {
         final byte[] packet;
         final String from;
         Item(byte[] packet, String from) { this.packet = packet; this.from = from; }
+        boolean opened() { return from.startsWith(OPENED); }
+        String callId() { return from.substring(OPENED.length()); }
     }
 
     private final File file;
@@ -39,7 +44,7 @@ final class Inbox {
             while (true) {
                 String from = in.readUTF();
                 int n = in.readInt();
-                if (n < Packet.HEADER || n > Packet.MAX_PACKET) break;
+                if (n < Packet.HEADER || n > MAX_ITEM) break;
                 byte[] b = new byte[n];
                 in.readFully(b);
                 out.add(new Item(b, from));
@@ -47,6 +52,25 @@ final class Inbox {
         } catch (IOException ignored) {
         }
         return out;
+    }
+
+    synchronized boolean addOpened(byte[] sealed, String callId) {
+        return add(sealed, OPENED + (callId == null ? "" : callId));
+    }
+
+    synchronized void removeCall(String callId) {
+        List<Item> keep = new ArrayList<>();
+        for (Item it : readAll()) if (!(it.opened() && it.callId().equals(callId))) keep.add(it);
+        try (DataOutputStream out = new DataOutputStream(new FileOutputStream(file, false))) {
+            for (Item it : keep) {
+                out.writeUTF(it.from);
+                out.writeInt(it.packet.length);
+                out.write(it.packet);
+            }
+            out.flush();
+            count = keep.size();
+        } catch (IOException ignored) {
+        }
     }
 
     synchronized boolean add(byte[] packet, String from) {

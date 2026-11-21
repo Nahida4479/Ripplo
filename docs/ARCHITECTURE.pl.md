@@ -510,7 +510,9 @@ stałyby w kolejce dalej niż 400 ms, są porzucane. Raz na sekundę silnik poł
 dochodzi, ale jest cichy”; brak jakiejkolwiek ramki przez 4 s po uruchomieniu rozmowy daje „nie dotarł jeszcze żaden dźwięk”. Rozpoczęcie
 lub odebranie połączenia najpierw sprawdza uprawnienie do mikrofonu i prosi o nie natywnie, bo WebView może inaczej oddać cichy strumień.
 Koder i dekoder są odbudowywane po błędzie, a format PCM jest czytany tak, jak przyszedł, więc jedna zła ramka nie wycisza rozmowy na stałe; ekran połączenia pokazuje
-liczby ramek wysłanych / odebranych / odtworzonych / błędów do diagnozy. Wyciszenie wyłącza ścieżkę, więc cisza jest nadal wysyłana i podtrzymuje łącze.
+liczby ramek wysłanych / odebranych / odtworzonych / błędów do diagnozy. Jeśli mikrofon milczy przez 4 s, silnik najpierw raz ponawia próbę bez przetwarzania głosu (bez usuwania echa, redukcji szumu i automatycznego
+wzmocnienia), częstej przyczyny cichego nagrywania na niektórych telefonach, i dopiero potem pokazuje ostrzeżenie. Wiersz statystyk pokazuje też stan ścieżki,
+stan kontekstu audio i liczbę przechwyconych ramek. Wyciszenie wyłącza ścieżkę, więc cisza jest nadal wysyłana i podtrzymuje łącze.
 Rozmowa kończy się `lost` po 6 s bez uwierzytelnionej ramki (30 s przed pierwszą, gdy u rozmówcy może być otwarte pytanie o
 mikrofon) albo gdy sąsiad zniknie.
 
@@ -521,3 +523,28 @@ tonu WebAudio.
 
 Jeszcze nie: dzwonienie przy zamkniętej aplikacji, rozmowy przez kilka telefonów, iOS (ścieżka WebCodecs nietestowana).
 iOS nigdy nie zadzwoni do zamkniętej aplikacji bez pusha od Apple, a on wymaga serwera.
+
+
+## 14. Powiadomienia i połączenia przy zamkniętej aplikacji (Android)
+
+Pakiet DATA dla tego telefonu, który dochodzi, gdy JS nie jest podpięty (aplikacja zamknięta lub ekran zgaszony), był dotąd zapisywany surowy
+i pokazywany jako ogólne „Nowa wiadomość”. Teraz silnik sam go otwiera (`Opener`, wspólny dla procesu `SignalCore` z `Shared`, te same klucze
+w Keystore co w aplikacji), więc może pokazać, kto i co napisał, albo zadzwonić przy połączeniu. Odszyfrowana wiadomość jest zużyta z ratchetu,
+więc trafia do skrzynki jako rekord zaszyfrowany kluczem bazy (AES-GCM, AAD `inbox`), element `~<callId>`; aplikacja dostaje go jako `{ opened }`
+(`drainInbox` albo zdarzenie `opened`) i pomija odszyfrowanie. Jeśli natywne otwarcie lub klucz bazy zawiedzie, zapisywany jest surowy pakiet
+i pokazywane ogólne powiadomienie, dokładnie jak wcześniej. Awaria między odszyfrowaniem a zapisem do skrzynki gubi tę jedną wiadomość.
+
+Treść powiadomienia pochodzi z magazynu kontaktów czytanego natywnie (format skarbca z sekcji 12.1) albo, dla obcego, z nazwy w karcie, która
+jedzie z wiadomością: wiadomość tekstowa pokazuje `nazwa` / fragment (200 znaków; grupy `grupa: nazwa`, tylko gdy nadawca jest członkiem zapisanej
+grupy), zdjęcie „Wysłano zdjęcie”, inny załącznik „Wysłano załącznik”, zaproszenie „Masz zaproszenie do kontaktów od użytkownika nazwa”. Wiadomości
+od oczekującej prośby, zaproszenia od obcych w trybie ukrytym oraz wszystko, co nie jest wiadomością, zaproszeniem ani połączeniem, są ciche. Gdy
+blokada aplikacji jest włączona, tekst to ogólne „Nowa wiadomość”; na ekranie blokady wersja publiczna jest zawsze ogólna. Rekord niesie `notified`,
+więc aplikacja nie pokazuje drugiego powiadomienia. Stuknięcie powiadomienia otwiera ten czat.
+
+Połączenia: oferta od kontaktu, którego dodałeś/aś, zaakceptowałeś/aś lub do którego pisałeś/aś, nie starsza niż 120 s, z poprawnym id i kluczem, gdy nie dzwoni
+inne natywne połączenie, wywołuje pełnoekranowe powiadomienie na kanale `calls` (Odbierz, Odrzuć) i dzwoni przez `Ringer` przez 45 s zgodnie z systemowymi
+trybami dźwięku. Odbierz uruchamia aplikację z `ripplo.answer`: ekran pokazuje się nad blokadą, a aplikacja odbiera połączenie, gdy tylko pojawi się zapisana
+oferta (w ciągu 20 s). Odrzuć wycisza dzwonek i usuwa ofertę ze skrzynki, więc dzwoniący po prostu nie dostaje odpowiedzi. `end` dla tego samego połączenia
+anuluje dzwonek i pokazuje „Nieodebrane połączenie”. Wymaga powiadomień i, na Androidzie 14+, specjalnego dostępu do powiadomień pełnoekranowych, o który prosi
+ekran uprawnień; bez niego pojawia się baner z tymi samymi akcjami. Otwarcie aplikacji przejmuje sprawę: wycisza natywny dzwonek, a aplikacja dzwoni sama, dopóki
+połączenie trwa. iOS nie ma odpowiednika: bez pusha od Apple, który wymaga serwera, zamknięta aplikacja na iOS nie może zadzwonić.

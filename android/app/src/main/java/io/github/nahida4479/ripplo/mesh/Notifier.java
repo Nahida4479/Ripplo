@@ -8,6 +8,8 @@ import android.app.PendingIntent;
 import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
 import android.os.Build;
 import androidx.core.app.NotificationCompat;
 import androidx.core.app.NotificationManagerCompat;
@@ -23,8 +25,21 @@ final class Notifier {
     static final int ID_MESSAGE = 4102;
     static final int ID_UPDATED = 4103;
     static final int ID_UPDATE_INFO = 4104;
+    static final int ID_CALL = 4105;
+    static final String CH_CALLS = "calls";
+    static final String EXTRA_CHAT = "ripplo.chat";
+    static final String EXTRA_ANSWER = "ripplo.answer";
+    static final long RING_MS = 45000L;
+
+    private static final int ACCENT = 0xFF4F9CF9;
+    private static Bitmap largeIcon;
 
     private Notifier() { }
+
+    private static synchronized Bitmap large(Context ctx) {
+        if (largeIcon == null) largeIcon = BitmapFactory.decodeResource(ctx.getResources(), R.drawable.ic_notification_large);
+        return largeIcon;
+    }
 
     static void createChannels(Context ctx) {
         if (Build.VERSION.SDK_INT < 26) return;
@@ -34,6 +49,11 @@ final class Notifier {
         nm.createNotificationChannel(relay);
         NotificationChannel msg = new NotificationChannel(CH_MESSAGES, ctx.getString(R.string.channel_messages), NotificationManager.IMPORTANCE_HIGH);
         nm.createNotificationChannel(msg);
+        NotificationChannel calls = new NotificationChannel(CH_CALLS, ctx.getString(R.string.channel_calls), NotificationManager.IMPORTANCE_HIGH);
+        calls.setSound(null, null);
+        calls.enableVibration(false);
+        calls.setLockscreenVisibility(Notification.VISIBILITY_PUBLIC);
+        nm.createNotificationChannel(calls);
         nm.createNotificationChannel(new NotificationChannel(CH_UPDATES, ctx.getString(R.string.channel_updates), NotificationManager.IMPORTANCE_DEFAULT));
     }
 
@@ -46,6 +66,8 @@ final class Notifier {
         createChannels(ctx);
         return new NotificationCompat.Builder(ctx, CH_RELAY)
                 .setSmallIcon(R.drawable.ic_stat_ripplo)
+                .setLargeIcon(large(ctx))
+                .setColor(ACCENT)
                 .setContentTitle(ctx.getString(R.string.app_name))
                 .setContentText(ctx.getString(R.string.relay_text))
                 .setOngoing(true)
@@ -55,12 +77,100 @@ final class Notifier {
                 .build();
     }
 
+    private static PendingIntent openChat(Context ctx, int req, String chat, String answer) {
+        Intent i = new Intent(ctx, MainActivity.class).setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_SINGLE_TOP);
+        if (chat != null) i.putExtra(EXTRA_CHAT, chat);
+        if (answer != null) i.putExtra(EXTRA_ANSWER, answer);
+        return PendingIntent.getActivity(ctx, req, i, PendingIntent.FLAG_IMMUTABLE | PendingIntent.FLAG_UPDATE_CURRENT);
+    }
+
+    private static boolean allowed(Context ctx) {
+        return Build.VERSION.SDK_INT < 33
+                || ContextCompat.checkSelfPermission(ctx, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED;
+    }
+
+    static void message(Context ctx, String chatId, String title, String body) {
+        if (!allowed(ctx)) return;
+        createChannels(ctx);
+        int id = 5000 + (chatId.hashCode() & 0x7FF);
+        Notification generic = new NotificationCompat.Builder(ctx, CH_MESSAGES)
+                .setSmallIcon(R.drawable.ic_stat_ripplo)
+                .setLargeIcon(large(ctx))
+                .setColor(ACCENT)
+                .setContentTitle(ctx.getString(R.string.app_name))
+                .setContentText(ctx.getString(R.string.new_message))
+                .build();
+        Notification n = new NotificationCompat.Builder(ctx, CH_MESSAGES)
+                .setSmallIcon(R.drawable.ic_stat_ripplo)
+                .setLargeIcon(large(ctx))
+                .setColor(ACCENT)
+                .setContentTitle(title)
+                .setContentText(body)
+                .setStyle(new NotificationCompat.BigTextStyle().bigText(body))
+                .setAutoCancel(true)
+                .setPriority(NotificationCompat.PRIORITY_HIGH)
+                .setCategory(NotificationCompat.CATEGORY_MESSAGE)
+                .setVisibility(NotificationCompat.VISIBILITY_PRIVATE)
+                .setPublicVersion(generic)
+                .setContentIntent(openChat(ctx, id, chatId, null))
+                .build();
+        try {
+            NotificationManagerCompat.from(ctx).notify(id, n);
+        } catch (SecurityException ignored) {
+        }
+    }
+
+    static void invite(Context ctx, String id, String name) {
+        message(ctx, id, ctx.getString(R.string.invite_title), ctx.getString(R.string.invite_text, name));
+    }
+
+    static void incomingCall(Context ctx, String name, String callId, String peerId) {
+        if (!allowed(ctx)) return;
+        createChannels(ctx);
+        PendingIntent show = openChat(ctx, ID_CALL, peerId, "");
+        PendingIntent answer = openChat(ctx, ID_CALL + 1, peerId, callId);
+        PendingIntent decline = PendingIntent.getBroadcast(ctx, ID_CALL + 2,
+                new Intent(ctx, CallActionReceiver.class).setAction(CallActionReceiver.DECLINE).putExtra("callId", callId),
+                PendingIntent.FLAG_IMMUTABLE | PendingIntent.FLAG_UPDATE_CURRENT);
+        Notification n = new NotificationCompat.Builder(ctx, CH_CALLS)
+                .setSmallIcon(R.drawable.ic_stat_ripplo)
+                .setLargeIcon(large(ctx))
+                .setColor(ACCENT)
+                .setContentTitle(name)
+                .setContentText(ctx.getString(R.string.incoming_call))
+                .setCategory(NotificationCompat.CATEGORY_CALL)
+                .setPriority(NotificationCompat.PRIORITY_HIGH)
+                .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+                .setOngoing(true)
+                .setOnlyAlertOnce(true)
+                .setTimeoutAfter(RING_MS)
+                .setFullScreenIntent(show, true)
+                .setContentIntent(show)
+                .addAction(0, ctx.getString(R.string.call_answer), answer)
+                .addAction(0, ctx.getString(R.string.call_decline), decline)
+                .build();
+        try {
+            NotificationManagerCompat.from(ctx).notify(ID_CALL, n);
+        } catch (SecurityException ignored) {
+        }
+    }
+
+    static void cancelCall(Context ctx) {
+        NotificationManagerCompat.from(ctx).cancel(ID_CALL);
+    }
+
+    static void missedCall(Context ctx, String name, String peerId) {
+        message(ctx, peerId, name, ctx.getString(R.string.missed_call));
+    }
+
     static void updated(Context ctx) {
         if (Build.VERSION.SDK_INT >= 33
                 && ContextCompat.checkSelfPermission(ctx, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) return;
         createChannels(ctx);
         Notification n = new NotificationCompat.Builder(ctx, CH_MESSAGES)
                 .setSmallIcon(R.drawable.ic_stat_ripplo)
+                .setLargeIcon(large(ctx))
+                .setColor(ACCENT)
                 .setContentTitle(ctx.getString(R.string.app_name))
                 .setContentText(ctx.getString(R.string.updated_text))
                 .setAutoCancel(true)
@@ -79,6 +189,8 @@ final class Notifier {
         createChannels(ctx);
         Notification n = new NotificationCompat.Builder(ctx, CH_UPDATES)
                 .setSmallIcon(R.drawable.ic_stat_ripplo)
+                .setLargeIcon(large(ctx))
+                .setColor(ACCENT)
                 .setContentTitle(ctx.getString(R.string.app_name))
                 .setContentText(text)
                 .setAutoCancel(true)
@@ -111,6 +223,8 @@ final class Notifier {
         createChannels(ctx);
         Notification n = new NotificationCompat.Builder(ctx, CH_MESSAGES)
                 .setSmallIcon(R.drawable.ic_stat_ripplo)
+                .setLargeIcon(large(ctx))
+                .setColor(ACCENT)
                 .setContentTitle(ctx.getString(R.string.app_name))
                 .setContentText(ctx.getString(R.string.new_message))
                 .setAutoCancel(true)

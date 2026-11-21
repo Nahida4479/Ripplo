@@ -2,6 +2,7 @@ package io.github.nahida4479.ripplo.mesh;
 
 import android.Manifest;
 import android.app.Activity;
+import android.app.NotificationManager;
 import android.app.PendingIntent;
 import android.content.Context;
 import android.content.Intent;
@@ -83,6 +84,7 @@ public class RipploMeshPlugin extends Plugin implements MeshEngine.Listener {
     static volatile PluginCall installCall;
     static volatile boolean foreground;
     private volatile JSObject pendingShare;
+    private volatile JSObject pendingOpen;
     private final ExecutorService shareExec = Executors.newSingleThreadExecutor();
 
     private interface SignalOp {
@@ -92,9 +94,6 @@ public class RipploMeshPlugin extends Plugin implements MeshEngine.Listener {
     private final ExecutorService signalExec = Executors.newSingleThreadExecutor();
     private final ExecutorService storeExec = Executors.newSingleThreadExecutor();
     private final ExecutorService backupExec = Executors.newSingleThreadExecutor();
-    private SignalCore signalCore;
-    private SignalFileStore signalStore;
-    private NativeStore nativeStore;
     private BackupEngine backupEngine;
     private MeshEngine engine;
     private boolean drained;
@@ -104,12 +103,46 @@ public class RipploMeshPlugin extends Plugin implements MeshEngine.Listener {
         engine = MeshEngine.get(getContext());
         engine.setListener(this);
         readShare(getActivity() == null ? null : getActivity().getIntent());
+        readOpen(getActivity() == null ? null : getActivity().getIntent());
     }
 
     @Override
     protected void handleOnNewIntent(Intent intent) {
         super.handleOnNewIntent(intent);
         readShare(intent);
+        readOpen(intent);
+    }
+
+    private void readOpen(Intent intent) {
+        if (intent == null) return;
+        String chat = intent.getStringExtra(Notifier.EXTRA_CHAT);
+        if (chat == null) return;
+        String answer = intent.getStringExtra(Notifier.EXTRA_ANSWER);
+        intent.removeExtra(Notifier.EXTRA_CHAT);
+        intent.removeExtra(Notifier.EXTRA_ANSWER);
+        JSObject o = new JSObject();
+        o.put("chatId", chat);
+        if (answer != null && !answer.isEmpty()) o.put("answer", answer);
+        pendingOpen = o;
+        notifyListeners("open", new JSObject());
+    }
+
+    @PluginMethod
+    public void takeOpen(PluginCall call) {
+        JSObject s = pendingOpen;
+        pendingOpen = null;
+        JSObject r = new JSObject();
+        if (s != null) r.put("open", s);
+        call.resolve(r);
+    }
+
+    private JSObject openedJson(Inbox.Item it) {
+        try {
+            byte[] plain = Shared.open(Shared.dbKey(getContext()), it.packet, "inbox");
+            return new JSObject(new String(plain, java.nio.charset.StandardCharsets.UTF_8));
+        } catch (Exception e) {
+            return null;
+        }
     }
 
     private void readShare(Intent intent) {
@@ -180,9 +213,27 @@ public class RipploMeshPlugin extends Plugin implements MeshEngine.Listener {
     protected void handleOnResume() {
         foreground = true;
         Notifier.cancelUpdated(getContext());
+        Ringer.stop();
+        Notifier.cancelCall(getContext());
+        Opener.forgetRinging();
         if (!drained) return;
         engine.setJsAttached(true);
-        for (Inbox.Item it : engine.drainInbox()) onPacket(it.packet, it.from);
+        for (Inbox.Item it : engine.drainInbox()) {
+            if (!it.opened()) { onPacket(it.packet, it.from); continue; }
+            JSObject o = openedJson(it);
+            if (o != null) notifyListeners("opened", o);
+        }
+    }
+
+    @PluginMethod
+    public void requestFullScreen(PluginCall call) {
+        if (Build.VERSION.SDK_INT >= 34) {
+            try {
+                getActivity().startActivity(new Intent(Settings.ACTION_MANAGE_APP_USE_FULL_SCREEN_INTENT, Uri.parse("package:" + getContext().getPackageName())));
+            } catch (RuntimeException ignored) {
+            }
+        }
+        call.resolve();
     }
 
     @PluginMethod
@@ -288,8 +339,14 @@ public class RipploMeshPlugin extends Plugin implements MeshEngine.Listener {
         JSArray arr = new JSArray();
         for (Inbox.Item it : engine.drainInbox()) {
             JSObject o = new JSObject();
-            o.put("packet", Base64.encodeToString(it.packet, Base64.NO_WRAP));
-            o.put("from", it.from);
+            if (it.opened()) {
+                JSObject rec = openedJson(it);
+                if (rec == null) continue;
+                o.put("opened", rec);
+            } else {
+                o.put("packet", Base64.encodeToString(it.packet, Base64.NO_WRAP));
+                o.put("from", it.from);
+            }
             arr.put(o);
         }
         JSObject r = new JSObject();
@@ -297,45 +354,12 @@ public class RipploMeshPlugin extends Plugin implements MeshEngine.Listener {
         call.resolve(r);
     }
 
-    private SecretKey dbWrapKey() throws Exception {
-        KeyStore ks = KeyStore.getInstance("AndroidKeyStore");
-        ks.load(null);
-        if (!ks.containsAlias(KEY_ALIAS)) {
-            KeyGenerator kg = KeyGenerator.getInstance(KeyProperties.KEY_ALGORITHM_AES, "AndroidKeyStore");
-            kg.init(new KeyGenParameterSpec.Builder(KEY_ALIAS, KeyProperties.PURPOSE_ENCRYPT | KeyProperties.PURPOSE_DECRYPT)
-                    .setBlockModes(KeyProperties.BLOCK_MODE_GCM)
-                    .setEncryptionPaddings(KeyProperties.ENCRYPTION_PADDING_NONE)
-                    .setKeySize(256)
-                    .build());
-            kg.generateKey();
-        }
-        return (SecretKey) ks.getKey(KEY_ALIAS, null);
-    }
-
     private String wrapDbKey(byte[] key) throws Exception {
-        Cipher c = Cipher.getInstance("AES/GCM/NoPadding");
-        c.init(Cipher.ENCRYPT_MODE, dbWrapKey());
-        byte[] iv = c.getIV();
-        byte[] ct = c.doFinal(key);
-        byte[] blob = new byte[iv.length + ct.length];
-        System.arraycopy(iv, 0, blob, 0, iv.length);
-        System.arraycopy(ct, 0, blob, iv.length, ct.length);
-        return Base64.encodeToString(blob, Base64.NO_WRAP);
+        return Shared.wrapDbKey(key);
     }
 
-    private synchronized byte[] loadDbKey() throws Exception {
-        SharedPreferences sp = getContext().getSharedPreferences("ripplo_keys", Context.MODE_PRIVATE);
-        String stored = sp.getString("dbkey", null);
-        if (stored == null) {
-            byte[] key = new byte[32];
-            new SecureRandom().nextBytes(key);
-            sp.edit().putString("dbkey", wrapDbKey(key)).commit();
-            return key;
-        }
-        byte[] blob = Base64.decode(stored, Base64.NO_WRAP);
-        Cipher c = Cipher.getInstance("AES/GCM/NoPadding");
-        c.init(Cipher.DECRYPT_MODE, dbWrapKey(), new GCMParameterSpec(128, blob, 0, 12));
-        return c.doFinal(blob, 12, blob.length - 12);
+    private byte[] loadDbKey() throws Exception {
+        return Shared.dbKey(getContext());
     }
 
     @PluginMethod
@@ -381,8 +405,7 @@ public class RipploMeshPlugin extends Plugin implements MeshEngine.Listener {
     private void signal(PluginCall call, SignalOp op) {
         signalExec.execute(() -> {
             try {
-                if (signalCore == null) signalCore = new SignalCore(sigStore());
-                call.resolve(op.run(signalCore));
+                call.resolve(op.run(Shared.signal(getContext())));
             } catch (Exception e) {
                 String m = e.getMessage();
                 boolean known = SignalCore.BAD_BUNDLE.equals(m) || SignalCore.NO_SESSION.equals(m)
@@ -465,14 +488,12 @@ public class RipploMeshPlugin extends Plugin implements MeshEngine.Listener {
         });
     }
 
-    private synchronized SignalFileStore sigStore() throws Exception {
-        if (signalStore == null) signalStore = new SignalFileStore(getContext().getFilesDir(), loadDbKey());
-        return signalStore;
+    private SignalFileStore sigStore() throws Exception {
+        return Shared.signalStore(getContext());
     }
 
-    private synchronized NativeStore db() {
-        if (nativeStore == null) nativeStore = new NativeStore(getContext(), "ripplo.db");
-        return nativeStore;
+    private NativeStore db() {
+        return Shared.db(getContext());
     }
 
     private synchronized BackupEngine backup() {
@@ -934,10 +955,7 @@ public class RipploMeshPlugin extends Plugin implements MeshEngine.Listener {
             throw e;
         }
         deleteTree(old);
-        synchronized (this) {
-            signalStore = null;
-        }
-        signalCore = null;
+        Shared.reset();
     }
 
     @PluginMethod
@@ -982,6 +1000,10 @@ public class RipploMeshPlugin extends Plugin implements MeshEngine.Listener {
         o.put("wifi", state(wifi, "wifi"));
         o.put("notifications", state(notif, "notifications"));
         o.put("microphone", state(granted(Manifest.permission.RECORD_AUDIO), "microphone"));
+        if (Build.VERSION.SDK_INT >= 34) {
+            NotificationManager nm = getContext().getSystemService(NotificationManager.class);
+            o.put("fullscreen", nm != null && nm.canUseFullScreenIntent() ? "granted" : "prompt");
+        }
         PowerManager pm = (PowerManager) getContext().getSystemService(Context.POWER_SERVICE);
         o.put("battery", pm.isIgnoringBatteryOptimizations(getContext().getPackageName()) ? "granted" : "prompt");
         return o;

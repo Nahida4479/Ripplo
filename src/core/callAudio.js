@@ -22,6 +22,10 @@ function toFloat(data) {
   return out
 }
 
+const openMic = (raw) => navigator.mediaDevices.getUserMedia({
+  audio: { echoCancellation: !raw, noiseSuppression: !raw, autoGainControl: !raw, channelCount: 1 },
+})
+
 export async function createAudio() {
   if (!audioSupported()) throw new Error('unsupported')
   let ctx = null
@@ -35,7 +39,8 @@ export async function createAudio() {
   let tsOut = 0
   let tsIn = 0
   const pending = []
-  const counts = { sent: 0, recv: 0, played: 0, errors: 0 }
+  const counts = { sent: 0, recv: 0, played: 0, errors: 0, frames: 0 }
+  let source = null
   const peaks = { mic: 0, out: 0 }
 
   function makeEncoder(onFrames) {
@@ -98,21 +103,21 @@ export async function createAudio() {
 
   return {
     async start(onFrames) {
-      stream = await navigator.mediaDevices.getUserMedia({
-        audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true, channelCount: 1 },
-      })
+      stream = await openMic(false)
       ctx = new AudioContext({ sampleRate: RATE, latencyHint: 'interactive' })
       await ctx.resume()
       await ctx.audioWorklet.addModule('/call-worklet.js')
       node = new AudioWorkletNode(ctx, 'ripplo-capture', { processorOptions: { frame: FRAME } })
       const silent = ctx.createGain()
       silent.gain.value = 0
-      ctx.createMediaStreamSource(stream).connect(node)
+      source = ctx.createMediaStreamSource(stream)
+      source.connect(node)
       node.connect(silent).connect(ctx.destination)
       makeEncoder(onFrames)
       makeDecoder()
       node.port.onmessage = (e) => {
         if (stopped) return
+        counts.frames++
         let top = 0
         for (let i = 0; i < e.data.length; i++) top = Math.max(top, Math.abs(e.data[i]))
         peaks.mic = Math.max(peaks.mic, top)
@@ -144,8 +149,20 @@ export async function createAudio() {
       }
     },
 
+    async fallback() {
+      if (stopped || !ctx || !node) return
+      const next = await openMic(true)
+      try { source.disconnect() } catch {}
+      for (const t of stream.getTracks()) t.stop()
+      stream = next
+      source = ctx.createMediaStreamSource(stream)
+      source.connect(node)
+    },
+
     stats() {
-      const out = { ...counts, mic: peaks.mic, out: peaks.out }
+      if (ctx && ctx.state === 'suspended') ctx.resume().catch(() => {})
+      const track = stream && stream.getAudioTracks()[0]
+      const out = { ...counts, mic: peaks.mic, out: peaks.out, ctx: ctx ? ctx.state : 'none', track: track ? track.readyState + (track.muted ? '/muted' : '') : 'none' }
       peaks.mic = 0
       peaks.out = 0
       return out

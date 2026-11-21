@@ -591,7 +591,9 @@ queue more than 400 ms ahead are dropped. Once a second the call engine reports 
 (while not muted) the screen warns "your microphone seems silent"; frames arriving but decoding to silence gives "sound is arriving but silent";
 no frame at all 4 s after the call went live gives "no sound has arrived yet". Starting or answering a call first checks the microphone
 permission and asks for it natively, because the WebView otherwise may hand over a silent stream. The encoder and decoder are rebuilt after an error and the PCM format is read as delivered, so one bad frame cannot silence a call for good; the call screen shows
-sent / received / played / error frame counts for diagnosis. Muting disables the track, so silence is still sent and keeps the link alive. The call
+sent / received / played / error frame counts for diagnosis. If the microphone stays silent for 4 s the engine first retries once without voice processing (no echo cancellation, noise suppression
+or automatic gain), a common cause of silent capture on some phones, and only then shows the warning. The stats line also shows the
+track state, the audio context state and the number of captured frames. Muting disables the track, so silence is still sent and keeps the link alive. The call
 ends with `lost` after 6 s without an authenticated frame (30 s before the first one, while the peer's microphone permission
 prompt may be open) or when the neighbor disappears.
 
@@ -601,3 +603,29 @@ any interruption filter other than "all" = neither sound nor vibration, only the
 
 Not yet: ringing while the app is closed, calls across several phones, iOS (the WebCodecs path is untested there).
 iOS can never ring a closed app without Apple push, which needs a server.
+
+
+## 14. Notifications and calls while the app is closed (Android)
+
+A DATA packet for this phone that arrives while JS is not attached (app closed or screen off) used to be stored raw and shown as a
+generic "New message". Now the engine opens it itself (`Opener`, process-wide `SignalCore` from `Shared`, the same Keystore-wrapped keys
+as the app), so it can show who wrote and what, or ring for a call. The decrypted message is consumed from the ratchet, so it is
+stored as a record sealed with the DB key (AES-GCM, AAD `inbox`) as inbox item `~<callId>`; the app receives it as `{ opened }`
+(`drainInbox`, or the `opened` event) and skips decryption. If the native open or the DB key fails the raw packet is stored and the
+generic notification shown, exactly as before. A crash between the decrypt and the inbox write loses that one message.
+
+Notification content, from the contacts store read natively (vault format of section 12.1) or, for a stranger, the name in the card that
+travels with the message: a text message shows `name` / excerpt (200 characters; groups `group: name`, only when the sender is a member
+of the stored group), a photo "Sent a photo", any other attachment "Sent an attachment", an invitation "You have an invitation to contacts
+from name". Messages from a pending request, invitations from strangers while hidden, and everything that is not a message, invitation
+or call are silent. When app lock is on the text is the generic "New message"; on the lock screen the public version is always generic.
+The record carries `notified`, so the app does not show a second notification. Tapping a notification opens that chat.
+
+Calls: an offer from a contact you added, accepted or wrote to, not older than 120 s, with a well-formed id and key, and no other native call
+ringing, raises a full-screen notification on the `calls` channel (Answer, Decline) and rings with `Ringer` for 45 s following the system
+sound modes. Answer starts the app with `ripplo.answer`: the screen shows over the lock screen, the app accepts the call as soon as the
+stored offer shows up (within 20 s). Decline silences the ring and removes the offer from the inbox, so the caller simply gets no answer.
+An `end` for the same call cancels the ring and posts "Missed call". Needs notifications and, on Android 14+, the full-screen-intent
+special access, which the permission screen asks for; without it a heads-up banner with the same actions appears. Opening the app takes
+over: it silences the native ring and the app rings itself while the call is still ringing. iOS has no equivalent: without Apple push,
+which needs a server, a closed iOS app cannot ring.

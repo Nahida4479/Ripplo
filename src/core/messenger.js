@@ -59,6 +59,7 @@ export function createCore({ mesh, dbName = 'ripplo', state = createState(), not
   let unsent = new Set()
   let unsends = []
   let flushing = false
+  let silentNow = false
   let searchText = ''
   let peopleBase = null
   const loaded = new Set()
@@ -150,7 +151,7 @@ export function createCore({ mesh, dbName = 'ripplo', state = createState(), not
       if (!c || c.request) return { ok: false }
       try { return await transmit(await buildPacket(c, body)) } catch { return { ok: false } }
     },
-    notify: (id) => notifier({ title: state.contacts[id]?.name || '', body: t('incomingCall') }),
+    notify: (id) => { if (!silentNow) notifier({ title: state.contacts[id]?.name || '', body: t('incomingCall') }) },
     log: (id, reason, ms) => {
       if (!state.contacts[id]) return
       const text = reason === 'ended' ? t('callLog', { time: fmtDur(ms) }) : t('call_' + reason)
@@ -230,9 +231,13 @@ export function createCore({ mesh, dbName = 'ripplo', state = createState(), not
   async function start() {
     unsubs.push(mesh.on('packet', ({ packet, from }) => onPacket(packet, from)))
     unsubs.push(mesh.on('neighbor', onNeighbor))
+    unsubs.push(mesh.on('opened', (rec) => enqueue(() => handleOpened(rec))))
     await mesh.start(me.tag)
     for (const n of (await mesh.getNeighbors()) || []) onNeighbor({ ...n, up: true })
-    for (const { packet, from } of (await mesh.drainInbox()) || []) onPacket(packet, from)
+    for (const item of (await mesh.drainInbox()) || []) {
+      if (item.opened) enqueue(() => handleOpened(item.opened))
+      else onPacket(item.packet, item.from)
+    }
     flushUnsends()
   }
 
@@ -541,6 +546,25 @@ export function createCore({ mesh, dbName = 'ripplo', state = createState(), not
   async function onSealed(payload) {
     let r
     try { r = await mesh.signalOpen(payload) } catch (e) { return onOpenFailed(e) }
+    await processOpened(r, false)
+  }
+
+  async function handleOpened(rec) {
+    let r
+    try { r = { tag: String(rec.tag), ik: unb64(rec.ik), plaintext: unb64(rec.plaintext) } } catch { return }
+    await processOpened(r, !!rec.notified)
+  }
+
+  async function processOpened(r, silent) {
+    silentNow = silent
+    try {
+      await processOpenedInner(r)
+    } finally {
+      silentNow = false
+    }
+  }
+
+  async function processOpenedInner(r) {
     const { tag, ik, plaintext } = r
     const ids = deriveIds(ik)
     const f = ids.ripploId
@@ -585,7 +609,7 @@ export function createCore({ mesh, dbName = 'ripplo', state = createState(), not
       if (fresh) {
         c.notified = true
         await persistContact(c)
-        notifier({ title: t('inviteNotifyTitle'), body: t('inviteNotifyBody', { name: c.name }) })
+        if (!silentNow) notifier({ title: t('inviteNotifyTitle'), body: t('inviteNotifyBody', { name: c.name }) })
       }
       return
     }
@@ -629,7 +653,7 @@ export function createCore({ mesh, dbName = 'ripplo', state = createState(), not
       if (!WIRE_ID_RE.test(msg.id) || !/^[0-9a-f]{32}$/.test(msg.attId) || !KINDS.includes(msg.kind) || !/^[0-9a-f]{64}$/.test(msg.sha256)) return
       if (!Number.isInteger(msg.size) || msg.size < 0 || msg.size > MAX_FILE || !Number.isInteger(msg.chunks) || msg.chunks < 1 || msg.chunks > MAX_CHUNKS) return
       if (typeof msg.key !== 'string' || unb64(msg.key).length !== 32 || !routeChat(f, msg.g)) return
-      await db.put('kv', `ptr/${msg.attId}`, { f, msg })
+      await db.put('kv', `ptr/${msg.attId}`, { f, msg, silent: silentNow })
       await tryFinish(msg.attId)
     } else if (msg.t === 'unsend') {
       if (!WIRE_ID_RE.test(msg.id)) return
@@ -652,7 +676,7 @@ export function createCore({ mesh, dbName = 'ripplo', state = createState(), not
     const msg = addMsg({ ...m, ts: Date.now(), status: 'received' })
     touchChat(m.chatId, preview, msg.ts, 1, m.att?.kind)
     const chat = state.chats.find((c) => c.id === m.chatId)
-    notifier({ title: chat?.type === 'group' ? `${chat.name}: ${state.contacts[m.from]?.name}` : state.contacts[m.from]?.name, body: notifyBody, chatId: m.chatId })
+    if (!silentNow) notifier({ title: chat?.type === 'group' ? `${chat.name}: ${state.contacts[m.from]?.name}` : state.contacts[m.from]?.name, body: notifyBody, chatId: m.chatId })
   }
 
   async function onGroup(f, msg) {
@@ -1025,7 +1049,7 @@ export function createCore({ mesh, dbName = 'ripplo', state = createState(), not
     const ptr = await db.get('kv', `ptr/${aid}`)
     const meta = pending[aid]
     if (!ptr || !meta || meta.count < meta.total) return
-    const { f, msg } = ptr
+    const { f, msg, silent } = ptr
     try {
       if (meta.total !== msg.chunks) throw new Error('chunk count')
       const parts = []
@@ -1041,10 +1065,13 @@ export function createCore({ mesh, dbName = 'ripplo', state = createState(), not
       if (typeof msg.wave === 'string' && msg.wave.length <= 96 && /^[A-Za-z0-9+/]*={0,2}$/.test(msg.wave)) att.wave = Array.from(unb64(msg.wave))
       const caption = captionOf(msg.text)
       const re = parseRe(msg.re)
-      await receive({ id: `${f}.${msg.id}`, chatId: msg.g || f, from: f, att, ...(caption && { text: caption }), ...(re && { re }) }, caption || '', caption || msg.kind)
+      silentNow = !!silent
+      await receive({ id: `${f}.${msg.id}`, chatId: msg.g || f, from: f, att, ...(caption && { text: caption }), ...(re && { re }) }, caption || '', `${t(msg.kind === 'image' ? 'notifPhoto' : 'notifAttachment')}${caption ? ': ' + caption : ''}`)
     } catch {
+      silentNow = false
       return discard(aid)
     }
+    silentNow = false
     await discard(aid)
   }
 

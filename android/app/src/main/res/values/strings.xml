@@ -9,6 +9,15 @@
     <string name="channel_updates">Updates</string>
     <string name="relay_text">Ripplo is waiting for new messages</string>
     <string name="new_message">New message</string>
+    <string name="notif_photo">Sent a photo</string>
+    <string name="notif_attachment">Sent an attachment</string>
+    <string name="invite_title">Contact invitation</string>
+    <string name="invite_text">You have an invitation to contacts from %1$s</string>
+    <string name="incoming_call">Incoming call</string>
+    <string name="call_answer">Answer</string>
+    <string name="call_decline">Decline</string>
+    <string name="missed_call">Missed call</string>
+    <string name="channel_calls">Calls</string>
     <string name="update_available">Ripplo %1$s is available. Open the app to update.</string>
     <string name="update_ready">Update ready. Tap to install.</string>
     <string name="updated_text">Ripplo was updated. Tap to open.</string>

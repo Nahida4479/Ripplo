@@ -34,7 +34,7 @@ describe('invite link', () => {
     expect(parseLink(`  ${link.slice(0, 30)}\n ${link.slice(30)} \n`).id).toBe(v.id)
     expect(parseLink(`join me: https://ripplo.app/add?x=${link} thanks`).id).toBe(v.id)
     const [head, sum] = link.split('.')
-    expect(code(() => parseLink(`${head}.${sum.slice(0, 7)}A`))).toBe('bad_checksum')
+    expect(code(() => parseLink(`${head}.${sum.slice(0, 7)}${sum[7] === 'A' ? 'B' : 'A'}`))).toBe('bad_checksum')
     const flipped = head.slice(0, 40) + (head[40] === 'A' ? 'B' : 'A') + head.slice(41)
     expect(code(() => parseLink(`${flipped}.${sum}`))).toBe('bad_checksum')
     expect(code(() => parseLink('hello'))).toBe('bad_link')

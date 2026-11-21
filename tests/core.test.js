@@ -4,7 +4,7 @@ import { resolveObjectURL } from 'node:buffer'
 import { createCore } from '../src/core/messenger.js'
 import { TYPE, encodePacket, decodePacket, newId } from '../src/mesh/packet.js'
 import { createDevSignal } from '../src/mesh/devSignal.js'
-import { parseLink } from '../src/crypto/identity.js'
+import { parseLink, deriveIds } from '../src/crypto/identity.js'
 import { isAvatar } from '../src/lib/avatar.js'
 import { importCallKey, sealFrame, openFrame, packFrames, unpackFrames, createReplay } from '../src/crypto/callFrame.js'
 import { slotOf, isDue, windowStart, SLOT_MS, WINDOW_MS, STALE_MS } from '../src/lib/schedule.js'
@@ -19,8 +19,8 @@ function fakeMesh() {
   const handlers = { packet: [], neighbor: [] }
   const m = {
     ...createDevSignal(), devCrypto: true, isNative: false, node: hex(random(8)), tag: '', neighbors: new Set(), offline: false,
-    on(ev, cb) { handlers[ev].push(cb); return () => handlers[ev].splice(handlers[ev].indexOf(cb), 1) },
-    emit(ev, d) { setTimeout(() => handlers[ev].slice().forEach((h) => h(d)), 0) },
+    on(ev, cb) { (handlers[ev] ||= []).push(cb); return () => handlers[ev].splice(handlers[ev].indexOf(cb), 1) },
+    emit(ev, d) { setTimeout(() => (handlers[ev] || []).slice().forEach((h) => h(d)), 0) },
     async start(tag) { m.tag = hex(tag); return { nodeTag: m.node } },
     async getNeighbors() { return [] },
     async drainInbox() { return [] },
@@ -581,6 +581,7 @@ function fakeAudio() {
   e.play = (f) => { e.frames.push(...f) }
   e.setMuted = (m) => { e.muted = m }
   e.stop = () => { e.stopped = true }
+  e.fallbackCalls = 0
   e.stats = () => ({ sent: 0, recv: e.frames.length, played: e.frames.length, errors: 0, mic: e.mic ?? 0.2, out: e.out ?? 0.2 })
   e.api = { supported: () => true, create: async () => e }
   return e
@@ -1095,6 +1096,28 @@ describe('call diagnostics and microphone permission', () => {
     await waitFor(() => a.state.call?.warn !== 'mic', 5000)
   })
 
+  it('retries the microphone without voice processing before warning, and recovers', async () => {
+    const { a, b, ea } = await pairWith({ mic: 0 })
+    ea.fallback = async () => { ea.fallbackCalls++; ea.mic = 0.3 }
+    await a.core.startCall(b.id)
+    await waitFor(() => b.state.call?.status === 'ringing')
+    await b.core.acceptCall()
+    await waitFor(() => ea.fallbackCalls === 1, 5000)
+    await new Promise((r) => setTimeout(r, 2500))
+    expect(a.state.call.warn).not.toBe('mic')
+    expect(ea.fallbackCalls).toBe(1)
+  })
+
+  it('warns when the microphone is still silent after the fallback', async () => {
+    const { a, b, ea } = await pairWith({ mic: 0 })
+    ea.fallback = async () => { ea.fallbackCalls++ }
+    await a.core.startCall(b.id)
+    await waitFor(() => b.state.call?.status === 'ringing')
+    await b.core.acceptCall()
+    await waitFor(() => a.state.call?.warn === 'mic', 8000)
+    expect(ea.fallbackCalls).toBe(1)
+  })
+
   it('warns when audio arrives but decodes to silence, and when nothing arrives', async () => {
     const { a, b, ea, eb } = await pairWith({}, { out: 0 })
     await a.core.startCall(b.id)
@@ -1116,5 +1139,62 @@ describe('call diagnostics and microphone permission', () => {
     await waitFor(() => a.state.neighbors[0]?.card)
     expect(await codeOf(a.core.startCall(b.id))).toBe('call_mic')
     expect(a.state.call).toBeNull()
+  })
+})
+
+describe('messages already opened by the native layer', () => {
+  async function bob(records = [], notifier = () => {}, audio) {
+    const mesh = fakeMesh()
+    mesh.drainInbox = async () => records
+    const core = createCore({ mesh, dbName: `db-bobo-${hex(random(4))}`, notifier, timing: TIMING, ...(audio && { audio }) })
+    await core.init()
+    await core.createProfile('Bob')
+    return { core, mesh }
+  }
+  const record = (a, obj, notified) => {
+    const v = parseLink(a.link)
+    return { tag: hex(deriveIds(v.ik).tag), ik: b64(v.ik), plaintext: b64(utf8(JSON.stringify(obj))), notified }
+  }
+
+  it('shows a drained message and stays silent when the native layer already notified', async () => {
+    const a = await user('Alice')
+    const seen = []
+    const b = await bob([{ opened: record(a, { t: 'msg', id: 'm1', text: 'hello from native' }, true) }], (n) => seen.push(n))
+    await waitFor(() => b.core.state.messages[a.id]?.some((m) => m.text === 'hello from native'))
+    expect(seen).toHaveLength(0)
+  })
+
+  it('notifies itself when the native layer did not', async () => {
+    const a = await user('Alice')
+    const seen = []
+    const b = await bob([{ opened: record(a, { t: 'msg', id: 'm2', text: 'plain' }, false) }], (n) => seen.push(n))
+    await waitFor(() => seen.length === 1)
+    expect(seen[0].body).toBe('plain')
+  })
+
+  it('handles an opened record that arrives as an event, in order with later ones', async () => {
+    const a = await user('Alice')
+    const b = await bob()
+    b.mesh.emit('opened', record(a, { t: 'msg', id: 'e1', text: 'first' }, true))
+    b.mesh.emit('opened', record(a, { t: 'msg', id: 'e2', text: 'second' }, true))
+    await waitFor(() => b.core.state.messages[a.id]?.length === 2)
+    expect(b.core.state.messages[a.id].map((m) => m.text)).toEqual(['first', 'second'])
+  })
+
+  it('shows an invitation silently and starts a ringing call from an opened offer', async () => {
+    const a = await user('Alice'), seen = [], e = fakeAudio()
+    const b = await bob([], (n) => seen.push(n), e.api)
+    b.mesh.emit('opened', record(a, { t: 'invite' }, true))
+    await waitFor(() => b.core.state.contacts[a.id]?.request === 'in')
+    await b.core.acceptRequest(a.id)
+    b.mesh.emit('opened', record(a, { t: 'call', k: 'offer', id: b64(random(8)), key: b64(random(32)), ts: Date.now() }, true))
+    await waitFor(() => b.core.state.call?.status === 'ringing')
+    expect(seen).toHaveLength(0)
+  })
+
+  it('ignores a malformed opened record', async () => {
+    const b = await bob([{ opened: { tag: 1, ik: '!!', plaintext: null } }])
+    await new Promise((r) => setTimeout(r, 100))
+    expect(Object.keys(b.core.state.contacts)).toHaveLength(0)
   })
 })

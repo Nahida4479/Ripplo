@@ -5,6 +5,15 @@
     <string name="channel_updates">Aktualizacje</string>
     <string name="relay_text">Ripplo oczekuje na nowe wiadomości</string>
     <string name="new_message">Nowa wiadomość</string>
+    <string name="notif_photo">Wysłano zdjęcie</string>
+    <string name="notif_attachment">Wysłano załącznik</string>
+    <string name="invite_title">Zaproszenie do kontaktów</string>
+    <string name="invite_text">Masz zaproszenie do kontaktów od użytkownika %1$s</string>
+    <string name="incoming_call">Połączenie przychodzące</string>
+    <string name="call_answer">Odbierz</string>
+    <string name="call_decline">Odrzuć</string>
+    <string name="missed_call">Nieodebrane połączenie</string>
+    <string name="channel_calls">Połączenia</string>
     <string name="update_available">Dostępne Ripplo %1$s. Otwórz aplikację, aby zaktualizować.</string>
     <string name="update_ready">Aktualizacja gotowa. Dotknij, aby zainstalować.</string>
     <string name="updated_text">Ripplo zostało zaktualizowane. Dotknij, aby otworzyć.</string>

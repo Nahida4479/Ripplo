@@ -27,3 +27,6 @@ done
 
 magick public/icon_ios.png -background white -alpha remove -alpha off -resize 1024x1024 \
   PNG24:ios/App/App/Assets.xcassets/AppIcon.appiconset/AppIcon-512@2x.png
+
+mkdir -p "$RES/drawable-nodpi"
+render public/icon.svg 192 "$RES/drawable-nodpi/ic_notification_large.png"

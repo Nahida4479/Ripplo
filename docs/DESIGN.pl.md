@@ -44,7 +44,7 @@ Strefy bezpieczne: `env(safe-area-inset-*)` w nagłówku i pasku zakładek.
   czerwoną kropkę, gdy dostępna jest aktualizacja lub kontrola integralności się nie powiodła.
 - Bramka uprawnień (blokująca, pełny ekran przed wszystkim innym): logo, jednozdaniowe wyjaśnienie po co, lista
   wymaganych uprawnień z plakietkami statusu (Bluetooth, Wi-Fi w pobliżu / lokalizacja, Powiadomienia) i
-  jeden przycisk **Przyznaj uprawnienia**, który po pozostałych uprawnieniach otwiera też systemowe okno zwolnienia z optymalizacji baterii (wiersz „Zezwól na przekazywanie w tle” pokazuje stan, ale nigdy nie blokuje). Na liście jest też wiersz Mikrofon (Android), o który prosi ten sam przycisk; on też nigdy nie blokuje.
+  jeden przycisk **Przyznaj uprawnienia**, który po pozostałych uprawnieniach otwiera też systemowe okno zwolnienia z optymalizacji baterii (wiersz „Zezwól na przekazywanie w tle” pokazuje stan, ale nigdy nie blokuje). Na liście są też wiersz Mikrofon i, na Androidzie 14+, wiersz „Ekran połączenia na ekranie blokady” (specjalny dostęp do powiadomień pełnoekranowych); prosi o nie ten sam przycisk i żaden nie blokuje. Ekran pojawia się też raz przy następnym starcie u osób, które mają już wymagane uprawnienia, ale brakuje im któregoś z tych dodatków; wtedy przycisk „Nie teraz” pozwala przejść dalej i potem nie wraca już dla dodatków.
 - Onboarding: pole na imię + utworzenie tożsamości („Twoje klucze powstają na tym telefonie i nigdy go nie opuszczają”).
 
 ## Zakładka Czaty
@@ -129,3 +129,11 @@ czcionką monospace) + jego QR, akcje: Zweryfikuj kodem QR, Ponów sprawdzenie w
 - **O aplikacji**: nazwa aplikacji + hasło, wersja, link do GitHuba, Licencja, karty **Współtwórcy**: awatar
   (awatar z GitHuba online, inicjały offline), login pogrubiony, podtekst „Profil GitHub”, ikona linku zewnętrznego
   po prawej; karta = `--surface`, obramowanie 1 px, promień 14.
+
+## Powiadomienia
+
+Android: glif na pasku stanu to jednobarwne `ic_stat_ripplo` w kolorze akcentu, a kolorowa ikona aplikacji (`ic_notification_large`, wyrenderowana z
+`public/icon.svg` przez `scripts/icons.sh`) jest dużą ikoną każdego powiadomienia, natywnego i lokalnego. iOS zawsze pokazuje ikonę aplikacji (`AppIcon`,
+ta sama grafika co `public/icon_ios.png`), której nie można zmienić dla pojedynczego powiadomienia.
+Tytuł to nazwa nadawcy (grupy: „grupa: nazwa”), treść to tekst wiadomości, „Wysłano zdjęcie” lub „Wysłano załącznik”; zaproszenia mają
+„Zaproszenie do kontaktów”; połączenia przychodzące są pełnoekranowe z przyciskami Odbierz i Odrzuć. Na ekranie blokady wiadomości pokazują tylko „Nowa wiadomość”.
