@@ -67,6 +67,7 @@ export function createCalls({ state, signal, sendMedia, hasNeighbor, supported, 
     c.lastRx = Date.now()
     state.call = { ...state.call, status: 'active', startedAt: Date.now() }
     c.watch = setInterval(() => {
+      if (c.audio.stats) state.call = { ...state.call, stats: c.audio.stats() }
       if (Date.now() - c.lastRx > (c.heard ? T.silence : T.first) || !hasNeighbor(c.peer)) finish(c, 'lost', 'end')
     }, 1000)
   }

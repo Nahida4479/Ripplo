@@ -15,6 +15,7 @@ abstract class Link {
     volatile String node;
     volatile long kbps;
     volatile long rttMs;
+    volatile long lastRx = System.nanoTime();
     volatile long pingNonce;
     volatile long pingStartNanos;
     volatile int pingBits;
@@ -73,6 +74,7 @@ abstract class Link {
     }
 
     final void onBytes(byte[] d, int off, int len) {
+        lastRx = System.nanoTime();
         try {
             while (len > 0) {
                 if (body == null) {

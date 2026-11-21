@@ -18,7 +18,7 @@
 </div>
 
 > [!NOTE]
-> Ripplo is in early development (v0.1.0). The native transports (Kotlin / Swift) have not been field-tested yet. Expect rough edges.
+> Ripplo is in early development. The native transports have not been field-tested yet. Expect rough edges.
 
 # Features
 

@@ -54,6 +54,7 @@ public final class MeshEngine implements Router.Host {
     private final SharedPreferences prefs;
     private final Inbox inbox;
     private final PowerManager.WakeLock wake;
+    private static final long DEAD_AFTER_NANOS = 150L * 1000000000L;
     private final String nodeTag;
     private final Object lock = new Object();
     private final Map<String, List<Link>> byNode = new HashMap<>();
@@ -146,7 +147,11 @@ public final class MeshEngine implements Router.Host {
         synchronized (lock) {
             for (List<Link> l : byNode.values()) all.addAll(l);
         }
-        for (Link l : all) sendPing(l);
+        long now = System.nanoTime();
+        for (Link l : all) {
+            if (now - l.lastRx > DEAD_AFTER_NANOS) l.close();
+            else sendPing(l);
+        }
         for (Transport t : new ArrayList<>(transports)) t.tick();
     }
 

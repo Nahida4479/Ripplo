@@ -184,8 +184,21 @@ public class RipploMeshPlugin extends Plugin implements MeshEngine.Listener {
         for (Inbox.Item it : engine.drainInbox()) onPacket(it.packet, it.from);
     }
 
+    @PluginMethod
+    public void startRing(PluginCall call) {
+        Ringer.start(getContext());
+        call.resolve();
+    }
+
+    @PluginMethod
+    public void stopRing(PluginCall call) {
+        Ringer.stop();
+        call.resolve();
+    }
+
     @Override
     protected void handleOnDestroy() {
+        Ringer.stop();
         engine.setJsAttached(false);
         engine.setListener(null);
         if (!engine.background()) engine.stop();

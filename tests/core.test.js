@@ -63,7 +63,7 @@ const waitFor = async (fn, ms = 4000) => {
     await new Promise((r) => setTimeout(r, 10))
   }
 }
-const TIMING = { ack: 1500, verify: 1200, proof: 300, poll: 30, discover: 600, quiet: 150, ring: 500, quietRing: 150 }
+const TIMING = { helloRetry: 40, ack: 1500, verify: 1200, proof: 300, poll: 30, discover: 600, quiet: 150, ring: 500, quietRing: 150 }
 
 async function user(name, timing = TIMING, audio) {
   const mesh = fakeMesh()
@@ -78,6 +78,12 @@ const unlock = async (a, b) => {
   await b.core.sendText(a.id, 'hello')
   await waitFor(() => a.state.contacts[b.id].cardAck)
 }
+const burn = async (b) => {
+  const c = await user('Burner')
+  await c.core.addContactFromLink(b.link)
+  await c.core.sendText(b.id, 'x')
+  await waitFor(() => b.state.contacts[c.id]?.addedVia === 'link')
+}
 const codeOf = async (p) => { try { await p; return null } catch (e) { return e.code } }
 
 describe('messaging', () => {
@@ -91,7 +97,7 @@ describe('messaging', () => {
     expect(m1.hops).toBe(1)
     const inc = await waitFor(() => b.state.messages[a.id]?.[0])
     expect(inc.text).toBe('hello bob')
-    expect(b.state.contacts[a.id]).toMatchObject({ addedVia: 'incoming', verification: 'none' })
+    expect(b.state.contacts[a.id]).toMatchObject({ addedVia: 'link', verification: 'none' })
     expect(b.state.chats.find((c) => c.id === a.id).unread).toBe(1)
     const r1 = await b.core.sendText(a.id, 'hi alice')
     await waitFor(() => r1.status === 'delivered')
@@ -421,6 +427,16 @@ describe('invitations and visibility', () => {
     expect(a.state.people.some((p) => p.id === b.id)).toBe(true)
   })
 
+  it('keeps asking for the neighbor card until it arrives, even when hellos are lost', async () => {
+    const a = await user('Alice'), b = await user('Bob')
+    let dropped = 0
+    const sendApp = b.mesh.sendApp
+    b.mesh.sendApp = (node, payload) => { if (dropped < 3) { dropped++; return Promise.resolve() } return sendApp(node, payload) }
+    connect(a.mesh, b.mesh)
+    await waitFor(() => a.state.neighbors[0]?.card?.id === b.id, 6000)
+    expect(dropped).toBe(3)
+  })
+
   it('hello is answered when the peer asks for it', async () => {
     const a = await user('Alice'), b = await user('Bob')
     connect(a.mesh, b.mesh)
@@ -709,6 +725,7 @@ describe('voice calls', () => {
   it('does not ring for someone who only wrote first, until you reply or add them', async () => {
     const ea = fakeAudio(), eb = fakeAudio()
     const a = await user('Alice', { ...TIMING, callRing: 300, callHold: 100 }, ea.api), b = await user('Bob', TIMING, eb.api)
+    await burn(b)
     await a.core.addContactFromLink(b.link)
     connect(a.mesh, b.mesh)
     await waitFor(() => a.state.neighbors[0]?.card && b.state.neighbors[0]?.card)
@@ -741,6 +758,19 @@ describe('voice calls', () => {
 })
 
 describe('request hygiene', () => {
+  it('notifies about an invitation with the sender name', async () => {
+    const seen = []
+    const mesh = fakeMesh()
+    const bob = createCore({ mesh, dbName: `db-bobn-${hex(random(4))}`, notifier: (n) => seen.push(n), timing: TIMING })
+    await bob.init()
+    await bob.createProfile('Bob')
+    const a = await user('Alice')
+    await a.core.invite({ id: bob.state.profile.ripploId, name: 'Bob', card: b64(parseLink(bob.myInviteLink()).card), hops: 1 })
+    await waitFor(() => seen.length === 1)
+    expect(seen[0].title).toMatch(/invitation|zaproszenie/i)
+    expect(seen[0].body).toContain('Alice')
+  })
+
   it('does not send profile changes or a name/photo with a decline to people you have not accepted', async () => {
     const a = await user('Alice'), b = await user('Bob')
     const seen = []
@@ -790,6 +820,7 @@ describe('media from and to people who have not replied', () => {
 
   it('drops a media pointer from a stranger who wrote first until you reply', async () => {
     const a = await user('Alice'), b = await user('Bob')
+    await burn(b)
     await a.core.addContactFromLink(b.link)
     await a.core.sendText(b.id, 'hi')
     await waitFor(() => b.state.contacts[a.id]?.card)
@@ -812,4 +843,231 @@ describe('media from and to people who have not replied', () => {
     for (const s of senders) await s.core.invite({ id: b.id, name: 'Bob', card: b64(parseLink(b.link).card), hops: 1 })
     await waitFor(() => Object.values(b.state.contacts).filter((c) => c.request === 'in').length === 25, 10000)
   }, 20000)
+})
+
+describe('replies and captions', () => {
+  it('quotes the replied text message on both sides', async () => {
+    const a = await user('Alice'), b = await user('Bob')
+    await a.core.addContactFromLink(b.link)
+    const first = await a.core.sendText(b.id, 'lunch at noon?')
+    const got = await waitFor(() => b.state.messages[a.id]?.find((x) => x.text === 'lunch at noon?'))
+    const mine = await b.core.sendText(a.id, 'sure', got.id)
+    expect(mine.re).toMatchObject({ who: a.id, text: 'lunch at noon?', mid: got.id })
+    const back = await waitFor(() => a.state.messages[b.id]?.find((x) => x.text === 'sure'))
+    expect(back.re).toMatchObject({ who: a.id, text: 'lunch at noon?', mid: first.id })
+    const again = await a.core.sendText(b.id, 'great', back.id)
+    expect(again.re).toMatchObject({ who: b.id, text: 'sure' })
+    const seen = await waitFor(() => b.state.messages[a.id]?.find((x) => x.text === 'great'))
+    expect(seen.re.mid).toBe(mine.id)
+  })
+
+  it('sends a caption with a photo and replies to a photo', async () => {
+    const a = await user('Alice'), b = await user('Bob')
+    await a.core.addContactFromLink(b.link)
+    await unlock(a, b)
+    const m = await a.core.sendAttachment(b.id, new Blob([random(400)], { type: 'image/png' }), 'image', { caption: 'look!' })
+    await waitFor(() => m.status === 'delivered', 8000)
+    const got = await waitFor(() => b.state.messages[a.id]?.find((x) => x.att), 8000)
+    expect(got.text).toBe('look!')
+    const r = await b.core.sendText(a.id, 'nice one', got.id)
+    expect(r.re).toMatchObject({ kind: 'image', text: 'look!' })
+    expect(await codeOf(a.core.sendAttachment(b.id, new Blob([random(50)], { type: 'image/png' }), 'image', { caption: 'x'.repeat(1001) }))).toBe('too_long')
+  })
+
+  it('drops a malformed reply reference but keeps the message', async () => {
+    const a = await user('Alice'), b = await user('Bob')
+    await a.core.addContactFromLink(b.link)
+    const seal = a.mesh.signalSeal
+    a.mesh.signalSeal = (tag, pt) => {
+      const o = JSON.parse(unutf8(pt))
+      if (o.t === 'msg') o.re = { id: '../x', who: 'nope', text: 5 }
+      return seal(tag, utf8(JSON.stringify(o)))
+    }
+    await a.core.sendText(b.id, 'hello there')
+    const got = await waitFor(() => b.state.messages[a.id]?.find((x) => x.text === 'hello there'))
+    expect(got.re).toBeUndefined()
+  })
+})
+
+describe('single-use invite links', () => {
+  it('trusts the first person who uses a link and treats a second use as a stranger', async () => {
+    const a = await user('Alice'), c = await user('Carol'), b = await user('Bob')
+    await a.core.addContactFromLink(b.link)
+    await a.core.sendText(b.id, 'first')
+    await waitFor(() => b.state.contacts[a.id]?.addedVia === 'link')
+    await c.core.addContactFromLink(b.link)
+    await c.core.sendText(b.id, 'second')
+    await waitFor(() => b.state.contacts[c.id])
+    await new Promise((r) => setTimeout(r, 100))
+    expect(b.state.contacts[c.id].addedVia).toBe('incoming')
+    await a.core.sendText(b.id, 'again')
+    await waitFor(() => b.state.messages[a.id]?.length === 2)
+    expect(b.state.contacts[a.id].addedVia).toBe('link')
+  })
+
+  it('each new code is a fresh link and an unknown token earns nothing', async () => {
+    const a = await user('Alice'), b = await user('Bob')
+    const one = b.core.myInviteLink(), two = b.core.myInviteLink()
+    expect(one).not.toBe(two)
+    expect(parseLink(one).token).toHaveLength(11)
+    expect(parseLink(two).id).toBe(b.id)
+    const forged = one.replace(/\.[A-Za-z0-9_-]{11}$/, '.AAAAAAAAAAA')
+    await a.core.addContactFromLink(forged)
+    await a.core.sendText(b.id, 'hi')
+    await waitFor(() => b.state.contacts[a.id])
+    await new Promise((r) => setTimeout(r, 100))
+    expect(b.state.contacts[a.id].addedVia).toBe('incoming')
+  })
+
+  it('a link without a token still parses and adds the contact', async () => {
+    const a = await user('Alice'), b = await user('Bob')
+    const bare = b.core.myInviteLink().replace(/\.[A-Za-z0-9_-]{11}$/, '')
+    expect(parseLink(bare).token).toBeUndefined()
+    const c = await a.core.addContactFromLink(bare)
+    expect(c.id).toBe(b.id)
+  })
+})
+
+describe('hidden mode', () => {
+  it('removes you from strangers\' nearby lists and refuses their invitations', async () => {
+    const a = await user('Alice'), b = await user('Bob')
+    connect(a.mesh, b.mesh)
+    await waitFor(() => a.state.neighbors[0]?.card && b.state.neighbors[0]?.card)
+    await a.core.saveSettings({ hidden: true })
+    await waitFor(() => !b.state.neighbors[0].card)
+    await new Promise((r) => setTimeout(r, 300))
+    expect(b.state.neighbors[0].card).toBeUndefined()
+    await b.core.invite({ id: a.id, name: 'Alice', card: b64(parseLink(a.link).card), hops: 1 })
+    await new Promise((r) => setTimeout(r, 250))
+    expect(a.state.contacts[b.id]).toBeUndefined()
+    await a.core.saveSettings({ hidden: false })
+    await waitFor(() => b.state.neighbors[0].card?.id === a.id)
+  })
+
+  it('keeps showing you to your contacts', async () => {
+    const a = await user('Alice'), b = await user('Bob')
+    await b.core.addContactFromLink(a.link)
+    await a.core.addContactFromLink(b.link)
+    connect(a.mesh, b.mesh)
+    await waitFor(() => a.state.neighbors[0]?.card && b.state.neighbors[0]?.card)
+    await a.core.saveSettings({ hidden: true })
+    await new Promise((r) => setTimeout(r, 300))
+    expect(b.state.neighbors[0].card?.id).toBe(a.id)
+  })
+})
+
+describe('verification memory and hints', () => {
+  it('remembers a verified key across delete and re-add', async () => {
+    const a = await user('Alice'), b = await user('Bob')
+    await b.core.addContactFromLink(a.link)
+    await b.core.markVerified(a.id)
+    expect(b.state.contacts[a.id].verification).toBe('manual')
+    await b.core.deleteContact(a.id)
+    const again = await b.core.addContactFromLink(a.link)
+    expect(again.verification).toBe('manual')
+    expect(again.verifiedAt).toBeGreaterThan(0)
+  })
+
+  it('does not restore verification for a different key under the same id', async () => {
+    const a = await user('Alice'), b = await user('Bob'), c = await user('Carol')
+    await b.core.addContactFromLink(a.link)
+    await b.core.markVerified(a.id)
+    await b.core.deleteContact(a.id)
+    const other = await b.core.addContactFromLink(c.link)
+    expect(other.verification).toBe('none')
+  })
+
+  it('tells the other person that you verified their key, as a hint only', async () => {
+    const a = await user('Alice'), b = await user('Bob')
+    await a.core.addContactFromLink(b.link)
+    await a.core.sendText(b.id, 'hi')
+    await waitFor(() => b.state.contacts[a.id]?.card)
+    await a.core.markVerified(b.id)
+    await waitFor(() => b.state.contacts[a.id].peerVerified?.level === 'manual')
+    expect(b.state.contacts[a.id].verification).toBe('none')
+  })
+
+  it('always tries the nearby proof, also for someone who wrote first', async () => {
+    const a = await user('Alice'), b = await user('Bob')
+    connect(a.mesh, b.mesh)
+    await waitFor(() => a.state.neighbors[0]?.card && b.state.neighbors[0]?.card)
+    await a.core.addContactFromLink(b.link)
+    await a.core.sendText(b.id, 'hi')
+    await waitFor(() => b.state.contacts[a.id]?.verification === 'nearby', 6000)
+    await waitFor(() => a.state.contacts[b.id].verification === 'nearby', 6000)
+  })
+
+  it('does not tell a stranger who only wrote first anything about you', async () => {
+    const a = await user('Alice'), b = await user('Bob')
+    await burn(b)
+    connect(a.mesh, b.mesh)
+    await waitFor(() => a.state.neighbors[0]?.card && b.state.neighbors[0]?.card)
+    await a.core.addContactFromLink(b.link)
+    await a.core.sendText(b.id, 'hi')
+    await waitFor(() => b.state.contacts[a.id])
+    await b.core.markVerified(a.id)
+    await new Promise((r) => setTimeout(r, 200))
+    expect(a.state.contacts[b.id].peerVerified).toBeUndefined()
+  })
+})
+
+describe('unsending messages', () => {
+  it('removes a text message for both people', async () => {
+    const a = await user('Alice'), b = await user('Bob')
+    await a.core.addContactFromLink(b.link)
+    const m = await a.core.sendText(b.id, 'wrong chat')
+    await waitFor(() => b.state.messages[a.id]?.some((x) => x.text === 'wrong chat'))
+    await a.core.unsendMessage(b.id, m.id)
+    expect(a.state.messages[b.id].some((x) => x.id === m.id)).toBe(false)
+    await waitFor(() => !b.state.messages[a.id].some((x) => x.text === 'wrong chat'))
+    expect(b.state.chats.find((c) => c.id === a.id).lastText).toBe('')
+  })
+
+  it('only the author can unsend and a message that arrives after its unsend is dropped', async () => {
+    const a = await user('Alice'), b = await user('Bob')
+    await a.core.addContactFromLink(b.link)
+    const theirs = await a.core.sendText(b.id, 'keep me')
+    await waitFor(() => b.state.messages[a.id]?.length === 1)
+    expect(await codeOf(b.core.unsendMessage(a.id, b.state.messages[a.id][0].id))).toBe('no_message')
+    expect(b.state.messages[a.id]).toHaveLength(1)
+    const held = []
+    const kinds = []
+    let hold = true
+    const send = a.mesh.send
+    const seal = a.mesh.signalSeal
+    a.mesh.signalSeal = (tag, pt) => { kinds.push(JSON.parse(unutf8(pt)).t); return seal(tag, pt) }
+    a.mesh.send = async (pkt) => {
+      if (hold && decodePacket(pkt).type === TYPE.DATA) { held.push(pkt); return { neighbors: 1 } }
+      return send(pkt)
+    }
+    const m = await a.core.sendText(b.id, 'late')
+    await waitFor(() => kinds.includes('msg'))
+    await a.core.unsendMessage(b.id, m.id)
+    await waitFor(() => held.length === 2)
+    hold = false
+    const order = kinds.indexOf('unsend') < kinds.indexOf('msg') ? held : [held[1], held[0]]
+    const [first, second] = kinds.indexOf('msg') < kinds.indexOf('unsend') ? [held[1], held[0]] : order
+    await send(first)
+    await new Promise((r) => setTimeout(r, 100))
+    await send(second)
+    await new Promise((r) => setTimeout(r, 200))
+    expect(b.state.messages[a.id].some((x) => x.text === 'late')).toBe(false)
+    expect(b.state.messages[a.id].some((x) => x.text === 'keep me')).toBe(true)
+    expect(theirs.text).toBe('keep me')
+  })
+
+  it('removes a photo and clears the quoted excerpt in replies', async () => {
+    const a = await user('Alice'), b = await user('Bob')
+    await a.core.addContactFromLink(b.link)
+    await unlock(a, b)
+    const m = await a.core.sendAttachment(b.id, new Blob([random(300)], { type: 'image/png' }), 'image', { caption: 'secret pic' })
+    const got = await waitFor(() => b.state.messages[a.id]?.find((x) => x.att), 8000)
+    const reply = await b.core.sendText(a.id, 'what is this', got.id)
+    await waitFor(() => a.state.messages[b.id]?.some((x) => x.text === 'what is this'))
+    expect(reply.re.text).toBe('secret pic')
+    await a.core.unsendMessage(b.id, m.id)
+    await waitFor(() => !b.state.messages[a.id].some((x) => x.att))
+    const quoted = b.state.messages[a.id].find((x) => x.text === 'what is this')
+    expect(quoted.re.text).toBeUndefined()
+  })
 })

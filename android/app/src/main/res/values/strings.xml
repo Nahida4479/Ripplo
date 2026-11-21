@@ -7,7 +7,7 @@
     <string name="channel_relay">Mesh relay</string>
     <string name="channel_messages">Messages</string>
     <string name="channel_updates">Updates</string>
-    <string name="relay_text">Ripplo is running in the background</string>
+    <string name="relay_text">Ripplo is waiting for new messages</string>
     <string name="new_message">New message</string>
     <string name="update_available">Ripplo %1$s is available. Open the app to update.</string>
     <string name="update_ready">Update ready. Tap to install.</string>

@@ -59,6 +59,17 @@ Przyrostek to suma kontrolna integralności (wychwytuje obcięcie / uszkodzenie)
 każdy może ją przeliczyć. Autentyczność zapewnia weryfikacja (sekcja 5). Żaden serwer nigdy nie widzi
 linku.
 
+### Zaproszenia jednorazowe
+
+Za każdym razem, gdy pokazuje się zakładka „Mój kod” (i przy każdym wywołaniu `myInviteLink()`), powstaje nowy losowy 8-bajtowy token, a link
+ma postać `ripplo://add/<karta>.<suma>.<token>` (token = 11 znaków base64url; link bez tokenu nadal się parsuje). Wystawca trzyma do 30
+niewykorzystanych tokenów (`kv/tokens`, najstarszy odpada). Osoba, która skanuje link, zapamiętuje token na nowym kontakcie, a pierwsze
+wiadomości do wystawcy niosą go jako `tk` obok karty, dopóki wystawca raz nie odpowie. Wystawca realizuje token raz: nadawca jest wtedy
+zaufany jako ktoś, komu wystawca dał link (`addedVia: "link"`, więc połączenia i multimedia są przyjmowane, §6.1). Token nieznany lub już użyty
+przez kogoś innego nic nie daje, a taki nadawca zostaje obcym, który napisał pierwszy. Powtórzenie tego samego tokenu przez tego samego
+nadawcę jest nieszkodliwe. Link to więc klucz jednorazowy, a nie lista dostępu: przekazanie go dalej nie daje drugiej osobie zaufania, tylko
+pierwszej, która go użyła.
+
 ## 2. Warstwy szyfrowania
 
 1. **Protokół Signal — oficjalna `libsignal` 0.108.5** (AGPL-3.0, autorstwa Signal). PQXDH (X25519 +
@@ -180,6 +191,11 @@ PING z wypełnieniem (16 KiB dla mediów Wi-Fi/L2CAP, 2 KiB dla BLE GATT) i mier
 przełącza się na następne. Przed pierwszym pomiarem nominalne kbps: lan 20000,
 wifi-aware 20000, wifi-direct 20000, multipeer 10000, l2cap 300, ble 50.
 
+Łącze, które przez 150 s nie dostarczy żadnego bajtu, jest zamykane (co 60 s PING podtrzymuje rozmowę zdrowego, bezczynnego łącza, liczy się każdy
+odebrany bajt, więc długi transfer go nie wyzwoli). Bez tego łącze, którego druga strona zniknęła bez zamknięcia gniazda, zostawało na liście
+sąsiadów, router dalej wysyłał jednoadresowo trasą nauczoną z wcześniejszego ACK, a wiadomości kończyły jako „poza zasięgiem” przy telefonach obok siebie.
+Zamknięcie czyści trasy przez nie, więc następny DATA znów zalewa sieć.
+
 Zduplikowane łącza tego samego medium do tego samego węzła: zostaw to zainicjowane przez niższy nodeTag.
 
 | medium       | Android | iOS | interop | discovery |
@@ -216,7 +232,7 @@ Przebieg po dodaniu kontaktu przez link, zakładkę Ludzie lub QR:
    Próbuj przez 60 s.
 2. Sukces → `nearby` (albo `qr`, jeśli kontakt dodano przez skanowanie).
 3. Porażka → ostrzeżenie: *„Nie udało się zweryfikować tego klucza publicznego. Nie masz pewności, że osoba po drugiej
-   stronie to ta, którą dodałeś.”* z trzema akcjami: **Zweryfikuj kodem QR** (zeskanuj osobiście jej QR
+   stronie to ta, którą dodałeś/aś.”* z trzema akcjami: **Zweryfikuj kodem QR** (zeskanuj osobiście jej QR
    bezpieczeństwa), **Ponów przez sieć**, **Jestem pewien, że to ta osoba** (→ `manual`, okno potwierdzenia).
 4. Sąsiad lub wpis w Ludziach ogłaszający tę samą nazwę wyświetlaną z innym kluczem wywołuje czerwone
    ostrzeżenie *możliwa podmiana klucza*.
@@ -237,6 +253,35 @@ a `{ "t": "profile" }` (sam nośnik) idzie od razu do każdego kontaktu; nieudan
 Odbiorca stosuje `nm` po `cleanName` (≤ 40 znaków) i ponownie sprawdza konflikt tej samej nazwy. Nazwy w kartach
 NIE są podpisane, więc nazwa z karty, `hello` lub `REPLY` nigdy nie nadpisuje nazwy istniejącego kontaktu.
 `ripploId` i klucze się nie zmieniają.
+
+### Pamięć weryfikacji, stałe próby i podpowiedzi
+
+- Każdy zweryfikowany klucz (nearby, qr, manual) jest pamiętany po `ripploId` i kluczu w `kv/verified`, także po usunięciu kontaktu. Ponowne
+  dodanie tego samego klucza od razu przywraca weryfikację; inny klucz pod tym samym id nie.
+- Dowód bliskości jest próbowany dla każdego nowego kontaktu (także tego, który napisał pierwszy) i ponownie, gdy pojawia się sąsiad,
+  którego karta pasuje do niezweryfikowanego kontaktu (najwyżej co 30 s), o ile kontakt nie jest oczekującą prośbą.
+- Gdy kogoś zweryfikujesz, dostaje `vf` (nearby / qr / manual) w następnej wiadomości oraz od razu `{ "t": "profile" }`. Odbiorca zapisuje to
+  jako `peerVerified` i pokazuje „X już zweryfikował(a) twój klucz” tylko jako podpowiedź: twierdzenie od klucza, który jest sprawdzany, nic
+  nie dowodzi, więc nigdy nie zmienia własnego stanu weryfikacji odbiorcy. Jeśli kontakt, którego kartę już masz, przysyła kartę ponownie po tym,
+  jak cię potwierdził, to znaczy, że cię zgubił (usunął i dodał na nowo); `avSent`, `nameSent` i `vfSent` są zerowane i profil idzie jeszcze raz.
+  Obcy, którzy tylko napisali pierwsi (`incoming`, bez twojej odpowiedzi), nie dostają nic z tego.
+
+### Cofanie wysłania wiadomości
+
+Przytrzymaj (albo kliknij prawym, albo „Cofnij wysłanie” po stuknięciu w dymek) własną wiadomość. `{ "t": "unsend", "id": <id w sieci>, "g"? }` idzie
+do każdego odbiorcy, a wiadomość znika lokalnie od razu, razem z blobem zdjęcia. Odbiorca przyjmuje to tylko dla własnych wiadomości nadawcy
+(lokalne id to `idNadawcy.idWSieci`, nadawca jest uwierzytelniony przez Signal), usuwa wiadomość i jej blob, czyści cytowany fragment w widocznych
+odpowiedziach i zapamiętuje id w `kv/unsent` (1000 wpisów), żeby wiadomość, która dojdzie po cofnięciu, została odrzucona. Niedoręczone cofnięcia
+zostają w `kv/unsends` i są ponawiane przy starcie i gdy pojawia się sąsiad. Powiadomień już pokazanych nie da się wycofać.
+
+### Odpowiedzi i podpisy
+
+Wiadomość `msg` lub `att` może nieść `re = { id, who, text?, kind? }`: `id` to identyfikator w sieci cytowanej wiadomości, `who`
+to ripploId jej autora, `text` fragment do 120 znaków, `kind` image / video / voice dla multimediów. Odbiorca waliduje wszystkie
+cztery pola i odrzuca zniekształcone `re`, zachowując wiadomość. Mapuje odwołanie na lokalny identyfikator wiadomości (`id` dla
+własnych, `who.id` dla cudzych), więc stuknięcie w cytat przewija do oryginału. Fragment to to, co zadeklaruje nadawca, jak w
+każdym komunikatorze. Wskaźnik `att` może też nieść `text`, podpis do 1000 znaków, pokazywany pod multimediami. Podpis ani odpowiedź
+niczego nie zmieniają w uprawnieniach: bramkowanie multimediów z sekcji 6.1 nadal obowiązuje.
 
 ### Wiadomości głosowe
 
@@ -263,7 +308,7 @@ Podróżuje tylko jako pole `av` w wiadomości szyfrowanej Signalem, więc przek
 
 - `{ "t": "hello", "card": "<b64 card bytes>", "r": 1? }` — wysyłana do każdego nowego sąsiada; wypełnia sekcję „W pobliżu”
   w zakładce Ludzie i umożliwia dowód bliskości. `r` = „nie mam jeszcze twojej karty, odpowiedz”: odbiorca odsyła hello
-  bez `r`. Nadawca, który nadal nie ma karty sąsiada, ponawia z `r` po 3, 10 i 30 s, a hello, które przyjdzie przed
+  bez `r`. Nadawca, który nadal nie ma karty sąsiada, ponawia z `r` po 3, 6, 12 … aż do co 60 s, dopóki sąsiad nie ma karty, a hello, które przyjdzie przed
   zdarzeniem sąsiada, jest buforowane per węzeł, więc wykrywanie jest symetryczne. Gdy użytkownik jest ukryty (niżej),
   hello idzie tylko do sąsiadów, których karta należy do kontaktu (jedna odpowiedź na łącze, więc dwa ukryte kontakty
   nie odbijają się w nieskończoność).
@@ -283,7 +328,7 @@ szyfrowane Signalem; karta jedzie jak zwykle jako piggyback `c`.
   Każda inna wiadomość od kontaktu z `request: "out"` albo wzajemne `invite` liczy się jako akceptacja.
 - Kontakty z flagą prośby są ukryte w Nowym czacie, nie można ich dodać do grup, nigdy nie dostają wysyłek profilu
   (`profile`, ponowne `hello`) i dostają goły `{ "t": "decline" }` bez karty, nazwy i zdjęcia. Pisanie do kogoś, kogo tylko
-  zaprosiłeś, jest odrzucane, a zeskanowanie QR lub otwarcie linku osoby, która cię zaprosiła, akceptuje prośbę.
+  zaprosiłeś/aś, jest odrzucane, a zeskanowanie QR lub otwarcie linku osoby, która cię zaprosiła, akceptuje prośbę.
   Ktoś spoza kontaktów nadal może otworzyć zwykły czat, pisząc pierwszy (QR/link); mogą pisać tekst, ale
   żadne połączenie nie zadzwoni (§13) i żaden wskaźnik multimediów nie jest przyjmowany, dopóki im nie odpiszesz. Lustrzana reguła
   dla nadawcy: `sendAttachment` w czacie bezpośrednim rzuca `media_locked`, dopóki druga osoba nie odpowie (`cardAck`), chyba że
@@ -292,7 +337,8 @@ szyfrowane Signalem; karta jedzie jak zwykle jako piggyback `c`.
 ## 7. Zakładka Ludzie (wykrywanie w całej sieci mesh)
 
 Payload DISCOVER = `{ "t": "who" }`; każdy węzeł odpowiada payloadem REPLY = bajty swojej wizytówki (§1).
-Ustawienia → Profil → „Widoczność w Znajdź osoby” (domyślnie włączona). Wyłączona: DISCOVER nie dostaje odpowiedzi
+Ustawienia → Profil → „Widoczność w Znajdź osoby” (domyślnie włączona). Wyłączenie wysyła też link-lokalne `{ "t": "bye" }` do sąsiadów, którzy nie są
+kontaktami; porzucają oni kartę, którą o tobie trzymają (kontakty ją zachowują), a `invite` od obcego jest ignorowane, gdy jesteś ukryty/a. Wyłączona: DISCOVER nie dostaje odpowiedzi
 (węzeł nadal go przekazuje), a hello idzie tylko do zaakceptowanych kontaktów (§6). Ograniczenia: sąsiad, który powtórzy publiczną
 kartę kontaktu, dostanie twoje hello, więc obecność nie jest ukryta przed aktywnym atakującym, a dwa ukryte kontakty nie znajdą się
 w pobliżu (żaden nie wysyła pierwszy), więc nie zweryfikują się w pobliżu ani nie zadzwonią.
@@ -342,6 +388,7 @@ Wartości binarne to ciągi base64 (standardowego); tagi węzłów to małe lite
 | `selfHash` | → `{ sha256 }` hex of the installed APK (Android only) |
 | `installUpdate` | `{ url, sha256, prompt? }` → `{ status }` — pobranie, weryfikacja SHA-256 i certyfikatu, instalacja. Odrzuca `install_permission` (przed pobraniem), gdy Ripplo nie ma zgody „instaluj nieznane aplikacje”; z `prompt` otwiera ten ekran ustawień |
 | `requestBatteryExemption` | – (Android) |
+| `startRing` / `stopRing` | – (Android) — dzwoni i wibruje przy połączeniu przychodzącym zgodnie z systemowymi ustawieniami dźwięku (§13) |
 | `takeShare` | → `{ share? }` — oczekująca zawartość z menu udostępniania Androida, czyszczona po odczycie |
 | `setAutoUpdate` | `{ enabled }` — Android: zapisuje ustawienie i planuje / anuluje zadanie aktualizacji w tle (§10) |
 | `checkPermissions` / `requestPermissions` | aliasy `bluetooth`, `wifi`, `notifications`; wynik zawiera też `battery` (`granted`, gdy aplikacja jest zwolniona z optymalizacji baterii, tylko Android; nie blokuje przejścia dalej) |
@@ -438,7 +485,7 @@ Sygnalizacja to wiadomość szyfrowana Signalem (zwykła ścieżka DATA, od kont
 Tylko `offer` niesie `key`, losowy 32-bajtowy klucz rozmowy, więc przekaźniki go nie widzą. Odbiorca dzwoni 45 s
 (potem `missed`); `decline` z `r: "busy"` odpowiada na ofertę, gdy już trwa rozmowa (dwa telefony dzwoniące do siebie
 naraz dostają „Zajęty”). Oferta niesie `ts`; starsza niż 120 s jest ignorowana (oferta, która leżała w skrzynce, nie dzwoni z opóźnieniem). Połączenia są
-przyjmowane tylko od kontaktów, które dodałeś, zaakceptowałeś lub do których pisałeś; obcy, który tylko napisał pierwszy, nie
+przyjmowane tylko od kontaktów, które dodałeś/aś, zaakceptowałeś/aś lub do których pisałeś/aś; obcy, który tylko napisał pierwszy, nie
 zadzwoni. Obie strony zapisują w czacie linię systemową (nieodebrane, odrzucone, czas trwania).
 
 Dźwięk idzie jako pakiety APP link-local do sąsiada, którego karta z hello to kontakt, więc połączenie wymaga łącza
@@ -453,9 +500,15 @@ zniekształcone jest po cichu odrzucane.
 Audio (JS, WebCodecs): mikrofon z usuwaniem echa, redukcją szumu i AGC przy 48 kHz, `AudioWorklet`
 (`public/call-worklet.js`) tnie 20 ms ramki, `AudioEncoder` Opus 16 kb/s, trzy ramki na pakiet (około 17
 pakietów i 4,5 kB/s w każdą stronę), `AudioDecoder` i bufor jitter 100 ms po stronie odtwarzania; ramki, które
-stałyby w kolejce dalej niż 400 ms, są porzucane. Wyciszenie wyłącza ścieżkę, więc cisza jest nadal wysyłana i podtrzymuje łącze.
+stałyby w kolejce dalej niż 400 ms, są porzucane. Koder i dekoder są odbudowywane po błędzie, a format PCM jest czytany tak, jak przyszedł, więc jedna zła ramka nie wycisza rozmowy na stałe; ekran połączenia pokazuje
+liczby ramek wysłanych / odebranych / odtworzonych / błędów do diagnozy. Wyciszenie wyłącza ścieżkę, więc cisza jest nadal wysyłana i podtrzymuje łącze.
 Rozmowa kończy się `lost` po 6 s bez uwierzytelnionej ramki (30 s przed pierwszą, gdy u rozmówcy może być otwarte pytanie o
 mikrofon) albo gdy sąsiad zniknie.
+
+Dzwonienie (Android, `Ringer`) idzie za ustawieniami samego telefonu, a nie za głośnością aplikacji: tryb dzwonka normalny = domyślny
+dzwonek na strumieniu dzwonka (`USAGE_NOTIFICATION_RINGTONE`, w pętli) plus wibracja; tryb wibracji = tylko wibracja; tryb cichy albo Nie
+przeszkadzać / każdy filtr przerw inny niż „wszystko” = ani dźwięku, ani wibracji, tylko ekran połączenia. Inne platformy używają zapasowo
+tonu WebAudio.
 
 Jeszcze nie: dzwonienie przy zamkniętej aplikacji, rozmowy przez kilka telefonów, iOS (ścieżka WebCodecs nietestowana).
 iOS nigdy nie zadzwoni do zamkniętej aplikacji bez pusha od Apple, a on wymaga serwera.

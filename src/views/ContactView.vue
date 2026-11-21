@@ -56,6 +56,7 @@ function del() {
           <div class="hint" style="color: var(--text-2); font-size: 13px">
             <template v-if="verified">{{ t('method_' + c.verification) }} · {{ date }}</template>
             <template v-else>{{ t('unverifiedWarning') }}</template>
+            <template v-if="c.peerVerified && !verified"><br />{{ t('peerVerified', { name: c.name, method: t('method_' + c.peerVerified.level) }) }}</template>
           </div>
         </div>
       </div>

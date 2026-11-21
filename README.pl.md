@@ -18,7 +18,7 @@
 </div>
 
 > [!NOTE]
-> Ripplo jest na wczesnym etapie rozwoju (v0.1.0). Natywne transporty (Kotlin / Swift) nie były jeszcze testowane w terenie. Spodziewaj się niedociągnięć.
+> Ripplo jest na wczesnym etapie rozwoju. Natywne transporty (Kotlin / Swift) nie były jeszcze testowane w terenie. Spodziewaj się niedociągnięć.
 
 # Funkcje
 
@@ -87,7 +87,7 @@ Osoby dodane z zakładki Ludzie lub z linku zaproszenia są niezweryfikowane (pr
 |---|---|
 | W pobliżu (Nearby) | Dowód typu challenge-response przez bezpośrednie łącze: właściciel klucza jest fizycznie w zasięgu. |
 | QR | Zeskanowano osobiście kod QR bezpieczeństwa tej osoby. |
-| Ręcznie (Manual) | Poręczyłeś sam (np. porównałeś numer bezpieczeństwa w innym komunikatorze). |
+| Ręcznie (Manual) | Poręczyłeś/aś sam (np. porównałeś/aś numer bezpieczeństwa w innym komunikatorze). |
 
 Po dodaniu kontaktu aplikacja przez 60 sekund szuka go jako bezpośredniego sąsiada i przeprowadza dowód bliskości. Jeśli się nie powiedzie, możesz zweryfikować kodem QR, ponowić próbę przez sieć mesh albo potwierdzić „Jestem pewien, że to ta osoba”. Sąsiad ogłaszający to samo imię z innym kluczem wywołuje czerwone ostrzeżenie „możliwa podmiana klucza”.
 

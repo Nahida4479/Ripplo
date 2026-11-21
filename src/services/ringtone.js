@@ -1,5 +1,8 @@
+import { mesh } from '../mesh/bridge.js'
+
 let ctx = null
 let timer = null
+let native = false
 
 function beep(freq, at, length) {
   const osc = ctx.createOscillator()
@@ -23,6 +26,15 @@ function cycle() {
 
 export function startRing() {
   stopRing()
+  if (mesh.isNative) {
+    native = true
+    mesh.startRing().catch(webRing)
+    return
+  }
+  webRing()
+}
+
+function webRing() {
   try {
     ctx = new AudioContext()
     ctx.resume().catch(() => {})
@@ -34,6 +46,10 @@ export function startRing() {
 }
 
 export function stopRing() {
+  if (native) {
+    native = false
+    mesh.stopRing()
+  }
   clearInterval(timer)
   timer = null
   if (navigator.vibrate) navigator.vibrate(0)

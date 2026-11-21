@@ -70,6 +70,11 @@ Empty state: illustration of ripples + "Add a friend by QR code or invite link".
   "via 3 phones"), out_of_range (red cloud-off + "Out of mesh range" + **Retry**), failed.
 - Media: images/video thumbnails 240 max, rounded 14; voice note = play button + waveform bars +
   duration. Incoming media appears only when complete.
+- Reply: drag a message sideways (either direction, 56 px) and let go; a reply icon fades in, the bubble springs back and a reply bar
+  (author + excerpt + X) appears above the composer. The reply bubble shows a quote block (author, two lines) and tapping it scrolls to
+  and flashes the original.
+- Attachments: `+` picks up to 10 photos or videos (multi-select); they wait as 64 px thumbnails with an X above the composer and
+  nothing is sent until Send. The text field then becomes the caption of the last item; a reply goes with the first.
 - Composer pill: `+` (photo/video, max 20 MB), text area auto-grow (counter `n/1000` appears from
   900, red at 1000), mic button when empty (tap to record; while recording: cancel, red dot with timer, live level bars, send), send button when text.
 - Every chat shows a lock line at the top: "Messages are end-to-end encrypted with the Signal protocol."
@@ -88,7 +93,7 @@ delivery failed); someone who invited you shows **Accept**. Contacts already add
 A phone button in the chat header (hidden for groups and pending requests, disabled during a call) starts a call; it
 needs a direct link. Full-screen sheet over everything: avatar 112, name, status (Calling… / Incoming call /
 Connecting… / timer / ended reason), then round 68 px buttons: incoming = red Decline and green Answer (ringtone and
-vibration), otherwise Mute toggle and red End. The ended state stays for 2.5 s.
+vibration following the phone's sound mode; only the screen when it is silent or in Do Not Disturb), otherwise Mute toggle and red End. The ended state stays for 2.5 s.
 
 ## Share sheet ("Send to…")
 
@@ -99,7 +104,7 @@ immediately and opens that chat.
 ## Add contact sheet
 
 Tabs: **My code** (large QR of invite link + ripploId + Share link button via Web Share API /
-copy), **Scan** (camera viewfinder with rounded mask; continuous automatic detection, native `BarcodeDetector` when present, jsQR otherwise; no button to press), **Paste link**.
+copy), **Scan** (camera viewfinder with rounded mask; continuous automatic detection, native `BarcodeDetector` when it works, otherwise ZXing compiled to WebAssembly (jsQR only while it loads); no button to press. A match closes the sheet at once with "Keys verified successfully" or "Added to contacts" and a short vibration), **Paste link**.
 
 ## Contact page
 
@@ -116,7 +121,7 @@ monospace) + QR of it, actions: Verify with QR, Retry nearby, I'm sure it's them
 - **Appearance**: mode segmented control, Accent color swatches, Background gradient swatches,
   Language.
 - **Network**: live list of transports with state + measured speed; Background relay toggle
-  (Android foreground service) and battery exemption button; "Relayed messages are never shown".
+  (Android foreground service); "Relayed messages are never shown". The battery exemption is asked only on the permission screen.
 - **Security**: app integrity (Official build ✓ / Modified ✗ / Not checked yet), DB encryption
   status, Signal protocol info.
 - **Updates**: current version, latest version, Check now, Auto-update toggle (Android), progress.

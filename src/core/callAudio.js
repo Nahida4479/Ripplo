@@ -8,6 +8,20 @@ const MAX_AHEAD = 0.4
 export const audioSupported = () =>
   !!(globalThis.AudioEncoder && globalThis.AudioDecoder && globalThis.AudioData && globalThis.EncodedAudioChunk && globalThis.AudioWorkletNode)
 
+function toFloat(data) {
+  const n = data.numberOfFrames
+  if (data.format && data.format.startsWith('s16')) {
+    const ints = new Int16Array(n)
+    data.copyTo(ints, { planeIndex: 0 })
+    const out = new Float32Array(n)
+    for (let i = 0; i < n; i++) out[i] = ints[i] / 32768
+    return out
+  }
+  const out = new Float32Array(n)
+  data.copyTo(out, { planeIndex: 0 })
+  return out
+}
+
 export async function createAudio() {
   if (!audioSupported()) throw new Error('unsupported')
   let ctx = null
@@ -21,12 +35,50 @@ export async function createAudio() {
   let tsOut = 0
   let tsIn = 0
   const pending = []
+  const counts = { sent: 0, recv: 0, played: 0, errors: 0 }
+
+  function makeEncoder(onFrames) {
+    encoder = new AudioEncoder({
+      output: (chunk) => {
+        const bytes = new Uint8Array(chunk.byteLength)
+        chunk.copyTo(bytes)
+        pending.push(bytes)
+        if (pending.length >= BATCH) {
+          counts.sent += pending.length
+          onFrames(pending.splice(0))
+        }
+      },
+      error: () => {
+        counts.errors++
+        if (!stopped) makeEncoder(onFrames)
+      },
+    })
+    encoder.configure({ codec: 'opus', sampleRate: RATE, numberOfChannels: 1, bitrate: BITRATE })
+  }
+
+  function makeDecoder() {
+    decoder = new AudioDecoder({
+      output: playData,
+      error: () => {
+        counts.errors++
+        if (!stopped) makeDecoder()
+      },
+    })
+    decoder.configure({ codec: 'opus', sampleRate: RATE, numberOfChannels: 1 })
+  }
 
   function playData(data) {
-    const pcm = new Float32Array(data.numberOfFrames)
-    data.copyTo(pcm, { planeIndex: 0, format: 'f32-planar' })
-    data.close()
+    let pcm
+    try {
+      pcm = toFloat(data)
+    } catch {
+      counts.errors++
+      return
+    } finally {
+      data.close()
+    }
     if (stopped || !ctx) return
+    if (ctx.state === 'suspended') ctx.resume().catch(() => {})
     const now = ctx.currentTime
     if (nextTime < now + 0.02) nextTime = now + JITTER
     if (nextTime - now > MAX_AHEAD) return
@@ -37,6 +89,7 @@ export async function createAudio() {
     src.connect(ctx.destination)
     src.start(nextTime)
     nextTime += pcm.length / RATE
+    counts.played++
   }
 
   return {
@@ -52,35 +105,39 @@ export async function createAudio() {
       silent.gain.value = 0
       ctx.createMediaStreamSource(stream).connect(node)
       node.connect(silent).connect(ctx.destination)
-      encoder = new AudioEncoder({
-        output: (chunk) => {
-          const bytes = new Uint8Array(chunk.byteLength)
-          chunk.copyTo(bytes)
-          pending.push(bytes)
-          if (pending.length >= BATCH) onFrames(pending.splice(0))
-        },
-        error: () => {},
-      })
-      encoder.configure({ codec: 'opus', sampleRate: RATE, numberOfChannels: 1, bitrate: BITRATE })
-      decoder = new AudioDecoder({ output: playData, error: () => {} })
-      decoder.configure({ codec: 'opus', sampleRate: RATE, numberOfChannels: 1 })
+      makeEncoder(onFrames)
+      makeDecoder()
       node.port.onmessage = (e) => {
         if (stopped) return
-        const data = new AudioData({ format: 'f32-planar', sampleRate: RATE, numberOfFrames: FRAME, numberOfChannels: 1, timestamp: tsOut, data: e.data })
-        tsOut += 20000
-        encoder.encode(data)
-        data.close()
+        try {
+          if (encoder.state === 'closed') makeEncoder(onFrames)
+          const data = new AudioData({ format: 'f32-planar', sampleRate: RATE, numberOfFrames: FRAME, numberOfChannels: 1, timestamp: tsOut, data: e.data })
+          tsOut += 20000
+          encoder.encode(data)
+          data.close()
+        } catch {
+          counts.errors++
+        }
       }
       started = true
     },
 
     play(frames) {
       if (!started || stopped) return
+      counts.recv += frames.length
       for (const f of frames) {
-        decoder.decode(new EncodedAudioChunk({ type: 'key', timestamp: tsIn, data: f }))
+        try {
+          if (decoder.state === 'closed') makeDecoder()
+          decoder.decode(new EncodedAudioChunk({ type: 'key', timestamp: tsIn, data: f }))
+        } catch {
+          counts.errors++
+          makeDecoder()
+        }
         tsIn += 20000
       }
     },
+
+    stats: () => ({ ...counts }),
 
     setMuted(muted) {
       if (stream) for (const t of stream.getAudioTracks()) t.enabled = !muted

@@ -30,11 +30,14 @@ async function handle(text, via) {
   try {
     if (verify.value) {
       const ok = await verifyByQr(ui.add.id, text)
+      if (ok && navigator.vibrate) navigator.vibrate(30)
       toast(ok ? t('verifiedOk') : t('verifyMismatch'))
       if (!ok) { setTimeout(() => { busy = false }, 1500); return }
       close()
     } else {
       const c = await addContactFromLink(text, via)
+      if (navigator.vibrate) navigator.vibrate(30)
+      toast(t('added'))
       close(); router.push('/contact/' + c.id)
     }
   } catch (e) {

@@ -59,6 +59,17 @@ The suffix is an integrity checksum (catches truncation / corruption). It is NOT
 anyone can recompute it. Authenticity comes from verification (section 5). No server ever sees the
 link.
 
+### Single-use invite links
+
+Each time the "My code" tab is shown (and each `myInviteLink()` call) a new random 8-byte token is issued and the link becomes
+`ripplo://add/<card>.<checksum>.<token>` (token = 11 base64url characters; a link without a token still parses). The issuer keeps
+up to 30 unused tokens (`kv/tokens`, oldest dropped). The person who scans the link remembers the token on the new contact and the
+first messages to the issuer carry it as `tk` next to the card, until the issuer has answered once. The issuer redeems a token once:
+the sender is then trusted as someone the issuer handed the link to (`addedVia: "link"`, so calls and media are accepted, §6.1). A token
+that is unknown or already used by someone else earns nothing, and that sender stays a stranger who wrote first. A repeat of the same
+token by the same sender is harmless. The link is therefore a one-time key, not an access list: forwarding it gives the second
+person no trust, only the first person to use it.
+
 ## 2. Encryption layers
 
 1. **Signal protocol — official `libsignal` 0.108.5** (AGPL-3.0, by Signal). PQXDH (X25519 +
@@ -181,6 +192,11 @@ PING with filler (16 KiB on Wi-Fi/L2CAP media, 2 KiB on BLE GATT) and measures
 back to the next on failure. Before the first measurement, nominal kbps: lan 20000,
 wifi-aware 20000, wifi-direct 20000, multipeer 10000, l2cap 300, ble 50.
 
+A link that delivers no byte for 150 s is closed (every 60 s PING keeps a healthy idle link talking, any received byte counts, so a
+long transfer never trips it). Without this a link whose peer vanished without closing the socket stayed in the neighbor list, the
+router kept unicasting along the route learned from an earlier ACK, and messages ended as "out of range" with the phones side by side.
+Closing it clears the routes through it, so the next DATA floods again.
+
 Duplicate links of the same medium to the same node: keep the one initiated by the lower nodeTag.
 
 | medium       | Android | iOS | interop | discovery |
@@ -239,6 +255,36 @@ a failed send resets `nameSent`. The receiver applies `nm` after `cleanName` (�
 the same-name conflict check. Names inside cards are NOT signed, so a name from a card, `hello` or
 `REPLY` never overrides the name of an existing contact. The `ripploId` and keys do not change.
 
+### Verification memory, always-on checks and hints
+
+- Every verified key (nearby, qr, manual) is remembered by `ripploId` and key in `kv/verified`, also after the contact is deleted.
+  Adding the same key again restores the verification at once; a different key under the same id does not.
+- A nearby proof is tried for every new contact (also one who wrote first) and again whenever a neighbor whose card matches an
+  unverified contact shows up (at most every 30 s), as long as the contact is not a pending request.
+- When you verify someone, they get `vf` (nearby / qr / manual) in the next message, plus an immediate `{ "t": "profile" }`. The
+  receiver stores it as `peerVerified` and shows "X already verified your key" as a hint only: a claim from the key under test proves
+  nothing, so it never changes the receiver's own verification state. If a contact whose card you already have sends the card again
+  after you had been acknowledged, they lost you (deleted and re-added); `avSent`, `nameSent` and `vfSent` are reset and the profile
+  is pushed again. Strangers who only wrote first (`incoming`, never replied to) get none of this.
+
+### Unsending a message
+
+Long-press (or right-click, or "Unsend" after tapping the bubble) on your own message. `{ "t": "unsend", "id": <wire id>, "g"? }` goes
+to every recipient, and the message disappears locally at once, including the photo blob. The receiver accepts it only for the sender's
+own messages (the local id is `senderId.wireId`, the sender is authenticated by Signal), deletes the message and its blob, clears the
+quoted excerpt in replies it can see, and remembers the id in `kv/unsent` (1000 entries) so a message that arrives after its unsend is
+dropped. Undelivered unsends stay in `kv/unsends` and are retried on start and whenever a neighbor appears. Notifications already shown
+cannot be recalled.
+
+### Replies and captions
+
+A `msg` or `att` message may carry `re = { id, who, text?, kind? }`: `id` is the wire id of the quoted message, `who` the
+ripploId of its author, `text` an excerpt of at most 120 characters, `kind` image / video / voice for media. The receiver
+validates all four fields and drops a malformed `re` while keeping the message. It maps the reference to the local message id
+(`id` for its own messages, `who.id` for everyone else's) so a tap on the quote scrolls to the original. The excerpt is whatever the
+sender declares, as in any messenger. An `att` pointer may also carry `text`, a caption of at most 1000 characters, shown under the
+media. A caption or reply never changes what is allowed: the media gating of section 6.1 still applies.
+
 ### Voice messages
 
 Recorded with `MediaRecorder` (`audio/webm;codecs=opus`, else `audio/mp4`, `audio/ogg`), 250 ms slices. A live
@@ -264,7 +310,7 @@ strangers). It travels only as the field `av` of a Signal-encrypted message, so 
 
 - `{ "t": "hello", "card": "<b64 card bytes>", "r": 1? }` — sent on every new neighbor; fills the People tab "nearby"
   section and enables the nearby proof. `r` = "I do not have your card yet, answer": the receiver replies with a hello
-  without `r`. A sender that still lacks the neighbor's card retries with `r` after 3, 10 and 30 s, and a hello that
+  without `r`. A sender that still lacks the neighbor's card retries with `r` after 3, 6, 12 … up to every 60 s for as long as the neighbor stays without a card, and a hello that
   arrives before the neighbor event is cached per node, so discovery is symmetric. When the user is hidden (below),
   hellos are sent only to neighbors whose card belongs to a contact (one answer per link, so two hidden contacts
   do not ping-pong).
@@ -293,7 +339,8 @@ Everything is Signal-encrypted; the card rides along as the usual `c` piggyback.
 ## 7. People tab (mesh-wide discovery)
 
 DISCOVER payload = `{ "t": "who" }`; every node answers with REPLY payload = its card bytes (§1).
-Settings → Profile → "Visible in Find people" (on by default). Off: DISCOVER is not answered (the node still
+Settings → Profile → "Visible in Find people" (on by default). Turning it off also sends link-local `{ "t": "bye" }` to neighbors that are not
+contacts, which drop the card they hold for you (contacts keep it), and an `invite` from a stranger is ignored while hidden. Off: DISCOVER is not answered (the node still
 forwards it) and hello is sent only to accepted contacts (§6). Limits: a neighbor that replays a contact's public card gets your
 hello back, so presence is not hidden from an active attacker, and two hidden contacts do not find each other nearby (neither
 sends first), so they cannot verify nearby or call.
@@ -342,6 +389,7 @@ Binary values are base64 (standard) strings; node tags are lowercase hex.
 | `selfHash` | → `{ sha256 }` hex of the installed APK (Android only) |
 | `installUpdate` | `{ url, sha256, prompt? }` → `{ status }` — download, verify SHA-256 + signing cert, install. Rejects `install_permission` (before downloading) when "install unknown apps" is not allowed for Ripplo; with `prompt` it opens that settings screen |
 | `requestBatteryExemption` | – (Android) |
+| `startRing` / `stopRing` | – (Android) — ring and vibrate an incoming call following the system sound settings (§13) |
 | `takeShare` | → `{ share? }` — pending Android share-sheet content, cleared after reading |
 | `setAutoUpdate` | `{ enabled }` — Android: stores the setting and schedules / cancels the background update job (§10) |
 | `checkPermissions` / `requestPermissions` | aliases `bluetooth`, `wifi`, `notifications`; the result also has `battery` (`granted` when exempt from battery optimization, Android only; not required to continue) |
@@ -534,9 +582,14 @@ malformed is dropped silently.
 Audio (JS, WebCodecs): microphone with echo cancellation, noise suppression and AGC at 48 kHz, an `AudioWorklet`
 (`public/call-worklet.js`) cuts 20 ms frames, `AudioEncoder` Opus 16 kb/s, three frames per packet (about 17
 packets and 4.5 kB/s each way), `AudioDecoder` and a 100 ms jitter buffer on the playback side; frames that would
-queue more than 400 ms ahead are dropped. Muting disables the track, so silence is still sent and keeps the link alive. The call
+queue more than 400 ms ahead are dropped. The encoder and decoder are rebuilt after an error and the PCM format is read as delivered, so one bad frame cannot silence a call for good; the call screen shows
+sent / received / played / error frame counts for diagnosis. Muting disables the track, so silence is still sent and keeps the link alive. The call
 ends with `lost` after 6 s without an authenticated frame (30 s before the first one, while the peer's microphone permission
 prompt may be open) or when the neighbor disappears.
+
+Ringing (Android, `Ringer`) follows the phone's own settings instead of the app volume: ringer mode normal = the default ringtone
+on the ring stream (`USAGE_NOTIFICATION_RINGTONE`, looping) plus vibration; vibrate mode = vibration only; silent mode, or Do Not Disturb /
+any interruption filter other than "all" = neither sound nor vibration, only the call screen. Other platforms fall back to a WebAudio tone.
 
 Not yet: ringing while the app is closed, calls across several phones, iOS (the WebCodecs path is untested there).
 iOS can never ring a closed app without Apple push, which needs a server.

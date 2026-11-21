@@ -70,6 +70,11 @@ Stan pusty: ilustracja fal + „Dodaj znajomego kodem QR lub linkiem zaproszenia
   „przez 3 telefony”), out_of_range (czerwona chmura-off + „Poza zasięgiem sieci” + **Ponów**), failed.
 - Multimedia: miniatury obrazów/wideo maks. 240, zaokrąglone 14; wiadomość głosowa = przycisk odtwarzania + słupki fali +
   czas trwania. Przychodzące multimedia pojawiają się dopiero po otrzymaniu w całości.
+- Odpowiedź: przeciągnij wiadomość w bok (w dowolną stronę, 56 px) i puść; pojawia się ikona odpowiedzi, dymek sprężynuje z powrotem, a nad
+  polem pisania pasek odpowiedzi (autor + fragment + X). Dymek odpowiedzi pokazuje blok cytatu (autor, dwie linie), a stuknięcie w niego
+  przewija do oryginału i go podświetla.
+- Załączniki: `+` wybiera do 10 zdjęć lub filmów (wielokrotny wybór); czekają jako miniatury 64 px z X nad polem pisania i nic nie jest wysyłane
+  do czasu Wyślij. Pole tekstowe staje się wtedy podpisem ostatniego elementu; odpowiedź idzie z pierwszym.
 - Pole pisania w kształcie pigułki: `+` (zdjęcie/wideo, maks. 20 MB), pole tekstowe z automatycznym powiększaniem (licznik `n/1000` pojawia się od
   900, czerwony przy 1000), przycisk mikrofonu przy pustym polu (stuknij, by nagrywać; podczas nagrywania: anuluj, czerwona kropka z czasem, kreski poziomu na żywo, wyślij), przycisk wysyłania przy tekście.
 - Każdy czat pokazuje na górze linię z kłódką: „Wiadomości są szyfrowane end-to-end protokołem Signal.”
@@ -88,7 +93,7 @@ doręczenie się nie udało); osoba, która cię zaprosiła, ma **Akceptuj**. Ko
 Przycisk słuchawki w nagłówku czatu (ukryty dla grup i oczekujących próśb, zablokowany podczas rozmowy) zaczyna
 połączenie; wymaga łącza bezpośredniego. Arkusz na cały ekran nad wszystkim: awatar 112, nazwa, stan (Dzwonię… /
 Połączenie przychodzące / Łączenie… / licznik / powód zakończenia), potem okrągłe przyciski 68 px: przychodzące = czerwony
-Odrzuć i zielony Odbierz (dzwonek i wibracja), w innym razie przełącznik Wycisz i czerwony Zakończ. Stan zakończenia
+Odrzuć i zielony Odbierz (dzwonek i wibracja zgodnie z trybem dźwięku telefonu; tylko ekran, gdy jest cichy lub w trybie Nie przeszkadzać), w innym razie przełącznik Wycisz i czerwony Zakończ. Stan zakończenia
 zostaje 2,5 s.
 
 ## Arkusz udostępniania („Wyślij do…”)
@@ -100,7 +105,7 @@ czatu wysyła od razu i otwiera ten czat.
 ## Arkusz dodawania kontaktu
 
 Zakładki: **Mój kod** (duży QR linku zaproszenia + ripploId + przycisk Udostępnij link przez Web Share API /
-kopiowanie), **Skanuj** (wizjer kamery z zaokrągloną maską; ciągłe automatyczne wykrywanie, natywny `BarcodeDetector` gdy jest, w przeciwnym razie jsQR; bez przycisku), **Wklej link**.
+kopiowanie), **Skanuj** (wizjer kamery z zaokrągloną maską; ciągłe automatyczne wykrywanie, natywny `BarcodeDetector`, gdy działa, w przeciwnym razie ZXing skompilowany do WebAssembly (jsQR tylko podczas ładowania); bez przycisku. Trafienie od razu zamyka arkusz z komunikatem „Klucze zostały poprawnie zweryfikowane” lub „Dodano do kontaktów” i krótką wibracją), **Wklej link**.
 
 ## Strona kontaktu
 
@@ -117,7 +122,7 @@ czcionką monospace) + jego QR, akcje: Zweryfikuj kodem QR, Ponów sprawdzenie w
 - **Wygląd**: kontrolka segmentowa trybu, próbki Koloru akcentu, próbki Tła (gradient),
   Język.
 - **Sieć**: lista transportów na żywo ze stanem + zmierzoną prędkością; przełącznik Przekazywania w tle
-  (usługa pierwszoplanowa Androida) i przycisk zwolnienia z optymalizacji baterii; „Przekazywane wiadomości nigdy nie są wyświetlane”.
+  (usługa pierwszoplanowa Androida); „Przekazywane wiadomości nigdy nie są wyświetlane”. Zwolnienie z optymalizacji baterii jest pytane tylko na ekranie uprawnień.
 - **Bezpieczeństwo**: integralność aplikacji (Oficjalna wersja ✓ / Zmodyfikowana wersja ✗ / Jeszcze nie sprawdzono), stan
   szyfrowania bazy danych, informacje o protokole Signal.
 - **Aktualizacje**: obecna wersja, najnowsza wersja, Sprawdź teraz, przełącznik Aktualizuj automatycznie (Android), postęp.

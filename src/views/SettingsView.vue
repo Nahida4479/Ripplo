@@ -44,15 +44,19 @@ const initials = l => l.slice(0, 2).toUpperCase()
     <div class="card">
       <div class="row">
         <button class="icon-btn" style="width: auto; height: auto" :aria-label="t('changePhoto')" @click="photoInput.click()"><Avatar :name="state.profile?.name" :photo="state.profile?.avatar" :size="44" /></button>
-        <span v-if="draft === null" class="grow"><span class="label">{{ state.profile?.name }}</span><br /><span class="hint mono">{{ state.profile?.ripploId }}</span></span>
+        <span v-if="draft === null" class="grow wrap"><span class="label">{{ state.profile?.name }}</span><br /><span class="hint mono">{{ state.profile?.ripploId }}</span></span>
         <input v-else v-model="draft" class="field grow" maxlength="40" :aria-label="t('yourName')" @keyup.enter="saveName" />
+        <input ref="photoInput" type="file" accept="image/*" hidden @change="pickPhoto" />
+      </div>
+      <div class="row profile-acts">
         <template v-if="draft !== null">
           <button class="btn sm ghost" @click="draft = null">{{ t('cancel') }}</button>
           <button class="btn sm" @click="saveName">{{ t('save') }}</button>
         </template>
-        <button v-else class="btn sm ghost" @click="draft = state.profile?.name">{{ t('changeName') }}</button>
-        <button v-if="draft === null && state.profile?.avatar" class="btn sm ghost" @click="setAvatar('')">{{ t('removePhoto') }}</button>
-        <input ref="photoInput" type="file" accept="image/*" hidden @change="pickPhoto" />
+        <template v-else>
+          <button class="btn sm ghost" @click="draft = state.profile?.name">{{ t('changeName') }}</button>
+          <button v-if="state.profile?.avatar" class="btn sm ghost" @click="setAvatar('')">{{ t('removePhoto') }}</button>
+        </template>
       </div>
       <div class="row hint">{{ t('photoHint') }}</div>
       <div class="row">
@@ -95,7 +99,6 @@ const initials = l => l.slice(0, 2).toUpperCase()
         <span class="grow"><span class="label">{{ t('backgroundRelay') }}</span><br /><span class="hint">{{ t('relayHint') }}</span></span>
         <button class="switch" role="switch" :aria-checked="state.settings.backgroundRelay" :aria-label="t('backgroundRelay')" @click="saveSettings({ backgroundRelay: !state.settings.backgroundRelay })" />
       </div>
-      <button v-if="android" class="row" @click="mesh.requestBatteryExemption()"><span class="grow label">{{ t('batteryExemption') }}</span></button>
     </div>
 
     <h2 class="section">{{ t('security') }}</h2>
@@ -149,6 +152,8 @@ const initials = l => l.slice(0, 2).toUpperCase()
   </main>
 </template>
 <style scoped>
+.wrap { overflow-wrap: anywhere; }
+.profile-acts { flex-wrap: wrap; justify-content: flex-end; }
 .contrib { display: flex; align-items: center; gap: 12px; }
 .contrib img, .ini { width: 44px; height: 44px; border-radius: 50%; flex: none; }
 .ini { display: grid; place-items: center; background: var(--surface-2); font-weight: 600; }

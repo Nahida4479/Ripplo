@@ -1,9 +1,9 @@
 <script setup>
 import { ref, computed, watch, nextTick, onMounted, onBeforeUnmount } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ChevronLeft, Phone, Lock, Check, CheckCheck, CloudOff, CircleAlert, Plus, Mic, Send, X, Play, Pause, ShieldAlert } from 'lucide-vue-next'
+import { ChevronLeft, Phone, Reply, Lock, Check, CheckCheck, CloudOff, CircleAlert, Plus, Mic, Send, X, Play, Pause, ShieldAlert } from 'lucide-vue-next'
 import { state } from '../core/state.js'
-import { startCall, loadMessages, markRead, sendText, sendAttachment, retry, verifyNearby, markVerified, MAX_TEXT, MAX_FILE } from '../core/api.js'
+import { startCall, unsendMessage, loadMessages, markRead, sendText, sendAttachment, retry, verifyNearby, markVerified, MAX_TEXT, MAX_FILE } from '../core/api.js'
 import { ui, toast } from '../components/ui.js'
 import { t, locale } from '../i18n.js'
 import Avatar from '../components/Avatar.vue'
@@ -47,18 +47,105 @@ function toBottom() { nextTick(() => scroller.value && (scroller.value.scrollTop
 onMounted(async () => { await loadMessages(id); await markRead(id); toBottom() })
 watch(() => msgs.value.length, () => { toBottom(); markRead(id) })
 
+const replyTo = ref(null)
+const staged = ref([])
+const MAX_STAGED = 10
+const authorOf = m => (m.from === 'me' ? t('you') : state.contacts[m.from]?.name || 'Ripplo')
+const whoName = who => (who === state.profile?.ripploId ? t('you') : state.contacts[who]?.name || 'Ripplo')
+const kindLabel = kind => t(kind === 'video' ? 'videoMessage' : kind === 'voice' ? 'voiceMessage' : 'photoMessage')
+const snippet = m => m.text || kindLabel(m.att?.kind)
+
+function unstageAll() {
+  for (const s of staged.value) URL.revokeObjectURL(s.url)
+  staged.value = []
+}
+function unstage(i) {
+  URL.revokeObjectURL(staged.value[i].url)
+  staged.value.splice(i, 1)
+}
 async function send() {
   const v = text.value.trim()
-  if (!v || v.length > MAX_TEXT) return
+  if ((!v && !staged.value.length) || v.length > MAX_TEXT) return
+  const items = staged.value
+  const to = replyTo.value?.id
+  staged.value = []
+  replyTo.value = null
   text.value = ''
-  try { await sendText(id, v) } catch (e) { toast(e.message) }
+  try {
+    if (!items.length) return await sendText(id, v, to)
+    for (let i = 0; i < items.length; i++) {
+      const last = i === items.length - 1
+      await sendAttachment(id, items[i].file, items[i].kind, { ...(last && v && { caption: v }), ...(i === 0 && to && { replyTo: to }) })
+      URL.revokeObjectURL(items[i].url)
+    }
+  } catch (e) {
+    items.forEach(s => URL.revokeObjectURL(s.url))
+    fail(e)
+  }
 }
-async function pickFile(e) {
-  const f = e.target.files[0]
+function pickFile(e) {
+  const files = [...e.target.files]
   e.target.value = ''
-  if (!f) return
-  if (f.size > MAX_FILE) return toast(t('fileTooBig'))
-  try { await sendAttachment(id, f, f.type.startsWith('video') ? 'video' : 'image') } catch (err) { fail(err) }
+  for (const f of files) {
+    if (staged.value.length >= MAX_STAGED) break
+    if (f.size > MAX_FILE) { toast(t('fileTooBig')); continue }
+    staged.value.push({ file: f, kind: f.type.startsWith('video') ? 'video' : 'image', url: URL.createObjectURL(f) })
+  }
+}
+onBeforeUnmount(unstageAll)
+
+const SWIPE = 56
+const offset = ref({ id: null, x: 0, rest: true })
+let drag = null
+let swiped = false
+function confirmUnsend(m) {
+  ui.confirm = { title: t('unsendTitle'), text: t('unsendText'), ok: t('unsend'), danger: true, onOk: () => unsendMessage(id, m.id).catch(fail) }
+}
+function onDown(e, m) {
+  if (e.pointerType === 'mouse' && e.button !== 0) return
+  drag = { m, x: e.clientX, y: e.clientY, locked: false, el: e.currentTarget, pid: e.pointerId, press: null }
+  if (m.from === 'me') {
+    const d = drag
+    d.press = setTimeout(() => {
+      if (drag === d && !d.locked) { swiped = true; drag = null; if (navigator.vibrate) navigator.vibrate(15); confirmUnsend(m) }
+    }, 550)
+  }
+}
+function onMove(e) {
+  if (!drag) return
+  const dx = e.clientX - drag.x
+  const dy = e.clientY - drag.y
+  if (Math.abs(dx) > 8 || Math.abs(dy) > 8) clearTimeout(drag.press)
+  if (!drag.locked) {
+    if (Math.abs(dy) > 12 && Math.abs(dy) > Math.abs(dx)) { drag = null; return }
+    if (Math.abs(dx) < 12) return
+    drag.locked = true
+    try { drag.el.setPointerCapture(drag.pid) } catch {}
+  }
+  offset.value = { id: drag.m.id, x: Math.max(-72, Math.min(72, dx)), rest: false }
+}
+function endDrag(commit) {
+  if (!drag) return
+  clearTimeout(drag.press)
+  const hit = drag.locked && commit && Math.abs(offset.value.x) >= SWIPE
+  if (drag.locked) { swiped = true; setTimeout(() => { swiped = false }, 80) }
+  if (hit) { replyTo.value = drag.m; if (navigator.vibrate) navigator.vibrate(12) }
+  offset.value = { id: drag.m.id, x: 0, rest: true }
+  drag = null
+}
+function toggleStatus(m) {
+  if (!swiped) shown.value = shown.value === m.id ? null : m.id
+}
+const viewer = ref(null)
+function openImage(m) {
+  if (!swiped) viewer.value = m
+}
+function jump(mid) {
+  const el = document.getElementById('m-' + mid)
+  if (!el) return
+  el.scrollIntoView({ block: 'center', behavior: 'smooth' })
+  el.classList.add('flash')
+  setTimeout(() => el.classList.remove('flash'), 1200)
 }
 
 const rec = ref(false)
@@ -160,6 +247,7 @@ function sure() { ui.confirm = { title: t('imSure'), text: t('imSureConfirm'), o
       <ShieldAlert :size="20" />
       <div>
         <p>{{ banner === 'red' ? t('conflictWarning') : t('unverifiedWarning') }}</p>
+        <p v-if="contact?.peerVerified">{{ t('peerVerified', { name: contact.name, method: t('method_' + contact.peerVerified.level) }) }}</p>
         <div class="bacts">
           <button class="btn sm ghost" @click="ui.add = { mode: 'verify', id }">{{ t('verifyQr') }}</button>
           <button class="btn sm ghost" @click="retryMesh">{{ t('retryMesh') }}</button>
@@ -174,9 +262,18 @@ function sure() { ui.confirm = { title: t('imSure'), text: t('imSureConfirm'), o
       <template v-for="(m, i) in msgs" :key="m.id">
         <div v-if="showDay(i)" class="day"><span>{{ dayLabel(m.ts) }}</span></div>
         <p v-if="m.from === 'system'" class="lock sys">{{ m.text }}</p>
-        <div v-else class="msg" :class="m.from === 'me' ? 'out' : 'in'">
-          <div class="bubble" @click="shown = shown === m.id ? null : m.id">
-            <img v-if="m.att?.kind === 'image' && m.att.url" :src="m.att.url" class="media" :alt="t('image')" />
+        <div v-else :id="'m-' + m.id" class="msg" :class="m.from === 'me' ? 'out' : 'in'">
+          <Reply v-if="offset.id === m.id && offset.x" class="swipe-ic" :class="{ right: offset.x < 0 }" :style="{ opacity: Math.min(1, Math.abs(offset.x) / SWIPE) }" :size="20" />
+          <div
+            class="bubble" :class="{ rest: offset.id === m.id && offset.rest }"
+            :style="offset.id === m.id && offset.x ? { transform: `translateX(${offset.x}px)` } : null"
+            @click="toggleStatus(m)" @pointerdown="onDown($event, m)" @pointermove="onMove" @pointerup="endDrag(true)" @pointercancel="endDrag(false)" @contextmenu.prevent="m.from === 'me' && confirmUnsend(m)"
+          >
+            <button v-if="m.re" class="quote" @click.stop="jump(m.re.mid)">
+              <b>{{ whoName(m.re.who) }}</b>
+              <span>{{ m.re.text || kindLabel(m.re.kind) }}</span>
+            </button>
+            <img v-if="m.att?.kind === 'image' && m.att.url" :src="m.att.url" class="media zoomable" :alt="t('image')" @click.stop="openImage(m)" />
             <video v-else-if="m.att?.kind === 'video' && m.att.url" :src="m.att.url" class="media" controls preload="metadata" />
             <div v-else-if="m.att?.kind === 'voice'" class="voice">
               <button class="pl" :aria-label="t('play')" @click.stop="play(m)"><component :is="playing === m.id ? Pause : Play" :size="18" /></button>
@@ -198,11 +295,30 @@ function sure() { ui.confirm = { title: t('imSure'), text: t('imSureConfirm'), o
             <CloudOff :size="14" /> {{ m.status === 'failed' ? t('status_failed') : t('outOfMeshRange') }}
             <button class="btn sm" @click="retry(m.id)">{{ t('retry') }}</button>
           </div>
-          <div v-else-if="m.from === 'me' && (shown === m.id || m.status === 'delivered')" class="st">{{ statusLabel(m) }}</div>
+          <div v-else-if="m.from === 'me' && (shown === m.id || m.status === 'delivered')" class="st">
+            {{ statusLabel(m) }}
+            <button v-if="shown === m.id" class="btn sm ghost" @click="confirmUnsend(m)">{{ t('unsend') }}</button>
+          </div>
         </div>
       </template>
     </div>
 
+    <div v-if="viewer" class="viewer" role="dialog" aria-modal="true" @click.self="viewer = null">
+      <button class="icon-btn close" :aria-label="t('close')" @click="viewer = null"><X :size="24" /></button>
+      <img :src="viewer.att.url" alt="" />
+    </div>
+    <div v-if="replyTo" class="replybar">
+      <Reply :size="18" />
+      <div class="rt"><b>{{ authorOf(replyTo) }}</b><span>{{ snippet(replyTo) }}</span></div>
+      <button class="icon-btn" :aria-label="t('cancel')" @click="replyTo = null"><X :size="20" /></button>
+    </div>
+    <div v-if="staged.length" class="staged">
+      <div v-for="(s, i) in staged" :key="s.url" class="thumb">
+        <img v-if="s.kind === 'image'" :src="s.url" alt="" />
+        <video v-else :src="s.url" muted playsinline preload="metadata" />
+        <button class="rm" :aria-label="t('cancel')" @click="unstage(i)"><X :size="14" /></button>
+      </div>
+    </div>
     <footer class="comp">
       <template v-if="rec">
         <button class="icon-btn" :aria-label="t('cancel')" @click="stopRec(true)"><X :size="22" /></button>
@@ -211,12 +327,12 @@ function sure() { ui.confirm = { title: t('imSure'), text: t('imSureConfirm'), o
       </template>
       <template v-else>
         <button class="icon-btn" :aria-label="t('attach')" @click="mediaLocked ? toast(t('err_media_locked')) : fileIn.click()"><Plus :size="22" /></button>
-        <input ref="fileIn" type="file" accept="image/*,video/*" hidden @change="pickFile" />
+        <input ref="fileIn" type="file" accept="image/*,video/*" multiple hidden @change="pickFile" />
         <div class="box">
           <textarea v-model="text" rows="1" :placeholder="t('message')" :aria-label="t('message')" @keydown.enter.exact.prevent="send" @input="e => { e.target.style.height = 'auto'; e.target.style.height = e.target.scrollHeight + 'px' }" />
           <small v-if="text.length >= 900" :class="{ over: text.length >= MAX_TEXT }">{{ text.length }}/{{ MAX_TEXT }}</small>
         </div>
-        <button v-if="text.trim()" class="send" :aria-label="t('send')" @click="send"><Send :size="20" /></button>
+        <button v-if="text.trim() || staged.length" class="send" :aria-label="t('send')" @click="send"><Send :size="20" /></button>
         <button v-else class="icon-btn" :aria-label="t('recordVoice')" @click="startRec"><Mic :size="22" /></button>
       </template>
     </footer>
@@ -251,6 +367,28 @@ function sure() { ui.confirm = { title: t('imSure'), text: t('imSureConfirm'), o
 .out .pl svg { color: var(--accent); }
 .wave { display: flex; align-items: center; gap: 2px; flex: 1; }
 .wave i { width: 3px; border-radius: 2px; background: currentColor; opacity: .7; }
+.zoomable { cursor: zoom-in; }
+.viewer { position: fixed; inset: 0; z-index: 60; background: rgba(0, 0, 0, .92); display: grid; place-items: center; padding: calc(var(--sat, 0px) + 56px) 12px calc(var(--sab, 0px) + 12px); }
+.viewer img { max-width: 100%; max-height: 100%; border-radius: 8px; }
+.viewer .close { position: absolute; top: calc(var(--sat, 0px) + 8px); right: 8px; color: #fff; }
+.msg { position: relative; touch-action: pan-y; }
+.bubble { touch-action: pan-y; user-select: none; }
+.bubble.rest { transition: transform .18s ease; }
+.swipe-ic { position: absolute; top: 50%; left: -30px; transform: translateY(-50%); color: var(--text-2); }
+.swipe-ic.right { left: auto; right: -30px; }
+.msg.flash .bubble { animation: flash 1.2s ease; }
+@keyframes flash { 0%, 60% { box-shadow: 0 0 0 3px var(--accent); } 100% { box-shadow: 0 0 0 3px transparent; } }
+.quote { display: block; width: 100%; text-align: left; margin: 0 0 6px; padding: 4px 8px; border-left: 3px solid currentColor; border-radius: 6px; background: color-mix(in srgb, currentColor 12%, transparent); font-size: 12px; white-space: normal; }
+.quote b { display: block; opacity: .85; }
+.quote span { display: block; opacity: .75; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+.replybar { display: flex; align-items: center; gap: 8px; padding: 6px 10px; margin-bottom: 4px; border-radius: 14px; background: var(--surface); border: 1px solid var(--border); color: var(--text-2); }
+.replybar .rt { flex: 1; min-width: 0; font-size: 12px; }
+.replybar .rt b { display: block; color: var(--text); }
+.replybar .rt span { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.staged { display: flex; gap: 8px; overflow-x: auto; padding: 6px 0; }
+.thumb { position: relative; flex: none; width: 64px; height: 64px; border-radius: 12px; overflow: hidden; background: var(--surface-2); }
+.thumb img, .thumb video { width: 100%; height: 100%; object-fit: cover; display: block; }
+.thumb .rm { position: absolute; top: 3px; right: 3px; width: 20px; height: 20px; border-radius: 50%; display: grid; place-items: center; background: rgba(0, 0, 0, .6); color: #fff; }
 .st, .oor { font-size: 11px; color: var(--text-2); margin: 2px 4px; display: flex; gap: 6px; align-items: center; }
 .oor { color: var(--danger); }
 .comp { display: flex; align-items: flex-end; gap: 6px; padding: 8px 0 calc(var(--sab) + 8px); }

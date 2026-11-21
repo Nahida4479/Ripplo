@@ -92,6 +92,7 @@ final class MeshEngine {
         var node: String?
         var kbps: Double
         var rttMs = 0
+        var lastRx = Date()
         var pings = [Data: (Date, Int)]()
         init(_ link: MeshLink) {
             self.link = link
@@ -226,6 +227,7 @@ final class MeshEngine {
 
     func linkData(_ link: MeshLink, _ data: Data) {
         guard let s = states[ObjectIdentifier(link)] else { return }
+        s.lastRx = Date()
         guard let frames = s.reader.feed(data) else {
             states.removeValue(forKey: ObjectIdentifier(link))
             link.close(block: false)
@@ -338,6 +340,12 @@ final class MeshEngine {
         tickCount += 1
         transports.forEach { $0.tick() }
         guard tickCount % 4 == 0 else { return }
+        let dead = states.values.filter { Date().timeIntervalSince($0.lastRx) > 150 }
+        for s in dead {
+            states.removeValue(forKey: ObjectIdentifier(s.link))
+            s.link.close(block: false)
+            nodeLost(s)
+        }
         let cutoff = Date().addingTimeInterval(-60)
         for s in states.values {
             s.pings = s.pings.filter { $0.value.0 > cutoff }

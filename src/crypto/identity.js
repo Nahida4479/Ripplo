@@ -35,12 +35,12 @@ export function checkCard(card) {
   return { id: ripploId, tag, ik, name, bundle, card }
 }
 
-export function encodeLink(card) {
-  return `ripplo://add/${b64url(card)}.${b64url(sha256(card).slice(0, 6))}`
+export function encodeLink(card, token) {
+  return `ripplo://add/${b64url(card)}.${b64url(sha256(card).slice(0, 6))}${token ? '.' + b64url(token) : ''}`
 }
 
 export function parseLink(text) {
-  const m = /ripplo:\/\/add\/([A-Za-z0-9_-]+)\.([A-Za-z0-9_-]{8})/.exec(String(text).replace(/\s+/g, ''))
+  const m = /ripplo:\/\/add\/([A-Za-z0-9_-]+)\.([A-Za-z0-9_-]{8})(?:\.([A-Za-z0-9_-]{11}))?/.exec(String(text).replace(/\s+/g, ''))
   if (!m) throw new RipploError('bad_link', 'not a Ripplo link')
   let card
   try {
@@ -49,5 +49,6 @@ export function parseLink(text) {
   } catch (e) {
     throw e instanceof RipploError ? e : new RipploError('bad_link', 'not a Ripplo link')
   }
-  return checkCard(card)
+  const v = checkCard(card)
+  return m[3] ? { ...v, token: m[3] } : v
 }
