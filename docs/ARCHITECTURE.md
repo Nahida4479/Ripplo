@@ -277,7 +277,7 @@ Binary values are base64 (standard) strings; node tags are lowercase hex.
 | `drainInbox` | → `{ packets: [{ packet, from }] }` — packets received while JS was not attached |
 | `getDbKey` | → `{ key }` 32 bytes, created once, stored with Keystore / Keychain |
 | `selfHash` | → `{ sha256 }` hex of the installed APK (Android only) |
-| `installUpdate` | `{ url, sha256 }` → `{ status }` — download, verify SHA-256 + signing cert, install |
+| `installUpdate` | `{ url, sha256, prompt? }` → `{ status }` — download, verify SHA-256 + signing cert, install. Rejects `install_permission` (before downloading) when "install unknown apps" is not allowed for Ripplo; with `prompt` it opens that settings screen |
 | `requestBatteryExemption` | – (Android) |
 | `checkPermissions` / `requestPermissions` | aliases `bluetooth`, `wifi`, `notifications`; the result also has `battery` (`granted` when exempt from battery optimization, Android only; not required to continue) |
 | `signalInit` | → `{ bundle, ik }` — creates the identity on first call, then returns the same bundle (§1) |
@@ -309,6 +309,10 @@ and shows a content-free notification *"New message"* for `0x01` payloads.
   `SHA256SUMS` block in the release notes); `SHA256SUMS` is never fetched from the WebView because
   github.com download redirects carry no CORS headers. The current version is the native
   `versionName` (`App.getInfo()`), not the bundled `package.json` version.
+- After a self-update the system kills the app. `UpdatedReceiver` (`MY_PACKAGE_REPLACED`) relaunches
+  `MainActivity` only if Ripplo started that install in the last 30 min. Android 10+ may block starting an
+  activity from the background, so it also posts a "Ripplo was updated. Tap to open." notification,
+  removed on the next resume.
 - Native install errors carry the `PackageInstaller` status message, shown in Settings → Updates.
 - Self-check: on Android the app hashes its own installed APK and compares it with `SHA256SUMS` of
   the release matching its version — so copies shared with Nearby Share / Quick Share are verified

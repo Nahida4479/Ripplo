@@ -8,4 +8,5 @@
     <string name="channel_messages">Messages</string>
     <string name="relay_text">Relaying encrypted messages</string>
     <string name="new_message">New message</string>
+    <string name="updated_text">Ripplo was updated. Tap to open.</string>
 </resources>

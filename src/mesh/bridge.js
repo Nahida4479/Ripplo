@@ -29,7 +29,7 @@ function nativeMesh() {
     drainInbox: async () => (await P.drainInbox()).packets.map(inbound),
     getDbKey: async () => ({ key: unb64((await P.getDbKey()).key), insecure: false }),
     selfHash: async () => (await P.selfHash()).sha256,
-    installUpdate: (url, sha256) => P.installUpdate({ url, sha256 }),
+    installUpdate: (url, sha256, prompt) => P.installUpdate({ url, sha256, prompt }),
     requestBatteryExemption: () => P.requestBatteryExemption(),
     checkPermissions: () => P.checkPermissions(),
     requestPermissions: () => P.requestPermissions(),

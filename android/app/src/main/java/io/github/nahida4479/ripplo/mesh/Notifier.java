@@ -20,6 +20,7 @@ final class Notifier {
     static final String CH_MESSAGES = "messages";
     static final int ID_RELAY = 4101;
     static final int ID_MESSAGE = 4102;
+    static final int ID_UPDATED = 4103;
 
     private Notifier() { }
 
@@ -49,6 +50,28 @@ final class Notifier {
                 .setCategory(NotificationCompat.CATEGORY_SERVICE)
                 .setContentIntent(open(ctx))
                 .build();
+    }
+
+    static void updated(Context ctx) {
+        if (Build.VERSION.SDK_INT >= 33
+                && ContextCompat.checkSelfPermission(ctx, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) return;
+        createChannels(ctx);
+        Notification n = new NotificationCompat.Builder(ctx, CH_MESSAGES)
+                .setSmallIcon(R.drawable.ic_stat_ripplo)
+                .setContentTitle(ctx.getString(R.string.app_name))
+                .setContentText(ctx.getString(R.string.updated_text))
+                .setAutoCancel(true)
+                .setPriority(NotificationCompat.PRIORITY_HIGH)
+                .setContentIntent(open(ctx))
+                .build();
+        try {
+            NotificationManagerCompat.from(ctx).notify(ID_UPDATED, n);
+        } catch (SecurityException ignored) {
+        }
+    }
+
+    static void cancelUpdated(Context ctx) {
+        NotificationManagerCompat.from(ctx).cancel(ID_UPDATED);
     }
 
     static void newMessage(Context ctx) {

@@ -21,12 +21,14 @@ public class InstallReceiver extends BroadcastReceiver {
                     ctx.startActivity(confirm);
                     return;
                 } catch (RuntimeException e) {
+                    UpdatedReceiver.disarm(ctx);
                     RipploMeshPlugin.installResult(false, -1, "cannot open installer");
                     return;
                 }
             }
             return;
         }
+        if (status != PackageInstaller.STATUS_SUCCESS) UpdatedReceiver.disarm(ctx);
         RipploMeshPlugin.installResult(status == PackageInstaller.STATUS_SUCCESS, status, intent.getStringExtra(PackageInstaller.EXTRA_STATUS_MESSAGE));
     }
 }

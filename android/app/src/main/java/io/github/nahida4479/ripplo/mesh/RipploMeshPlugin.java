@@ -108,6 +108,7 @@ public class RipploMeshPlugin extends Plugin implements MeshEngine.Listener {
 
     @Override
     protected void handleOnResume() {
+        Notifier.cancelUpdated(getContext());
         if (!drained) return;
         engine.setJsAttached(true);
         for (Inbox.Item it : engine.drainInbox()) onPacket(it.packet, it.from);
@@ -918,6 +919,16 @@ public class RipploMeshPlugin extends Plugin implements MeshEngine.Listener {
         final String url = call.getString("url", "");
         final String sha = call.getString("sha256", "").toLowerCase();
         if (!url.startsWith("https://") || !sha.matches("[0-9a-f]{64}")) { call.reject("bad arguments"); return; }
+        if (Build.VERSION.SDK_INT >= 26 && !getContext().getPackageManager().canRequestPackageInstalls()) {
+            if (call.getBoolean("prompt", false)) {
+                try {
+                    getActivity().startActivity(new Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, Uri.parse("package:" + getContext().getPackageName())));
+                } catch (RuntimeException ignored) {
+                }
+            }
+            call.reject("install_permission");
+            return;
+        }
         Thread t = new Thread(() -> {
             File apk = new File(getContext().getCacheDir(), "update.apk");
             try {
@@ -1010,11 +1021,13 @@ public class RipploMeshPlugin extends Plugin implements MeshEngine.Listener {
                 session.fsync(os);
             }
             installCall = call;
+            UpdatedReceiver.arm(ctx);
             Intent i = new Intent(ctx, InstallReceiver.class).setAction(ACTION_INSTALL);
             int flags = PendingIntent.FLAG_UPDATE_CURRENT | (Build.VERSION.SDK_INT >= 31 ? PendingIntent.FLAG_MUTABLE : 0);
             PendingIntent pending = PendingIntent.getBroadcast(ctx, id, i, flags);
             session.commit(pending.getIntentSender());
         } catch (Exception e) {
+            UpdatedReceiver.disarm(ctx);
             pi.abandonSession(id);
             throw e;
         }

@@ -2,6 +2,7 @@ import { App } from '@capacitor/app'
 import { Capacitor } from '@capacitor/core'
 import { state } from '../core/state.js'
 import { mesh } from '../mesh/bridge.js'
+import { t } from '../i18n.js'
 
 const REPO = 'https://api.github.com/repos/Nahida4479/Ripplo/releases'
 const native = Capacitor.getPlatform() === 'android'
@@ -43,7 +44,7 @@ export async function checkUpdate() {
     u.apkUrl = apk?.browser_download_url || null
     u.sha256 = hashOf(rel, `Ripplo-${rel.tag_name}.apk`)
     u.checkedAt = Date.now()
-    if (u.available && native && state.settings.autoUpdate && u.apkUrl && u.sha256) await install()
+    if (u.available && native && state.settings.autoUpdate && u.apkUrl && u.sha256) await install(false)
   } catch (e) {
     u.error = e.message
   } finally {
@@ -52,11 +53,12 @@ export async function checkUpdate() {
   }
 }
 
-export async function install() {
+export async function install(prompt = true) {
   const u = state.update
+  u.error = null
   u.progress = 0
   const off = mesh.on('updateProgress', ({ progress }) => { u.progress = progress })
-  try { await mesh.installUpdate(u.apkUrl, u.sha256) } catch (e) { u.error = e.message } finally { off(); u.progress = null }
+  try { await mesh.installUpdate(u.apkUrl, u.sha256, prompt) } catch (e) { u.error = e.message === 'install_permission' ? t('err_install_permission') : e.message } finally { off(); u.progress = null }
 }
 
 export async function checkIntegrity() {

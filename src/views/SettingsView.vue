@@ -110,7 +110,7 @@ const initials = l => l.slice(0, 2).toUpperCase()
       <div class="row">
         <button class="btn sm ghost" :disabled="state.update.checking" @click="checkUpdate">{{ t(state.update.checking ? 'checking' : 'checkNow') }}</button>
         <span class="grow" />
-        <button v-if="state.update.available && android && state.update.apkUrl" class="btn sm" @click="install">{{ t('install') }}</button>
+        <button v-if="state.update.available && android && state.update.apkUrl" class="btn sm" @click="install()">{{ t('install') }}</button>
         <a v-else-if="state.update.available" class="btn sm" :href="state.update.url" target="_blank" rel="noopener">{{ t('openRelease') }}</a>
       </div>
       <div v-if="android" class="row">

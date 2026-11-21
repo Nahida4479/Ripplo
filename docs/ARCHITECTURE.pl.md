@@ -276,7 +276,7 @@ Wartości binarne to ciągi base64 (standardowego); tagi węzłów to małe lite
 | `drainInbox` | → `{ packets: [{ packet, from }] }` — packets received while JS was not attached |
 | `getDbKey` | → `{ key }` 32 bytes, created once, stored with Keystore / Keychain |
 | `selfHash` | → `{ sha256 }` hex of the installed APK (Android only) |
-| `installUpdate` | `{ url, sha256 }` → `{ status }` — download, verify SHA-256 + signing cert, install |
+| `installUpdate` | `{ url, sha256, prompt? }` → `{ status }` — pobranie, weryfikacja SHA-256 i certyfikatu, instalacja. Odrzuca `install_permission` (przed pobraniem), gdy Ripplo nie ma zgody „instaluj nieznane aplikacje”; z `prompt` otwiera ten ekran ustawień |
 | `requestBatteryExemption` | – (Android) |
 | `checkPermissions` / `requestPermissions` | aliasy `bluetooth`, `wifi`, `notifications`; wynik zawiera też `battery` (`granted`, gdy aplikacja jest zwolniona z optymalizacji baterii, tylko Android; nie blokuje przejścia dalej) |
 | `signalInit` | → `{ bundle, ik }` — creates the identity on first call, then returns the same bundle (§1) |
@@ -307,6 +307,10 @@ i pokazuje pozbawione treści powiadomienie *„Nowa wiadomość”* dla payload
 - Skróty wydania pochodzą z pola `digest` zasobu w odpowiedzi API (zapasowo: blok `SHA256SUMS` w opisie wydania);
   `SHA256SUMS` nie jest pobierany z WebView, bo przekierowania pobierania z github.com nie mają nagłówków CORS.
   Obecna wersja to natywne `versionName` (`App.getInfo()`), a nie wersja z `package.json`.
+- Po samoaktualizacji system zamyka aplikację. `UpdatedReceiver` (`MY_PACKAGE_REPLACED`) uruchamia ponownie
+  `MainActivity` tylko wtedy, gdy Ripplo zainicjowało tę instalację w ciągu ostatnich 30 min. Android 10+ może zablokować
+  start aktywności z tła, więc dodatkowo pokazuje powiadomienie „Ripplo zostało zaktualizowane. Dotknij, aby otworzyć.”,
+  usuwane przy następnym wznowieniu.
 - Błędy natywnej instalacji niosą komunikat statusu `PackageInstaller`, widoczny w Ustawienia → Aktualizacje.
 - Autokontrola: na Androidzie aplikacja liczy skrót własnego zainstalowanego APK i porównuje go z `SHA256SUMS`
   wydania odpowiadającego jej wersji — więc kopie udostępnione przez Nearby Share / Quick Share są również weryfikowane.
