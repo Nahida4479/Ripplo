@@ -4,7 +4,11 @@ def ripploKeystore = System.getenv('RIPPLO_KEYSTORE_FILE')
 
 android {
     namespace = "io.github.nahida4479.ripplo"
-    if (System.getenv("ANDROID_NDK_LATEST_HOME")) ndkPath = System.getenv("ANDROID_NDK_LATEST_HOME")
+    def ciNdk = System.getenv("ANDROID_NDK_LATEST_HOME")
+    if (ciNdk) {
+        ndkPath = ciNdk
+        ndkVersion = new File(ciNdk).name
+    }
     compileSdk = rootProject.ext.compileSdkVersion
     defaultConfig {
         applicationId "io.github.nahida4479.ripplo"
