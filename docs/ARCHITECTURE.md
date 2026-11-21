@@ -321,3 +321,78 @@ src/services/*              updater, notifications, permissions, scheduler, them
 `safetyNumber(id)`, `sendText(chatId, text)`, `sendAttachment(chatId, file, kind)`,
 `retry(msgId)`, `loadMessages(chatId)`, `markRead(chatId)`, `createGroup(name, memberIds)`,
 `refreshPeople()`, `deleteChat(chatId)`, `deleteContact(id)`.
+
+## 12. Local storage, backup and app lock
+
+### 12.1 Native store (replaces IndexedDB on devices)
+
+One SQLite database per app (Android `android.database.sqlite`, iOS system `libsqlite3`), file
+`ripplo.db` in app-private storage (iOS: Application Support, file protection
+`completeUntilFirstUserAuthentication`, excluded from iCloud backup):
+
+```sql
+CREATE TABLE rows (store TEXT NOT NULL, key TEXT NOT NULL, idx TEXT, value BLOB NOT NULL,
+                   PRIMARY KEY (store, key));
+CREATE INDEX rows_idx ON rows (store, idx);
+```
+
+`value` is exactly what JS writes: already AES-GCM sealed by `src/crypto/vault.js` with the DB key
+(AAD `store/key`). Native never sees chat plaintext. `src/crypto/db.js` keeps its API; on native it
+calls the plugin, on the web it keeps IndexedDB.
+
+Migration: on the first native start with an empty `rows` table, JS copies every IndexedDB record
+as-is (same DB key, values stay sealed) into the native store, verifies the counts, then deletes the
+IndexedDB database. Every future storage change ships with a migration — an update must never lose
+data.
+
+### 12.2 Backup
+
+Recovery code: 30 random digits (≈ 100 bits), shown as 6 groups of 5, generated natively.
+`codeKey = PBKDF2-HMAC-SHA256(code digits as ASCII, salt(16), 600000, 32)`.
+Optional second factor (§12.4): `backupKey = HKDF-SHA256(ikm = codeKey | prf(32), salt, "ripplo-backup-v1", 32)`,
+otherwise `backupKey = codeKey`. `backupKey`, `salt` and the factor descriptor are kept on the device
+wrapped by a non-biometric Keystore / Keychain key so automatic backups run unattended; the code is
+kept too (wrapped) so the user can view it again after authenticating.
+
+File `Ripplo-backup-YYYYMMDD-HHMM.rbk`:
+
+```
+"RIPPLOBK" | ver u8 = 1 | flags u8 (bit0 = second factor) | iterations u32 | salt(16)
+[if bit0: credIdLen u16 | credId | prfSalt(32)]
+frames: u32 frameLen | nonce(12) | AES-256-GCM(backupKey, plaintext ≤ 1 MiB, AAD = SHA-256(header) | index u64 | last u8)
+```
+
+Plaintext stream = records `type u8 | len u32 | bytes`:
+`1` meta JSON `{ "app": version, "created": ms, "ripploId" }`, `2` DB key (32), `3` Signal store
+record (`keyLen u16 | key | plaintext value`), `4` store row (`store | key | idx` as
+length-prefixed UTF-8, then the sealed value). A file with a missing or unauthenticated last frame is
+rejected.
+
+Destinations: manual = system "Save as" (Android `ACTION_CREATE_DOCUMENT`, iOS document picker) —
+the user can pick Google Drive, iCloud Drive, Proton Drive, a USB stick. Automatic = a folder picked
+once (Android `ACTION_OPEN_DOCUMENT_TREE` with a persisted permission, iOS security-scoped bookmark),
+written at most once per 24 h when the app is opened; keeps the last 3 files.
+
+Restore (onboarding → "Restore from backup"): pick file → enter code → [second factor] → native
+wipes local state, writes the DB key, Signal records and rows, restarts JS. Because the Signal
+ratchet state in a backup is older than the peers', JS then re-creates every session from the
+contact's stored card (`signalForget` + `signalAddContact`) and sends `{ "t": "reset" }`. A message
+that fails to decrypt from a known contact triggers the same reset and shows "Couldn't decrypt a
+message from X — ask them to resend". Every app message to a contact carries `c` = own card (b64)
+until that contact has acknowledged one, so every contact has a card to reset from.
+
+### 12.3 App lock (optional)
+
+Off by default. When on: Android `BiometricPrompt` (`BIOMETRIC_STRONG | DEVICE_CREDENTIAL`), iOS
+`LAContext.evaluatePolicy(.deviceOwnerAuthentication)` on start and after 30 s in the background;
+`FLAG_SECURE` / blurred snapshot hides content in the app switcher. Viewing the recovery code,
+manual backup, restore and turning the lock off always require authentication when a lock or
+device credential exists. Biometric data never leaves the phone's secure hardware and is never
+synced; a new phone can only restore with the code (and the second factor).
+
+### 12.4 Second factor (optional)
+
+A passkey or security key that supports the WebAuthn PRF extension (CTAP2 `hmac-secret`): Google
+Password Manager, a password manager acting as a credential provider (e.g. Proton Pass), or a YubiKey.
+Its PRF output for `prfSalt` is mixed into `backupKey` (§12.2). Created while enabling backups with
+a "skip" option; the OS asks where to save it. Details depend on provider support (see README).
