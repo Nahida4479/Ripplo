@@ -3,6 +3,7 @@ import Capacitor
 import CoreBluetooth
 import Network
 import Security
+import SQLite3
 import UserNotifications
 
 @objc(RipploMeshPlugin)
@@ -28,7 +29,25 @@ public class RipploMeshPlugin: CAPPlugin, CAPBridgedPlugin {
         CAPPluginMethod(name: "signalOpen", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "signalProof", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "signalSafetyNumber", returnType: CAPPluginReturnPromise),
-        CAPPluginMethod(name: "signalForget", returnType: CAPPluginReturnPromise)
+        CAPPluginMethod(name: "signalForget", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "dbPut", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "dbPutMany", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "dbGet", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "dbDel", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "dbKeys", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "dbAll", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "dbByIdx", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "dbCount", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "authAvailable", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "authenticate", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "setSecure", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "backupStatus", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "backupEnable", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "backupShowCode", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "backupDisable", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "backupChooseFolder", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "backupCreate", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "backupRestore", returnType: CAPPluginReturnPromise)
     ]
 
     private var btProbe: CBCentralManager?
@@ -196,7 +215,7 @@ public class RipploMeshPlugin: CAPPlugin, CAPBridgedPlugin {
         SignalCore.shared.perform(work) { result in
             switch result {
             case .success(let v): call.resolve(ok(v))
-            case .failure(let e): call.reject(e.code, e.code)
+            case .failure(let e): call.reject(e.code, e.code, nil, e.tag.map { ["tag": $0.hex] as [String: Any] })
             }
         }
     }
@@ -259,5 +278,223 @@ public class RipploMeshPlugin: CAPPlugin, CAPBridgedPlugin {
             return
         }
         signalRun(call, { $0.forget(tag: tag) }) { _ in [:] }
+    }
+
+    private func storeRun<T>(_ call: CAPPluginCall, _ work: @escaping (SQLiteDB) throws -> T, _ ok: @escaping (T) -> [String: Any]) {
+        NativeStore.shared.perform(work) { result in
+            switch result {
+            case .success(let v): call.resolve(ok(v))
+            case .failure(let e): call.reject(e.code, e.code)
+            }
+        }
+    }
+
+    private static func rowOf(_ s: OpaquePointer) -> [String: Any] {
+        ["key": SQLiteDB.text(s, 0) ?? "", "value": SQLiteDB.blob(s, 1).base64EncodedString()]
+    }
+
+    private static func dbRow(_ o: [String: Any]) -> (String, String, String?, Data)? {
+        guard let st = o["store"] as? String, let k = o["key"] as? String, let v = o["value"] as? String,
+              let d = Data(base64Encoded: v) else { return nil }
+        return (st, k, o["idx"] as? String, d)
+    }
+
+    @objc func dbPut(_ call: CAPPluginCall) {
+        guard let r = RipploMeshPlugin.dbRow(call.options as? [String: Any] ?? [:]) else {
+            call.reject("bad_args", "bad_args")
+            return
+        }
+        storeRun(call, { try $0.put(r.0, r.1, r.2, r.3) }) { _ in [:] }
+    }
+
+    @objc func dbPutMany(_ call: CAPPluginCall) {
+        let raw = (call.getArray("rows") ?? []).compactMap { $0 as? [String: Any] }
+        let rows = raw.compactMap { RipploMeshPlugin.dbRow($0) }
+        guard rows.count == raw.count, raw.count == (call.getArray("rows") ?? []).count else {
+            call.reject("bad_args", "bad_args")
+            return
+        }
+        storeRun(call, { db -> Int in
+            try db.exec("BEGIN IMMEDIATE")
+            do {
+                for r in rows { try db.put(r.0, r.1, r.2, r.3) }
+                try db.exec("COMMIT")
+            } catch {
+                try? db.exec("ROLLBACK")
+                throw error
+            }
+            return rows.count
+        }) { ["count": $0] }
+    }
+
+    @objc func dbGet(_ call: CAPPluginCall) {
+        guard let st = call.getString("store"), let k = call.getString("key") else {
+            call.reject("bad_args", "bad_args")
+            return
+        }
+        storeRun(call, { db -> String? in
+            var out: String?
+            try db.query("SELECT value FROM rows WHERE store = ? AND key = ?", [st, k]) { out = SQLiteDB.blob($0, 0).base64EncodedString() }
+            return out
+        }) { ["value": $0.map { $0 as Any } ?? NSNull()] }
+    }
+
+    @objc func dbDel(_ call: CAPPluginCall) {
+        guard let st = call.getString("store"), let k = call.getString("key") else {
+            call.reject("bad_args", "bad_args")
+            return
+        }
+        storeRun(call, { try $0.run("DELETE FROM rows WHERE store = ? AND key = ?", [st, k]) }) { _ in [:] }
+    }
+
+    @objc func dbKeys(_ call: CAPPluginCall) {
+        guard let st = call.getString("store") else {
+            call.reject("bad_args", "bad_args")
+            return
+        }
+        let prefix = call.getString("prefix")
+        storeRun(call, { db -> [String] in
+            var out: [String] = []
+            if let p = prefix {
+                try db.query("SELECT key FROM rows WHERE store = ? AND key LIKE ? ESCAPE '\\' ORDER BY key",
+                             [st, NativeStore.escapeLike(p) + "/%"]) { out.append(SQLiteDB.text($0, 0) ?? "") }
+            } else {
+                try db.query("SELECT key FROM rows WHERE store = ? ORDER BY key", [st]) { out.append(SQLiteDB.text($0, 0) ?? "") }
+            }
+            return out
+        }) { ["keys": $0] }
+    }
+
+    @objc func dbAll(_ call: CAPPluginCall) {
+        guard let st = call.getString("store") else {
+            call.reject("bad_args", "bad_args")
+            return
+        }
+        storeRun(call, { db -> [[String: Any]] in
+            var out: [[String: Any]] = []
+            try db.query("SELECT key, value FROM rows WHERE store = ? ORDER BY key", [st]) { out.append(RipploMeshPlugin.rowOf($0)) }
+            return out
+        }) { ["rows": $0] }
+    }
+
+    @objc func dbByIdx(_ call: CAPPluginCall) {
+        guard let st = call.getString("store"), let idx = call.getString("idx") else {
+            call.reject("bad_args", "bad_args")
+            return
+        }
+        storeRun(call, { db -> [[String: Any]] in
+            var out: [[String: Any]] = []
+            try db.query("SELECT key, value FROM rows WHERE store = ? AND idx = ? ORDER BY key", [st, idx]) { out.append(RipploMeshPlugin.rowOf($0)) }
+            return out
+        }) { ["rows": $0] }
+    }
+
+    @objc func dbCount(_ call: CAPPluginCall) {
+        storeRun(call, { db -> Int in
+            var n = 0
+            try db.query("SELECT COUNT(*) FROM rows", []) { n = Int(sqlite3_column_int64($0, 0)) }
+            return n
+        }) { ["count": $0] }
+    }
+
+    @objc func authAvailable(_ call: CAPPluginCall) {
+        let a = AppLock.available()
+        call.resolve(["biometric": a.biometric, "deviceCredential": a.credential])
+    }
+
+    @objc func authenticate(_ call: CAPPluginCall) {
+        AppLock.authenticate(reason: call.getString("reason") ?? "Ripplo") { call.resolve(["ok": $0]) }
+    }
+
+    @objc func setSecure(_ call: CAPPluginCall) {
+        AppLock.secure = call.getBool("on") ?? false
+        call.resolve()
+    }
+
+    private func backupFail(_ call: CAPPluginCall, _ e: SignalFail) {
+        call.reject(e.code, e.code)
+    }
+
+    @objc func backupStatus(_ call: CAPPluginCall) {
+        call.resolve(BackupEngine.status())
+    }
+
+    @objc func backupEnable(_ call: CAPPluginCall) {
+        DispatchQueue.global(qos: .userInitiated).async {
+            do {
+                call.resolve(["code": try BackupEngine.enable()])
+            } catch {
+                self.backupFail(call, (error as? SignalFail) ?? SignalFail(code: "backup_failed"))
+            }
+        }
+    }
+
+    @objc func backupShowCode(_ call: CAPPluginCall) {
+        AppLock.authenticate(reason: "Show recovery code") { ok in
+            guard ok else {
+                call.reject("auth_failed", "auth_failed")
+                return
+            }
+            guard let c = BackupEngine.showCode() else {
+                call.reject("not_enabled", "not_enabled")
+                return
+            }
+            call.resolve(["code": c])
+        }
+    }
+
+    @objc func backupDisable(_ call: CAPPluginCall) {
+        AppLock.authenticate(reason: "Turn off backups") { ok in
+            guard ok else {
+                call.reject("auth_failed", "auth_failed")
+                return
+            }
+            BackupEngine.disable()
+            call.resolve()
+        }
+    }
+
+    @objc func backupChooseFolder(_ call: CAPPluginCall) {
+        BackupEngine.chooseFolder(from: bridge?.viewController) { r in
+            switch r {
+            case .success(let n): call.resolve(["folder": n])
+            case .failure(let e): self.backupFail(call, e)
+            }
+        }
+    }
+
+    @objc func backupCreate(_ call: CAPPluginCall) {
+        let mode = call.getString("mode") ?? "pick"
+        var meta = Data("{}".utf8)
+        if let o = call.getObject("meta"), let d = try? JSONSerialization.data(withJSONObject: o) {
+            meta = d
+        } else if let s = call.getString("meta") {
+            meta = Data(s.utf8)
+        }
+        BackupEngine.create(mode: mode, meta: meta, from: bridge?.viewController) { r in
+            switch r {
+            case .success(let v): call.resolve(v)
+            case .failure(let e): self.backupFail(call, e)
+            }
+        }
+    }
+
+    @objc func backupRestore(_ call: CAPPluginCall) {
+        guard let code = call.getString("code") else {
+            call.reject("bad_code", "bad_code")
+            return
+        }
+        AppLock.authenticate(reason: "Restore from backup") { ok in
+            guard ok else {
+                call.reject("auth_failed", "auth_failed")
+                return
+            }
+            BackupEngine.restore(code: code, from: self.bridge?.viewController) { r in
+                switch r {
+                case .success(let v): call.resolve(v)
+                case .failure(let e): self.backupFail(call, e)
+                }
+            }
+        }
     }
 }

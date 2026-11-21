@@ -34,7 +34,7 @@ const verify = () => {
   step.value = 'folder'
 }
 const folder = () => run(async () => { await mesh.backupChooseFolder(); close(); await refresh() })
-const now = () => run(async () => { await mesh.backupCreate({ mode: 'pick', meta: backupMeta() }); toast(t('backupDone')); await refresh() })
+const now = () => run(async () => { if (!(await mesh.authenticate(t('unlockReason'))).ok) return; await mesh.backupCreate({ mode: 'pick', meta: backupMeta() }); toast(t('backupDone')); await refresh() })
 const off = () => { ui.confirm = { title: t('backupOff'), text: t('backupOffConfirm'), ok: t('backupOff'), danger: true, onOk: () => run(async () => { await mesh.backupDisable(); await refresh() }) } }
 </script>
 <template>

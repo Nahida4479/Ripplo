@@ -152,7 +152,7 @@ public class SignalCoreTest {
     }
 
     private static byte[] referenceProof(Mem mem, byte[] otherIk, byte[] n, byte[] ct, byte[] pt) throws Exception {
-        org.signal.libsignal.protocol.IdentityKeyPair kp = new org.signal.libsignal.protocol.IdentityKeyPair(mem.get("ik"));
+        org.signal.libsignal.protocol.IdentityKeyPair kp = new org.signal.libsignal.protocol.IdentityKeyPair(mem.get("identity"));
         ECPrivateKey priv = kp.getPrivateKey();
         byte[] shared = priv.calculateAgreement(new ECPublicKey(otherIk));
         byte[] info = utf8("ripplo-proof-v1");

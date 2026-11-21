@@ -26,6 +26,9 @@
 		7E100000000000000000B008 /* RipploMeshPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E100000000000000000F008 /* RipploMeshPlugin.swift */; };
 		7E100000000000000000B009 /* RipploBridgeViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E100000000000000000F009 /* RipploBridgeViewController.swift */; };
 		7E100000000000000000B010 /* SignalCore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E100000000000000000F010 /* SignalCore.swift */; };
+		7E100000000000000000B012 /* NativeStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E100000000000000000F012 /* NativeStore.swift */; };
+		7E100000000000000000B013 /* BackupEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E100000000000000000F013 /* BackupEngine.swift */; };
+		7E100000000000000000B014 /* AppLock.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E100000000000000000F014 /* AppLock.swift */; };
 		7E100000000000000000B011 /* RipploSignal in Frameworks */ = {isa = PBXBuildFile; productRef = 7E100000000000000000D002 /* RipploSignal */; };
 /* End PBXBuildFile section */
 
@@ -51,6 +54,9 @@
 		7E100000000000000000F008 /* RipploMeshPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RipploMeshPlugin.swift; sourceTree = "<group>"; };
 		7E100000000000000000F009 /* RipploBridgeViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RipploBridgeViewController.swift; sourceTree = "<group>"; };
 		7E100000000000000000F010 /* SignalCore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SignalCore.swift; sourceTree = "<group>"; };
+		7E100000000000000000F012 /* NativeStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeStore.swift; sourceTree = "<group>"; };
+		7E100000000000000000F013 /* BackupEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackupEngine.swift; sourceTree = "<group>"; };
+		7E100000000000000000F014 /* AppLock.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppLock.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -97,6 +103,9 @@
 				7E100000000000000000F008 /* RipploMeshPlugin.swift */,
 				7E100000000000000000F009 /* RipploBridgeViewController.swift */,
 				7E100000000000000000F010 /* SignalCore.swift */,
+				7E100000000000000000F012 /* NativeStore.swift */,
+				7E100000000000000000F013 /* BackupEngine.swift */,
+				7E100000000000000000F014 /* AppLock.swift */,
 				50379B222058CBB4000EE86E /* capacitor.config.json */,
 				504EC3071FED79650016851F /* AppDelegate.swift */,
 				504EC30B1FED79650016851F /* Main.storyboard */,
@@ -204,6 +213,9 @@
 				7E100000000000000000B008 /* RipploMeshPlugin.swift in Sources */,
 				7E100000000000000000B009 /* RipploBridgeViewController.swift in Sources */,
 				7E100000000000000000B010 /* SignalCore.swift in Sources */,
+				7E100000000000000000B012 /* NativeStore.swift in Sources */,
+				7E100000000000000000B013 /* BackupEngine.swift in Sources */,
+				7E100000000000000000B014 /* AppLock.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

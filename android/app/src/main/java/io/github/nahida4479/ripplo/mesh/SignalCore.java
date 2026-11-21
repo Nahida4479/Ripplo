@@ -48,6 +48,15 @@ public final class SignalCore {
         void delete(String key);
     }
 
+    public static final class Failed extends IllegalArgumentException {
+        public final byte[] tag;
+
+        Failed(String message, byte[] tag) {
+            super(message);
+            this.tag = tag;
+        }
+    }
+
     public static final class Opened {
         public final byte[] tag;
         public final byte[] ik;
@@ -142,7 +151,7 @@ public final class SignalCore {
 
     private void ensure() throws Exception {
         if (identity != null) return;
-        byte[] raw = storage.get("ik");
+        byte[] raw = storage.get("identity");
         if (raw == null) {
             IdentityKeyPair ikp = IdentityKeyPair.generate();
             ECPrivateKey priv = ikp.getPrivateKey();
@@ -151,22 +160,22 @@ public final class SignalCore {
             SignedPreKeyRecord spr = new SignedPreKeyRecord(1, now, spk, priv.calculateSignature(spk.getPublicKey().serialize()));
             KEMKeyPair kem = KEMKeyPair.generate(KEMKeyType.KYBER_1024);
             KyberPreKeyRecord kpr = new KyberPreKeyRecord(1, now, kem, priv.calculateSignature(kem.getPublicKey().serialize()));
-            storage.put("spk", spr.serialize());
-            storage.put("kpk", kpr.serialize());
-            storage.put("reg", ByteBuffer.allocate(4).putInt(1 + RNG.nextInt(16380)).array());
-            storage.put("ik", ikp.serialize());
+            storage.put("spk:1", spr.serialize());
+            storage.put("kyber:1", kpr.serialize());
+            storage.put("regid", ByteBuffer.allocate(4).putInt(1 + RNG.nextInt(16380)).array());
+            storage.put("identity", ikp.serialize());
             raw = ikp.serialize();
         }
         identity = new IdentityKeyPair(raw);
-        registrationId = ByteBuffer.wrap(storage.get("reg")).getInt();
+        registrationId = ByteBuffer.wrap(storage.get("regid")).getInt();
         myTag = tagOf(identity.getPublicKey().serialize());
         localAddress = new SignalProtocolAddress(hex(myTag), 1);
     }
 
     public synchronized byte[] init() throws Exception {
         ensure();
-        SignedPreKeyRecord spr = new SignedPreKeyRecord(storage.get("spk"));
-        KyberPreKeyRecord kpr = new KyberPreKeyRecord(storage.get("kpk"));
+        SignedPreKeyRecord spr = new SignedPreKeyRecord(storage.get("spk:1"));
+        KyberPreKeyRecord kpr = new KyberPreKeyRecord(storage.get("kyber:1"));
         ByteBuffer b = ByteBuffer.allocate(BUNDLE_LEN);
         b.put((byte) 2).putInt(registrationId).put(identity.getPublicKey().serialize());
         b.putInt(spr.getId()).put(spr.getKeyPair().getPublicKey().serialize()).put(spr.getSignature());
@@ -273,13 +282,13 @@ public final class SignalCore {
                 throw new IllegalArgumentException(BAD_MESSAGE);
             }
         } catch (IllegalArgumentException e) {
-            throw e;
+            throw new Failed(e.getMessage(), tag);
         } catch (NoSessionException e) {
-            throw new IllegalArgumentException(NO_SESSION);
+            throw new Failed(NO_SESSION, tag);
         } catch (UntrustedIdentityException e) {
-            throw new IllegalArgumentException(UNTRUSTED);
+            throw new Failed(UNTRUSTED, tag);
         } catch (Exception e) {
-            throw new IllegalArgumentException(BAD_MESSAGE);
+            throw new Failed(BAD_MESSAGE, tag);
         }
         return new Opened(tag, ik, plain);
     }
@@ -312,8 +321,8 @@ public final class SignalCore {
         ensure();
         if (tag == null || tag.length != 16) throw new IllegalArgumentException(BAD_MESSAGE);
         String h = hex(tag);
-        storage.delete("sess/" + h);
-        storage.delete("id/" + h);
+        storage.delete("session:" + h);
+        storage.delete("ident:" + h);
     }
 
     private final class Store implements IdentityKeyStore, SessionStore, PreKeyStore, SignedPreKeyStore, KyberPreKeyStore {
@@ -331,10 +340,10 @@ public final class SignalCore {
 
         public IdentityChange saveIdentity(SignalProtocolAddress a, IdentityKey ik) {
             if (!tagMatches(a, ik)) return IdentityChange.NEW_OR_UNCHANGED;
-            byte[] old = storage.get("id/" + a.getName());
+            byte[] old = storage.get("ident:" + a.getName());
             byte[] now = ik.serialize();
             if (old != null && Arrays.equals(old, now)) return IdentityChange.NEW_OR_UNCHANGED;
-            storage.put("id/" + a.getName(), now);
+            storage.put("ident:" + a.getName(), now);
             return old == null ? IdentityChange.NEW_OR_UNCHANGED : IdentityChange.REPLACED_EXISTING;
         }
 
@@ -343,7 +352,7 @@ public final class SignalCore {
         }
 
         public IdentityKey getIdentity(SignalProtocolAddress a) {
-            byte[] raw = storage.get("id/" + a.getName());
+            byte[] raw = storage.get("ident:" + a.getName());
             if (raw == null) return null;
             try {
                 return new IdentityKey(raw);
@@ -353,7 +362,7 @@ public final class SignalCore {
         }
 
         public SessionRecord loadSession(SignalProtocolAddress a) {
-            byte[] raw = storage.get("sess/" + a.getName());
+            byte[] raw = storage.get("session:" + a.getName());
             if (raw == null) return new SessionRecord();
             try {
                 return new SessionRecord(raw);
@@ -365,7 +374,7 @@ public final class SignalCore {
         public List<SessionRecord> loadExistingSessions(List<SignalProtocolAddress> addresses) throws NoSessionException {
             java.util.ArrayList<SessionRecord> out = new java.util.ArrayList<>();
             for (SignalProtocolAddress a : addresses) {
-                if (storage.get("sess/" + a.getName()) == null) throw new NoSessionException("no session for " + a.getName());
+                if (storage.get("session:" + a.getName()) == null) throw new NoSessionException("no session for " + a.getName());
                 out.add(loadSession(a));
             }
             return out;
@@ -376,19 +385,19 @@ public final class SignalCore {
         }
 
         public void storeSession(SignalProtocolAddress a, SessionRecord r) {
-            storage.put("sess/" + a.getName(), r.serialize());
+            storage.put("session:" + a.getName(), r.serialize());
         }
 
         public boolean containsSession(SignalProtocolAddress a) {
-            return storage.get("sess/" + a.getName()) != null;
+            return storage.get("session:" + a.getName()) != null;
         }
 
         public void deleteSession(SignalProtocolAddress a) {
-            storage.delete("sess/" + a.getName());
+            storage.delete("session:" + a.getName());
         }
 
         public void deleteAllSessions(String name) {
-            storage.delete("sess/" + name);
+            storage.delete("session:" + name);
         }
 
         public PreKeyRecord loadPreKey(int id) throws InvalidKeyIdException {
@@ -406,7 +415,7 @@ public final class SignalCore {
         }
 
         public SignedPreKeyRecord loadSignedPreKey(int id) throws InvalidKeyIdException {
-            byte[] raw = id == 1 ? storage.get("spk") : null;
+            byte[] raw = id == 1 ? storage.get("spk:1") : null;
             if (raw == null) throw new InvalidKeyIdException("unknown signed prekey");
             try {
                 return new SignedPreKeyRecord(raw);
@@ -424,18 +433,18 @@ public final class SignalCore {
         }
 
         public void storeSignedPreKey(int id, SignedPreKeyRecord r) {
-            if (id == 1) storage.put("spk", r.serialize());
+            if (id == 1) storage.put("spk:1", r.serialize());
         }
 
         public boolean containsSignedPreKey(int id) {
-            return id == 1 && storage.get("spk") != null;
+            return id == 1 && storage.get("spk:1") != null;
         }
 
         public void removeSignedPreKey(int id) {
         }
 
         public KyberPreKeyRecord loadKyberPreKey(int id) throws InvalidKeyIdException {
-            byte[] raw = id == 1 ? storage.get("kpk") : null;
+            byte[] raw = id == 1 ? storage.get("kyber:1") : null;
             if (raw == null) throw new InvalidKeyIdException("unknown kyber prekey");
             try {
                 return new KyberPreKeyRecord(raw);
@@ -453,11 +462,11 @@ public final class SignalCore {
         }
 
         public void storeKyberPreKey(int id, KyberPreKeyRecord r) {
-            if (id == 1) storage.put("kpk", r.serialize());
+            if (id == 1) storage.put("kyber:1", r.serialize());
         }
 
         public boolean containsKyberPreKey(int id) {
-            return id == 1 && storage.get("kpk") != null;
+            return id == 1 && storage.get("kyber:1") != null;
         }
 
         public void markKyberPreKeyUsed(int kyberId, int signedId, ECPublicKey baseKey) {

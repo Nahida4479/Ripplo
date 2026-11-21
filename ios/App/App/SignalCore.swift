@@ -5,6 +5,7 @@ import RipploSignal
 
 struct SignalFail: Error {
     let code: String
+    var tag: Data? = nil
 }
 
 final class SignalCore: IdentityKeyStore, PreKeyStore, SignedPreKeyStore, KyberPreKeyStore, SessionStore {
@@ -35,7 +36,7 @@ final class SignalCore: IdentityKeyStore, PreKeyStore, SignedPreKeyStore, KyberP
             do {
                 done(.success(try work(self)))
             } catch {
-                done(.failure(SignalFail(code: SignalCore.code(error))))
+                done(.failure((error as? SignalFail) ?? SignalFail(code: SignalCore.code(error))))
             }
         }
     }
@@ -76,14 +77,19 @@ final class SignalCore: IdentityKeyStore, PreKeyStore, SignedPreKeyStore, KyberP
         return key
     }
 
-    private func file(_ name: String) -> URL {
+    private func file(_ name: String, in base: URL? = nil) -> URL {
         let h = SHA256.hash(data: Data(name.utf8)).map { String(format: "%02x", $0) }.joined()
-        return dir.appendingPathComponent(h)
+        return (base ?? dir).appendingPathComponent(h)
+    }
+
+    private func write(_ name: String, _ data: Data, in base: URL? = nil) throws {
+        guard let sealed = try AES.GCM.seal(data, using: storeKey()).combined else { throw SignalFail(code: "bad_message") }
+        try sealed.write(to: file(name, in: base), options: [.atomic, .completeFileProtectionUntilFirstUserAuthentication])
     }
 
     private func put(_ name: String, _ data: Data) throws {
-        guard let sealed = try AES.GCM.seal(data, using: storeKey()).combined else { throw SignalFail(code: "bad_message") }
-        try sealed.write(to: file(name), options: [.atomic, .completeFileProtectionUntilFirstUserAuthentication])
+        try write(name, data)
+        try track(name)
     }
 
     private func get(_ name: String) throws -> Data? {
@@ -93,6 +99,64 @@ final class SignalCore: IdentityKeyStore, PreKeyStore, SignedPreKeyStore, KyberP
 
     private func drop(_ name: String) {
         try? FileManager.default.removeItem(at: file(name))
+        if namesCache?.remove(name) != nil { try? saveIndex() }
+    }
+
+    private static let indexName = "\u{0}index"
+    private var namesCache: Set<String>?
+
+    private func names() throws -> Set<String> {
+        if let n = namesCache { return n }
+        var set = Set<String>()
+        if let d = try get(SignalCore.indexName) {
+            set = Set(String(decoding: d, as: UTF8.self).split(separator: "\n").map(String.init))
+        }
+        let before = set.count
+        for n in ["regid", "identity", "spk:1", "kyber:1"] where FileManager.default.fileExists(atPath: file(n).path) {
+            set.insert(n)
+        }
+        namesCache = set
+        if set.count != before { try saveIndex() }
+        return set
+    }
+
+    private func saveIndex() throws {
+        try write(SignalCore.indexName, Data((namesCache ?? []).sorted().joined(separator: "\n").utf8))
+    }
+
+    private func track(_ name: String) throws {
+        if try names().contains(name) { return }
+        namesCache?.insert(name)
+        try saveIndex()
+    }
+
+    func exportRecords() throws -> [(String, Data)] {
+        try queue.sync {
+            try names().sorted().compactMap { n in try get(n).map { (n, $0) } }
+        }
+    }
+
+    func importRecords(_ records: [(String, Data)]) throws {
+        try queue.sync {
+            let fm = FileManager.default
+            let tmp = dir.deletingLastPathComponent().appendingPathComponent("signal.new", isDirectory: true)
+            try? fm.removeItem(at: tmp)
+            try fm.createDirectory(
+                at: tmp,
+                withIntermediateDirectories: true,
+                attributes: [.protectionKey: FileProtectionType.completeUntilFirstUserAuthentication]
+            )
+            var vals = URLResourceValues()
+            vals.isExcludedFromBackup = true
+            var t = tmp
+            try? t.setResourceValues(vals)
+            for (n, d) in records { try write(n, d, in: tmp) }
+            try write(SignalCore.indexName, Data(records.map { $0.0 }.sorted().joined(separator: "\n").utf8), in: tmp)
+            _ = try fm.replaceItemAt(dir, withItemAt: tmp)
+            namesCache = nil
+            identityCache = nil
+            regIdCache = nil
+        }
     }
 
     private static func tagOf(_ ik33: Data) -> Data {
@@ -262,6 +326,7 @@ final class SignalCore: IdentityKeyStore, PreKeyStore, SignedPreKeyStore, KyberP
         let senderTag = inner.subdata(in: 1..<17)
         let type = inner[17]
         let body = inner.subdata(in: 18..<inner.count)
+        do {
         let from = try address(senderTag)
         let plain: Data
         if type == 3 {
@@ -292,6 +357,9 @@ final class SignalCore: IdentityKeyStore, PreKeyStore, SignedPreKeyStore, KyberP
         }
         guard let ik = try identity(for: from, context: ctx) else { throw SignalFail(code: "bad_message") }
         return (senderTag, ik.serialize(), plain)
+        } catch {
+            throw SignalFail(code: SignalCore.code(error), tag: senderTag)
+        }
     }
 
     private static func publicKey(_ ik: Data) throws -> PublicKey {

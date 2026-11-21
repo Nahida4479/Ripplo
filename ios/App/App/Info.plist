@@ -32,6 +32,8 @@
 		<string>_ripplo-mesh._tcp</string>
 		<string>_ripplo-mesh._udp</string>
 	</array>
+	<key>NSFaceIDUsageDescription</key>
+	<string>Ripplo uses Face ID to unlock the app and to protect your recovery code and backups.</string>
 	<key>NSCameraUsageDescription</key>
 	<string>Ripplo uses the camera to scan contact QR codes and take photos.</string>
 	<key>NSMicrophoneUsageDescription</key>
