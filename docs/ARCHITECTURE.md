@@ -75,6 +75,10 @@ that is unknown or already used by someone else earns nothing, and that sender s
 token by the same sender is harmless. The link is therefore a one-time key, not an access list: forwarding it gives the second
 person no trust, only the first person to use it.
 
+Scanning or opening a link (`qr`, `link`) also sends one small sealed profile message to the issuer at once, carrying the card and the token, so the issuer
+sees the scanner in their contacts straight away instead of after the first chat message. If the issuer is out of range it is not retried; the card then
+rides on the first real message as before.
+
 ## 2. Encryption layers
 
 1. **Signal protocol — official `libsignal` 0.108.5** (AGPL-3.0, by Signal). PQXDH (X25519 +

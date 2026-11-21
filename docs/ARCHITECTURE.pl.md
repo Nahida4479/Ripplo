@@ -75,6 +75,8 @@ przez kogoś innego nic nie daje, a taki nadawca zostaje obcym, który napisał 
 nadawcę jest nieszkodliwe. Link to więc klucz jednorazowy, a nie lista dostępu: przekazanie go dalej nie daje drugiej osobie zaufania, tylko
 pierwszej, która go użyła.
 
+Zeskanowanie albo otwarcie linku (`qr`, `link`) od razu wysyła też do wystawcy jedną małą zaszyfrowaną wiadomość profilu z kartą i tokenem, więc wystawca widzi skanującego w kontaktach od razu, a nie dopiero po pierwszej wiadomości. Gdy wystawca jest poza zasięgiem, nie jest to ponawiane; karta jedzie wtedy z pierwszą prawdziwą wiadomością jak dotąd.
+
 ## 2. Warstwy szyfrowania
 
 1. **Protokół Signal — oficjalna `libsignal` 0.108.5** (AGPL-3.0, autorstwa Signal). PQXDH (X25519 +

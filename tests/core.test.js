@@ -147,6 +147,15 @@ describe('messaging', () => {
 })
 
 describe('verification', () => {
+  it('scanning a link makes the owner see the scanner as a contact at once', async () => {
+    const a = await user('Alice'), b = await user('Bob')
+    connect(a.mesh, b.mesh)
+    await waitFor(() => a.state.neighbors[0]?.card && b.state.neighbors[0]?.card)
+    await a.core.addContactFromLink(b.link, 'qr')
+    await waitFor(() => b.state.contacts[a.id] && !b.state.contacts[a.id].request)
+    expect(b.state.contacts[a.id].addedVia).toBe('link')
+  })
+
   it('nearby proof succeeds for the real key holder', async () => {
     const a = await user('Alice'), b = await user('Bob')
     connect(a.mesh, b.mesh)

@@ -750,6 +750,7 @@ export function createCore({ mesh, dbName = 'ripplo', state = createState(), not
     const person = state.people.find((p) => p.id === v.id)
     if (person) person.isContact = true
     if (['link', 'qr', 'people'].includes(via)) verifyNearby(v.id).catch(() => {})
+    if (['link', 'qr'].includes(via)) tellVerified(c)
     return c
   }
 
