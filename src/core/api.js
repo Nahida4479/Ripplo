@@ -2,7 +2,8 @@ import { mesh } from '../mesh/bridge.js'
 import { state } from './state.js'
 import { createCore, MAX_TEXT, MAX_FILE } from './messenger.js'
 
-const core = createCore({ mesh, state })
+const devProfile = !mesh.isNative && new URLSearchParams(location.search).get('profile')
+const core = createCore({ mesh, state, dbName: devProfile ? `ripplo-${devProfile}` : 'ripplo' })
 
 export { state, MAX_TEXT, MAX_FILE }
 export const {

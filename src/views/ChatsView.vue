@@ -39,7 +39,7 @@ const fmt = ts => {
       <Avatar :name="c.name" :group="c.type === 'group'" :shield="shield(c)" />
       <span class="grow">
         <span class="name" style="display: block">{{ c.name }}</span>
-        <span class="prev"><template v-if="!c.lastText"><Mic :size="14" />{{ t('voiceMessage') }}</template><template v-else>{{ c.lastText }}</template></span>
+        <span class="prev"><template v-if="c.lastKind === 'voice'"><Mic :size="14" />{{ t('voiceMessage') }}</template><template v-else-if="c.lastKind">{{ t(c.lastKind === 'video' ? 'videoMessage' : 'photoMessage') }}</template><template v-else>{{ c.lastText }}</template></span>
       </span>
       <span class="meta">{{ fmt(c.lastTs) }}<span v-if="c.unread" class="badge" :aria-label="t('unread')">{{ c.unread }}</span></span>
     </button>

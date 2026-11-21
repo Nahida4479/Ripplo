@@ -186,10 +186,10 @@ export function createCore({ mesh, dbName = 'ripplo', state = createState(), not
     return encodePacket({ type: TYPE.DATA, dest: tagOf(c), payload: sealed })
   }
 
-  function touchChat(chatId, text, ts, unread = 0) {
+  function touchChat(chatId, text, ts, unread = 0, lastKind = null) {
     const chat = state.chats.find((c) => c.id === chatId)
     if (!chat) return
-    Object.assign(chat, { lastText: text, lastTs: ts, unread: chat.unread + unread })
+    Object.assign(chat, { lastText: text, lastKind, lastTs: ts, unread: chat.unread + unread })
     state.chats.sort((a, b) => b.lastTs - a.lastTs)
     persistChat(chat)
   }
@@ -270,7 +270,7 @@ export function createCore({ mesh, dbName = 'ripplo', state = createState(), not
     const att = { kind, mime: safeMime(file.type), size: bytes.length, attId, url: URL.createObjectURL(file) }
     if (file.duration) att.duration = file.duration
     const { m, recips } = newOutgoing(chatId, { att, progress: 0 })
-    touchChat(chatId, '', m.ts)
+    touchChat(chatId, '', m.ts, 0, kind)
     runAttachment(m, bytes, recips).catch(() => { m.status = 'failed'; persistMsg(m) })
     return m
   }
@@ -332,9 +332,11 @@ export function createCore({ mesh, dbName = 'ripplo', state = createState(), not
     const plain = t === 3 ? await cipher.decryptPreKeyWhisperMessage(body, 'binary') : await cipher.decryptWhisperMessage(body, 'binary')
     const used = await store.loadIdentity(f)
     if (!used || deriveIds(used).ripploId !== f) return
-    if (!state.contacts[f]) await addContact({ id: f, name: `Ripplo ${f.slice(0, 4)}`, ik: b64(used), card: null, addedVia: 'incoming' })
+    if (!state.contacts[f]) await addContact({ id: f, name: knownName(f) || `Ripplo ${f.slice(0, 4)}`, ik: b64(used), card: null, addedVia: 'incoming' })
     await onAppMessage(f, JSON.parse(unutf8(new Uint8Array(plain))))
   }
+
+  const knownName = (id) => state.neighbors.find((n) => n.card?.id === id)?.card.name || state.people.find((p) => p.id === id)?.name
 
   function routeChat(f, g) {
     if (g === undefined) return f
@@ -363,7 +365,7 @@ export function createCore({ mesh, dbName = 'ripplo', state = createState(), not
   async function receive(m, preview, notifyBody = preview) {
     if (await db.hasMsg(m.id)) return
     const msg = addMsg({ ...m, ts: Date.now(), status: 'received' })
-    touchChat(m.chatId, preview, msg.ts, 1)
+    touchChat(m.chatId, preview, msg.ts, 1, m.att?.kind)
     const chat = state.chats.find((c) => c.id === m.chatId)
     notifier({ title: chat?.type === 'group' ? `${chat.name}: ${state.contacts[m.from]?.name}` : state.contacts[m.from]?.name, body: notifyBody, chatId: m.chatId })
   }
@@ -447,7 +449,7 @@ export function createCore({ mesh, dbName = 'ripplo', state = createState(), not
     if (msg.t === 'hello') {
       const v = checkCard(msg.card)
       if (v.id === me.id) return
-      nb.card = { id: v.id, name: v.card.n, ik: v.card.ik }
+      nb.card = { id: v.id, name: v.card.n, ik: v.card.ik, card: v.card }
       markConflicts(v.card.n, v.id)
       if (state.contacts[v.id]) await learnCard(v, 'link')
     } else if (msg.t === 'challenge') {

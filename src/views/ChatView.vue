@@ -93,7 +93,7 @@ function play(m) {
 }
 onBeforeUnmount(() => audio?.pause())
 
-const statusLabel = m => m.status === 'delivered' && m.hops ? t('viaPhones', { n: m.hops }) : t('status_' + m.status)
+const statusLabel = m => m.status === 'delivered' && m.hops > 1 ? t('viaPhones', { n: m.hops - 1 }) : t('status_' + m.status)
 const shown = ref(null)
 async function retryMesh() { toast((await verifyNearby(id)) ? t('verifiedOk') : t('verifyFailed')) }
 function sure() { ui.confirm = { title: t('imSure'), text: t('imSureConfirm'), ok: t('confirm'), onOk: () => markVerified(id) } }

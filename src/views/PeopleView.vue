@@ -20,7 +20,7 @@ function add(p) {
     onOk: async () => { try { await addPerson(p); toast(t('added')) } catch (e) { toast(e.message) } }
   }
 }
-const nearbyPerson = n => ({ id: n.card.id, name: n.card.name, card: n.card, hops: 0 })
+const nearbyPerson = n => ({ id: n.card.id, name: n.card.name, card: n.card.card, hops: 0 })
 </script>
 <template>
   <main class="page">

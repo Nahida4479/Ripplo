@@ -9,14 +9,14 @@ const en = {
   grantPermissions: 'Grant permissions', allowBackground: 'Allow background relay', optional: 'Optional, keeps the mesh alive with the screen off',
   welcome: 'Welcome to Ripplo', onboardHint: 'Your keys are created on this phone and never leave it.', yourName: 'Your name', generateIdentity: 'Generate identity',
   profile: 'Profile', search: 'Search', addContact: 'Add contact', newChat: 'New chat', newGroup: 'New group', groupName: 'Group name', noContacts: 'No contacts yet. Add a friend first.',
-  emptyChats: 'Add a friend by QR code or invite link', voiceMessage: 'Voice message', unread: 'Unread messages',
+  emptyChats: 'Add a friend by QR code or invite link', voiceMessage: 'Voice message', photoMessage: 'Photo', videoMessage: 'Video', unread: 'Unread messages',
   myCode: 'My code', scan: 'Scan', pasteLink: 'Paste link', shareLink: 'Share link', copied: 'Link copied', cameraDenied: 'Camera not available',
   scanSafetyHint: "Scan the other person's safety-number QR code, shown on their contact page.",
   verifiedOk: 'Verified', verifyMismatch: 'Safety numbers do not match', verifyFailed: 'Could not verify over the mesh',
   err_bad_link: 'This is not a valid Ripplo link', err_bad_checksum: 'The link is damaged or was modified', err_self: 'That is your own code',
   deepLinkConfirm: 'Add the contact from this link? Its key stays unverified until you check it.',
   lastRefreshed: 'Last refreshed {time}', nextTonight: 'next tonight', refresh: 'Refresh', nearby: 'Nearby', inMesh: 'In mesh range',
-  nobodyNearby: 'Nobody nearby right now', nobodyInMesh: 'Nobody found yet. Tap refresh.', hops: '{n} hops away', inContacts: 'In your contacts',
+  nobodyNearby: 'Nobody nearby right now', nobodyInMesh: 'Nobody found yet. Tap refresh.', hops_one: '1 hop away', hops_other: '{n} hops away', inContacts: 'In your contacts',
   addPersonTitle: 'Add {name}?', added: 'Contact added',
   unverifiedWarning: "Could not verify this public key. You can't be sure the person on the other side is who you added.",
   conflictWarning: 'Possible key substitution: someone with this name is using a different key. Do not trust this chat until you verify in person.',
@@ -29,7 +29,7 @@ const en = {
   image: 'Image', play: 'Play', playFailed: 'Cannot play this voice message', micDenied: 'Microphone not available', fileTooBig: 'File is larger than 20 MB',
   attach: 'Attach photo or video', message: 'Message', recordVoice: 'Record voice message',
   status_encrypting: 'Encrypting', status_sending: 'Sending', status_delivered: 'Delivered', status_failed: 'Failed to send', status_out_of_range: 'Out of mesh range', status_received: '',
-  viaPhones: 'Delivered via {n} phones', outOfMeshRange: 'Contact is out of mesh range',
+  viaPhones_one: 'Delivered via 1 phone', viaPhones_other: 'Delivered via {n} phones', outOfMeshRange: 'Contact is out of mesh range',
   appearance: 'Appearance', themeMode: 'Theme', mode_system: 'System', mode_dark: 'Dark', mode_light: 'Light', accent: 'Accent color', customColor: 'Custom color', background: 'Background', none: 'None', language: 'Language',
   network: 'Network', noNeighbors: 'No phones connected right now', connected: 'Connected', backgroundRelay: 'Background relay', relayHint: 'Relayed messages are never shown', batteryExemption: 'Allow background activity (battery)',
   security: 'Security', integrity: 'App integrity', integrityOk: 'Official build', integrityBad: 'Modified build', integrityUnknown: 'Not checked yet',
@@ -47,14 +47,14 @@ const pl = {
   grantPermissions: 'Przyznaj uprawnienia', allowBackground: 'Zezwól na przekazywanie w tle', optional: 'Opcjonalne, utrzymuje sieć przy wyłączonym ekranie',
   welcome: 'Witaj w Ripplo', onboardHint: 'Twoje klucze powstają na tym telefonie i nigdy go nie opuszczają.', yourName: 'Twoje imię', generateIdentity: 'Utwórz tożsamość',
   profile: 'Profil', search: 'Szukaj', addContact: 'Dodaj kontakt', newChat: 'Nowy czat', newGroup: 'Nowa grupa', groupName: 'Nazwa grupy', noContacts: 'Brak kontaktów. Najpierw dodaj znajomego.',
-  emptyChats: 'Dodaj znajomego kodem QR lub linkiem zaproszenia', voiceMessage: 'Wiadomość głosowa', unread: 'Nieprzeczytane wiadomości',
+  emptyChats: 'Dodaj znajomego kodem QR lub linkiem zaproszenia', voiceMessage: 'Wiadomość głosowa', photoMessage: 'Zdjęcie', videoMessage: 'Wideo', unread: 'Nieprzeczytane wiadomości',
   myCode: 'Mój kod', scan: 'Skanuj', pasteLink: 'Wklej link', shareLink: 'Udostępnij link', copied: 'Skopiowano link', cameraDenied: 'Kamera niedostępna',
   scanSafetyHint: 'Zeskanuj kod QR numeru bezpieczeństwa z ekranu kontaktu drugiej osoby.',
   verifiedOk: 'Zweryfikowano', verifyMismatch: 'Numery bezpieczeństwa się nie zgadzają', verifyFailed: 'Nie udało się zweryfikować przez sieć',
   err_bad_link: 'To nie jest prawidłowy link Ripplo', err_bad_checksum: 'Link jest uszkodzony lub zmodyfikowany', err_self: 'To twój własny kod',
   deepLinkConfirm: 'Dodać kontakt z tego linku? Jego klucz pozostanie niezweryfikowany, dopóki go nie sprawdzisz.',
   lastRefreshed: 'Ostatnio odświeżono {time}', nextTonight: 'następne dziś w nocy', refresh: 'Odśwież', nearby: 'W pobliżu', inMesh: 'W zasięgu sieci',
-  nobodyNearby: 'Nikogo teraz w pobliżu', nobodyInMesh: 'Nikogo jeszcze nie znaleziono. Stuknij odśwież.', hops: '{n} przeskoków stąd', inContacts: 'Już w kontaktach',
+  nobodyNearby: 'Nikogo teraz w pobliżu', nobodyInMesh: 'Nikogo jeszcze nie znaleziono. Stuknij odśwież.', hops_one: '1 przeskok stąd', hops_few: '{n} przeskoki stąd', hops_many: '{n} przeskoków stąd', inContacts: 'Już w kontaktach',
   addPersonTitle: 'Dodać {name}?', added: 'Dodano kontakt',
   unverifiedWarning: 'Nie udało się zweryfikować tego klucza publicznego. Nie masz pewności, że osoba po drugiej stronie jest tą, którą dodałeś.',
   conflictWarning: 'Możliwa podmiana klucza: ktoś o tej nazwie używa innego klucza. Nie ufaj tej rozmowie, dopóki nie sprawdzisz osobiście.',
@@ -67,7 +67,7 @@ const pl = {
   image: 'Obraz', play: 'Odtwórz', playFailed: 'Nie można odtworzyć wiadomości głosowej', micDenied: 'Mikrofon niedostępny', fileTooBig: 'Plik jest większy niż 20 MB',
   attach: 'Dołącz zdjęcie lub film', message: 'Wiadomość', recordVoice: 'Nagraj wiadomość głosową',
   status_encrypting: 'Szyfrowanie', status_sending: 'Wysyłanie', status_delivered: 'Dostarczono', status_failed: 'Nie udało się wysłać', status_out_of_range: 'Poza zasięgiem sieci', status_received: '',
-  viaPhones: 'Dostarczono przez {n} telefonów', outOfMeshRange: 'Kontakt jest poza zasięgiem sieci',
+  viaPhones_one: 'Dostarczono przez 1 telefon', viaPhones_few: 'Dostarczono przez {n} telefony', viaPhones_many: 'Dostarczono przez {n} telefonów', outOfMeshRange: 'Kontakt jest poza zasięgiem sieci',
   appearance: 'Wygląd', themeMode: 'Motyw', mode_system: 'Systemowy', mode_dark: 'Ciemny', mode_light: 'Jasny', accent: 'Kolor akcentu', customColor: 'Własny kolor', background: 'Tło', none: 'Brak', language: 'Język',
   network: 'Sieć', noNeighbors: 'Brak połączonych telefonów', connected: 'Połączono', backgroundRelay: 'Przekazywanie w tle', relayHint: 'Przekazywane wiadomości nigdy nie są wyświetlane', batteryExemption: 'Zezwól na działanie w tle (bateria)',
   security: 'Bezpieczeństwo', integrity: 'Integralność aplikacji', integrityOk: 'Oficjalna wersja', integrityBad: 'Zmodyfikowana wersja', integrityUnknown: 'Jeszcze nie sprawdzono',
@@ -89,6 +89,7 @@ export function setLocale(l) {
 }
 
 export function t(key, params = {}) {
-  const s = dict[locale.value][key] ?? en[key] ?? key
+  const plural = typeof params.n === 'number' ? `${key}_${new Intl.PluralRules(locale.value).select(params.n)}` : null
+  const s = (plural && (dict[locale.value][plural] ?? en[plural])) ?? dict[locale.value][key] ?? en[key] ?? key
   return s.replace(/\{(\w+)\}/g, (_, k) => params[k] ?? '')
 }
