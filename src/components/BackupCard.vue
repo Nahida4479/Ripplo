@@ -41,13 +41,13 @@ const off = () => { ui.confirm = { title: t('backupOff'), text: t('backupOffConf
   <h2 class="section">{{ t('backup') }}</h2>
   <div class="card pad">
     <p v-if="!mesh.isNative" class="hint">{{ t('backupWeb') }}</p>
-    <template v-else-if="step === 'code'">
+    <!-- <template v-else-if="step === 'code'">
       <b>{{ t('codeTitle') }}</b>
       <div class="code mono" :aria-label="t('codeTitle')"><span v-for="(g, i) in groups" :key="i">{{ g }}</span></div>
       <p class="hint">{{ t('codeWarn') }}</p>
       <button v-if="setup" class="btn block" @click="wrote">{{ t('codeWritten') }}</button>
       <button v-else class="btn block" @click="close">{{ t('done') }}</button>
-    </template>
+    </template> -->
     <form v-else-if="step === 'check'" class="stack" @submit.prevent="verify">
       <b>{{ t('codeCheckTitle') }}</b>
       <p class="hint">{{ t('codeCheckHint') }}</p>
