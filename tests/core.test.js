@@ -1,22 +1,18 @@
 import 'fake-indexeddb/auto'
 import { describe, it, expect } from 'vitest'
 import { resolveObjectURL } from 'node:buffer'
-import { SessionBuilder, SessionCipher, SignalProtocolAddress } from '@privacyresearch/libsignal-protocol-typescript'
 import { createCore } from '../src/core/messenger.js'
 import { TYPE, encodePacket, decodePacket, newId } from '../src/mesh/packet.js'
-import { openDb } from '../src/crypto/db.js'
-import { createVault } from '../src/crypto/vault.js'
-import { createSignalStore } from '../src/crypto/signalStore.js'
-import { createIdentity, makeCard, encodeLink, parseLink, deriveIds } from '../src/crypto/identity.js'
-import { seal } from '../src/crypto/sealed.js'
-import { b64, b64url, hex, utf8, unutf8, random, ab } from '../src/lib/bytes.js'
+import { createDevSignal } from '../src/mesh/devSignal.js'
+import { parseLink } from '../src/crypto/identity.js'
+import { b64, b64url, hex, utf8, unutf8, random, concat } from '../src/lib/bytes.js'
 import { sha256 } from '@noble/hashes/sha2.js'
 
 const nodes = []
 function fakeMesh() {
   const handlers = { packet: [], neighbor: [] }
   const m = {
-    isNative: false, node: hex(random(8)), tag: '', neighbors: new Set(), offline: false,
+    ...createDevSignal(), devCrypto: true, isNative: false, node: hex(random(8)), tag: '', neighbors: new Set(), offline: false,
     on(ev, cb) { handlers[ev].push(cb); return () => handlers[ev].splice(handlers[ev].indexOf(cb), 1) },
     emit(ev, d) { setTimeout(() => handlers[ev].slice().forEach((h) => h(d)), 0) },
     async start(tag) { m.tag = hex(tag); return { nodeTag: m.node } },
@@ -98,40 +94,25 @@ describe('messaging', () => {
     expect(b.state.chats.find((c) => c.id === a.id).unread).toBe(0)
   })
 
-  it('rejects text over 1000 chars, own link and bad prekey signature', async () => {
+  it('rejects text over 1000 chars, own link and a card with a bad bundle', async () => {
     const a = await user('Alice'), b = await user('Bob')
     await a.core.addContactFromLink(b.link)
     expect(await codeOf(a.core.sendText(b.id, 'x'.repeat(1001)))).toBe('too_long')
     expect(await codeOf(a.core.addContactFromLink(a.link))).toBe('self')
-    const card = { ...parseLink(b.link).card }
-    card.spk = { ...card.spk, sig: b64(random(64)) }
-    const j = utf8(JSON.stringify(card))
-    const forged = `ripplo://add/${b64url(j)}.${b64url(sha256(j).slice(0, 6))}`
+    const card = parseLink(b.link).card.slice()
+    card[2 + card[1] + 5] = 4
+    const forged = `ripplo://add/${b64url(card)}.${b64url(sha256(card).slice(0, 6))}`
     const c = await user('Carol')
     expect(await codeOf(c.core.addContactFromLink(forged))).toBe('bad_link')
     expect(c.state.contacts[b.id]).toBeUndefined()
   })
 
-  it('drops a PreKey message whose identity does not derive the claimed sender id', async () => {
-    const a = await user('Alice'), b = await user('Bob')
-    const mesh = fakeMesh()
-    const vault = await createVault(mesh)
-    const store = createSignalStore(await openDb(`mal-${hex(random(4))}`, vault))
-    const mal = await createIdentity()
-    await store.setLocal({ ...mal, name: 'Mal' })
-    const bc = parseLink(b.link).card
-    await new SessionBuilder(store, new SignalProtocolAddress(b.id, 1)).processPreKey({
-      identityKey: ab(parseLink(b.link).ik), registrationId: bc.rid,
-      signedPreKey: { keyId: bc.spk.id, publicKey: ab(new Uint8Array(Buffer.from(bc.spk.pub, 'base64'))), signature: ab(new Uint8Array(Buffer.from(bc.spk.sig, 'base64'))) },
-    })
-    const { type, body } = await new SessionCipher(store, new SignalProtocolAddress(b.id, 1)).encrypt(ab(utf8(JSON.stringify({ t: 'msg', id: 'x1', text: 'forged', ts: 1 }))))
-    const inner = utf8(JSON.stringify({ f: a.id, t: type, b: b64(Uint8Array.from(body, (c) => c.charCodeAt(0))) }))
-    const { ik, tag } = parseLink(b.link)
-    const sealed = await seal(ik, tag, inner)
-    b.mesh.emit('packet', { packet: encodePacket({ type: TYPE.DATA, dest: tag, payload: sealed }), from: 'x' })
-    await new Promise((r) => setTimeout(r, 300))
-    expect(b.state.contacts[a.id]).toBeUndefined()
-    expect(b.state.messages[a.id]).toBeUndefined()
+  it('drops a malformed sealed payload without creating a contact', async () => {
+    const b = await user('Bob')
+    const { tag } = parseLink(b.link)
+    b.mesh.emit('packet', { packet: encodePacket({ type: TYPE.DATA, dest: tag, payload: concat(new Uint8Array([0xee, 5]), random(10)) }), from: 'x' })
+    await new Promise((r) => setTimeout(r, 200))
+    expect(Object.keys(b.state.contacts)).toEqual([])
   })
 
   it('retries after out_of_range', async () => {
@@ -172,12 +153,12 @@ describe('verification', () => {
     })
     connect(a.mesh, mal)
     await waitFor(() => a.state.neighbors.length === 1)
-    mal.sendApp(a.mesh.node, utf8(JSON.stringify({ t: 'hello', card: parseLink(b.link).card })))
+    mal.sendApp(a.mesh.node, utf8(JSON.stringify({ t: 'hello', card: b64(parseLink(b.link).card) })))
     expect(await a.core.verifyNearby(b.id)).toBe(false)
     expect(c.verifyState).toBe('failed')
     expect(c.verification).toBe('none')
     const evil = await user('Bob')
-    mal.sendApp(a.mesh.node, utf8(JSON.stringify({ t: 'hello', card: parseLink(evil.link).card })))
+    mal.sendApp(a.mesh.node, utf8(JSON.stringify({ t: 'hello', card: b64(parseLink(evil.link).card) })))
     await waitFor(() => c.conflict)
   })
 

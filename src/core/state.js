@@ -5,6 +5,7 @@ export function createState() {
     ready: false,
     needsOnboarding: false,
     insecureStorage: false,
+    devCrypto: false,
     profile: null,
     contacts: {},
     chats: [],

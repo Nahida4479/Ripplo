@@ -1,14 +1,9 @@
-import { SessionBuilder, SessionCipher, SignalProtocolAddress } from '@privacyresearch/libsignal-protocol-typescript'
-import { PreKeyWhisperMessage } from '@privacyresearch/libsignal-protocol-protobuf-ts'
 import { sha256 } from '@noble/hashes/sha2.js'
 import { TYPE, newId, encodePacket, decodePacket } from '../mesh/packet.js'
-import { b64, unb64, hex, unhex, utf8, unutf8, concat, random, ab, equal } from '../lib/bytes.js'
+import { b64, unb64, hex, unhex, utf8, unutf8, concat, random, equal } from '../lib/bytes.js'
 import { createVault } from '../crypto/vault.js'
 import { openDb } from '../crypto/db.js'
-import { createSignalStore } from '../crypto/signalStore.js'
-import { RipploError, createIdentity, makeCard, checkCard, encodeLink, parseLink, deriveIds, cleanName } from '../crypto/identity.js'
-import { seal, unseal } from '../crypto/sealed.js'
-import { safetyNumber as computeSafety, proofMac, proofValid } from '../crypto/safety.js'
+import { RipploError, encodeCard, checkCard, encodeLink, parseLink, deriveIds, cleanName } from '../crypto/identity.js'
 import { CHUNK, encryptFile, decryptFile, chunkCount, chunkPayload, parseChunk } from '../crypto/attachment.js'
 import { createState } from './state.js'
 import { notify } from '../services/notifications.js'
@@ -37,7 +32,7 @@ const safeMime = (m) => {
 export function createCore({ mesh, dbName = 'ripplo', state = createState(), notifier = notify, timing = {} }) {
   const T = { ...DEFAULT_TIMING, ...timing }
   let db = null
-  let store = null
+  let own = null
   let me = null
   let unsubs = []
   let queue = Promise.resolve()
@@ -56,27 +51,26 @@ export function createCore({ mesh, dbName = 'ripplo', state = createState(), not
   const persistMsg = (m) => db.putMsg({ ...m, att: m.att && { ...m.att, url: undefined } })
   const tagOf = (c) => deriveIds(unb64(c.ik)).tag
 
-  function loadMe(local) {
-    const ik = { pub: unb64(local.ik.pub), priv: unb64(local.ik.priv) }
-    const { tag, ripploId } = deriveIds(ik.pub)
-    const identity = { ik, regId: local.regId, spk: { id: local.spk.id, pub: unb64(local.spk.pub), sig: unb64(local.spk.sig) } }
-    me = { ik, tag, id: ripploId, name: local.name, card: makeCard(identity, local.name) }
-    state.profile = { name: local.name, ripploId, tag: hex(tag) }
+  function loadMe(name) {
+    const { tag, ripploId } = deriveIds(own.ik)
+    me = { ik: own.ik, tag, id: ripploId, name, card: encodeCard(name, own.bundle) }
+    state.profile = { name, ripploId, tag: hex(tag) }
   }
 
   async function init() {
     const vault = await createVault(mesh)
     state.insecureStorage = vault.insecure
+    state.devCrypto = !!mesh.devCrypto
+    own = await mesh.signalInit()
     db = await openDb(dbName, vault)
-    store = createSignalStore(db)
     Object.assign(state.settings, (await db.get('kv', 'settings')) || {})
     state.contacts = Object.fromEntries((await db.all('contacts')).map(([id, c]) => [id, { ...c, verifyState: 'idle' }]))
     state.chats = (await db.all('chats')).map(([, c]) => c).sort((a, b) => b.lastTs - a.lastTs)
     pending = (await db.get('kv', 'pending')) || {}
-    const local = await store.local()
-    state.needsOnboarding = !local
-    if (local) {
-      loadMe(local)
+    const profile = await db.get('kv', 'profile')
+    state.needsOnboarding = !profile
+    if (profile) {
+      loadMe(profile.name)
       await dropExpired()
       await start()
     }
@@ -86,9 +80,8 @@ export function createCore({ mesh, dbName = 'ripplo', state = createState(), not
   async function createProfile(name) {
     const clean = cleanName(name)
     if (!clean) throw new RipploError('bad_name')
-    const identity = await createIdentity()
-    await store.setLocal({ ...identity, name: clean })
-    loadMe(await store.local())
+    await db.put('kv', 'profile', { name: clean })
+    loadMe(clean)
     state.needsOnboarding = false
     await start()
   }
@@ -117,7 +110,7 @@ export function createCore({ mesh, dbName = 'ripplo', state = createState(), not
     }
     if (i >= 0) Object.assign(state.neighbors[i], { medium, kbps, rttMs })
     else state.neighbors.push({ node, medium, kbps, rttMs })
-    mesh.sendApp(node, utf8(JSON.stringify({ t: 'hello', card: me.card }))).catch(() => {})
+    mesh.sendApp(node, utf8(JSON.stringify({ t: 'hello', card: b64(me.card) }))).catch(() => {})
   }
 
   function onPacket(bytes, from) {
@@ -129,7 +122,8 @@ export function createCore({ mesh, dbName = 'ripplo', state = createState(), not
         if (seenIds.has(id)) return
         seenIds.add(id)
         if (seenIds.size > 2000) seenIds.delete(seenIds.values().next().value)
-        enqueue(() => (p.payload[0] === 2 ? onChunk(p) : onSealed(p.payload)))
+        if (p.payload[0] === 2) enqueue(() => onChunk(p))
+        else if (p.payload[0] === 1 || (mesh.devCrypto && p.payload[0] === 0xee)) enqueue(() => onSealed(p.payload))
         break
       case TYPE.ACK: settle(hex(p.dest), { ok: true, hops: p.hops }); break
       case TYPE.DEAD_END:
@@ -159,31 +153,9 @@ export function createCore({ mesh, dbName = 'ripplo', state = createState(), not
     w.resolve(result)
   }
 
-  async function createSession(card, id) {
-    try {
-      await new SessionBuilder(store, new SignalProtocolAddress(id, 1)).processPreKey({
-        identityKey: ab(unb64(card.ik)),
-        registrationId: card.rid,
-        signedPreKey: { keyId: card.spk.id, publicKey: ab(unb64(card.spk.pub)), signature: ab(unb64(card.spk.sig)) },
-      })
-    } catch {
-      throw new RipploError('bad_link', 'invalid prekey bundle')
-    }
-  }
-
-  async function ensureSession(c) {
-    if (await store.loadSession(new SignalProtocolAddress(c.id, 1).toString())) return
-    if (!c.card) throw new RipploError('no_session')
-    await createSession(c.card, c.id)
-  }
-
   async function buildPacket(c, obj) {
-    await ensureSession(c)
-    const cipher = new SessionCipher(store, new SignalProtocolAddress(c.id, 1))
-    const { type, body } = await cipher.encrypt(ab(utf8(JSON.stringify(obj))))
-    const inner = utf8(JSON.stringify({ f: me.id, t: type, b: b64(Uint8Array.from(body, (ch) => ch.charCodeAt(0))) }))
-    const sealed = await seal(unb64(c.ik), tagOf(c), inner)
-    return encodePacket({ type: TYPE.DATA, dest: tagOf(c), payload: sealed })
+    const payload = await mesh.signalSeal(hex(tagOf(c)), utf8(JSON.stringify(obj)))
+    return encodePacket({ type: TYPE.DATA, dest: tagOf(c), payload })
   }
 
   function touchChat(chatId, text, ts, unread = 0, lastKind = null) {
@@ -319,21 +291,12 @@ export function createCore({ mesh, dbName = 'ripplo', state = createState(), not
   }
 
   async function onSealed(payload) {
-    const inner = JSON.parse(unutf8(await unseal(me.ik.priv, me.tag, payload)))
-    const { f, t, b } = inner
-    if (!ID_RE.test(f) || f === me.id || (t !== 1 && t !== 3) || typeof b !== 'string') return
-    const body = latin1(unb64(b))
-    let idKey = null
-    if (t === 3) {
-      idKey = new Uint8Array(PreKeyWhisperMessage.decode(Uint8Array.from(body.slice(1), (ch) => ch.charCodeAt(0))).identityKey)
-      if (idKey.length !== 33 || idKey[0] !== 5 || deriveIds(idKey).ripploId !== f) return
-    }
-    const cipher = new SessionCipher(store, new SignalProtocolAddress(f, 1))
-    const plain = t === 3 ? await cipher.decryptPreKeyWhisperMessage(body, 'binary') : await cipher.decryptWhisperMessage(body, 'binary')
-    const used = await store.loadIdentity(f)
-    if (!used || deriveIds(used).ripploId !== f) return
-    if (!state.contacts[f]) await addContact({ id: f, name: knownName(f) || `Ripplo ${f.slice(0, 4)}`, ik: b64(used), card: null, addedVia: 'incoming' })
-    await onAppMessage(f, JSON.parse(unutf8(new Uint8Array(plain))))
+    const { tag, ik, plaintext } = await mesh.signalOpen(payload)
+    const ids = deriveIds(ik)
+    const f = ids.ripploId
+    if (hex(ids.tag) !== tag || f === me.id) return
+    if (!state.contacts[f]) await addContact({ id: f, name: knownName(f) || `Ripplo ${f.slice(0, 4)}`, ik: b64(ik), card: null, addedVia: 'incoming' })
+    await onAppMessage(f, JSON.parse(unutf8(plaintext)))
   }
 
   const knownName = (id) => state.neighbors.find((n) => n.card?.id === id)?.card.name || state.people.find((p) => p.id === id)?.name
@@ -375,7 +338,7 @@ export function createCore({ mesh, dbName = 'ripplo', state = createState(), not
     const name = cleanName(msg.name)
     if (!name) return
     let cards
-    try { cards = msg.members.map(checkCard) } catch { return }
+    try { cards = msg.members.map((m) => checkCard(unb64(m))) } catch { return }
     const ids = cards.map((c) => c.id)
     if (!ids.includes(f) || !ids.includes(me.id)) return
     const existing = state.chats.find((c) => c.id === msg.g)
@@ -398,13 +361,14 @@ export function createCore({ mesh, dbName = 'ripplo', state = createState(), not
 
   async function learnCard(v, via) {
     const c = state.contacts[v.id]
+    const card = b64(v.card), ik = b64(v.ik)
     if (!c) {
-      const created = await addContact({ id: v.id, name: v.card.n, ik: v.card.ik, card: v.card, addedVia: via })
-      return created
+      try { await mesh.signalAddContact(v.bundle) } catch { throw new RipploError('bad_link', 'invalid prekey bundle') }
+      return addContact({ id: v.id, name: v.name, ik, card, addedVia: via })
     }
-    if (!c.card && c.ik === v.card.ik) {
-      c.card = v.card
-      c.name = v.card.n
+    if (!c.card && c.ik === ik) {
+      c.card = card
+      c.name = v.name
       ensureChat(c.id, 'direct', c.name)
       markConflicts(c.name, c.id)
       await persistContact(c)
@@ -424,10 +388,9 @@ export function createCore({ mesh, dbName = 'ripplo', state = createState(), not
   async function addCard(raw, via) {
     const v = checkCard(raw)
     if (v.id === me.id) throw new RipploError('self')
-    const existing = state.contacts[v.id]
-    if (existing) return learnCard(v, via)
-    await createSession(v.card, v.id)
+    const isNew = !state.contacts[v.id]
     const c = await learnCard(v, via)
+    if (!isNew) return c
     const person = state.people.find((p) => p.id === v.id)
     if (person) person.isContact = true
     if (['link', 'qr', 'people'].includes(via)) verifyNearby(v.id).catch(() => {})
@@ -440,23 +403,23 @@ export function createCore({ mesh, dbName = 'ripplo', state = createState(), not
     return addCard(v.card, via)
   }
 
-  const addPerson = (person) => addCard(person.card, 'people')
+  const addPerson = (person) => addCard(unb64(person.card), 'people')
 
   async function onApp(p, from) {
     const msg = JSON.parse(unutf8(p.payload))
     const nb = state.neighbors.find((n) => n.node === from)
     if (!nb || !msg || typeof msg !== 'object') return
     if (msg.t === 'hello') {
-      const v = checkCard(msg.card)
+      const v = checkCard(unb64(msg.card))
       if (v.id === me.id) return
-      nb.card = { id: v.id, name: v.card.n, ik: v.card.ik, card: v.card }
-      markConflicts(v.card.n, v.id)
+      nb.card = { id: v.id, name: v.name, ik: b64(v.ik), card: b64(v.card) }
+      markConflicts(v.name, v.id)
       if (state.contacts[v.id]) await learnCard(v, 'link')
     } else if (msg.t === 'challenge') {
       const n = unb64(msg.n)
       const ik = nb.card && nb.card.id === msg.from ? unb64(nb.card.ik) : state.contacts[msg.from] && unb64(state.contacts[msg.from].ik)
       if (n.length !== 32 || !ik || deriveIds(ik).ripploId !== msg.from) return
-      const mac = proofMac(me.ik.priv, ik, n, deriveIds(ik).tag, me.tag)
+      const mac = await mesh.signalProof(ik, n, deriveIds(ik).tag, me.tag)
       await mesh.sendApp(from, utf8(JSON.stringify({ t: 'proof', n: msg.n, mac: b64(mac) })))
     } else if (msg.t === 'proof') {
       const w = proofs.get(msg.n)
@@ -477,7 +440,7 @@ export function createCore({ mesh, dbName = 'ripplo', state = createState(), not
     const mac = await answer
     if (!mac) return 'timeout'
     const ik = unb64(c.ik)
-    return proofValid(mac, proofMac(me.ik.priv, ik, n, me.tag, deriveIds(ik).tag)) ? 'ok' : 'bad'
+    return equal(mac, await mesh.signalProof(ik, n, me.tag, deriveIds(ik).tag)) ? 'ok' : 'bad'
   }
 
   function verifyNearby(id) {
@@ -524,10 +487,10 @@ export function createCore({ mesh, dbName = 'ripplo', state = createState(), not
     if (!c) return false
     const text = String(scanned)
     const digits = text.replace(/\s+/g, '')
-    if (/^\d{60}$/.test(digits)) return digits === safetyNumber(id) && setVerified(id, 'qr')
+    if (/^\d{60}$/.test(digits)) return digits === (await safetyNumber(id)) && setVerified(id, 'qr')
     try {
       const v = parseLink(text)
-      return v.card.ik === c.ik && (await setVerified(id, 'qr'))
+      return b64(v.ik) === c.ik && (await setVerified(id, 'qr'))
     } catch {
       return false
     }
@@ -535,10 +498,10 @@ export function createCore({ mesh, dbName = 'ripplo', state = createState(), not
 
   const markVerified = (id) => setVerified(id, 'manual').then(() => {})
 
-  function safetyNumber(id) {
+  async function safetyNumber(id) {
     const c = state.contacts[id]
     if (!c) throw new RipploError('no_contact')
-    return computeSafety(me.ik.pub, me.id, unb64(c.ik), id)
+    return mesh.signalSafetyNumber(unb64(c.ik))
   }
 
   async function loadMessages(chatId) {
@@ -569,7 +532,7 @@ export function createCore({ mesh, dbName = 'ripplo', state = createState(), not
     if (ids.some((i) => !state.contacts[i] || !state.contacts[i].card)) throw new RipploError('no_contact')
     const g = b64(random(9)).replace(/\+/g, '-').replace(/\//g, '_')
     const chat = ensureChat(g, 'group', clean, ids)
-    const body = { t: 'group', g, name: clean, members: [me.card, ...ids.map((i) => state.contacts[i].card)] }
+    const body = { t: 'group', g, name: clean, members: [b64(me.card), ...ids.map((i) => state.contacts[i].card)] }
     await Promise.all(ids.map(async (i) => {
       try { await mesh.send(await buildPacket(state.contacts[i], body)) } catch { return }
     }))
@@ -653,10 +616,10 @@ export function createCore({ mesh, dbName = 'ripplo', state = createState(), not
   function onReply(p) {
     if (!discover || hex(p.dest) !== discover.id) return
     let v
-    try { v = checkCard(JSON.parse(unutf8(p.payload))) } catch { return }
+    try { v = checkCard(p.payload) } catch { return }
     if (v.id === me.id) return
-    markConflicts(v.card.n, v.id)
-    const person = { id: v.id, name: v.card.n, card: v.card, hops: p.hops, seenAt: Date.now(), isContact: !!state.contacts[v.id] }
+    markConflicts(v.name, v.id)
+    const person = { id: v.id, name: v.name, card: b64(v.card), hops: p.hops, seenAt: Date.now(), isContact: !!state.contacts[v.id] }
     const i = state.people.findIndex((x) => x.id === v.id)
     if (i < 0) state.people.push(person)
     else if (person.hops < state.people[i].hops) state.people[i] = person
@@ -665,7 +628,7 @@ export function createCore({ mesh, dbName = 'ripplo', state = createState(), not
   function onDiscover(p) {
     if (discover && hex(p.id) === discover.id) return
     try { if (JSON.parse(unutf8(p.payload)).t !== 'who') return } catch { return }
-    mesh.send(encodePacket({ type: TYPE.REPLY, dest: p.id, payload: utf8(JSON.stringify(me.card)) })).catch(() => {})
+    mesh.send(encodePacket({ type: TYPE.REPLY, dest: p.id, payload: me.card })).catch(() => {})
   }
 
   async function deleteChat(chatId) {
@@ -681,9 +644,10 @@ export function createCore({ mesh, dbName = 'ripplo', state = createState(), not
 
   async function deleteContact(id) {
     await deleteChat(id)
+    const c = state.contacts[id]
     delete state.contacts[id]
     await db.del('contacts', id)
-    await store.removeSession(new SignalProtocolAddress(id, 1).toString())
+    if (c) await mesh.signalForget(hex(tagOf(c))).catch(() => {})
   }
 
   async function saveSettings(patch) {

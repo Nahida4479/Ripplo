@@ -70,6 +70,10 @@ jobs:
           echo "::add-mask::$KS_PASS"
           echo "::add-mask::$KEY_PASS"
 
+      - name: Signal crypto unit tests
+        working-directory: android
+        run: ./gradlew testReleaseUnitTest
+
       - name: Assemble release APK
         working-directory: android
         env:

@@ -71,6 +71,7 @@ const initials = l => l.slice(0, 2).toUpperCase()
 
     <h2 class="section">{{ t('security') }}</h2>
     <div class="card">
+      <div v-if="state.devCrypto" class="row" style="color: var(--danger); font-weight: 600"><TriangleAlert :size="22" /><span class="grow">{{ t('devCryptoWarn') }}</span></div>
       <div class="row"><component :is="integ[0]" :size="22" :stroke-width="1.75" /><span class="grow"><span class="label">{{ t('integrity') }}</span><br /><span class="hint">{{ t(integ[2]) }}</span></span></div>
       <div class="row" :style="state.insecureStorage ? 'color: var(--warn)' : ''">
         <TriangleAlert v-if="state.insecureStorage" :size="22" /><ShieldCheck v-else :size="22" :stroke-width="1.75" />

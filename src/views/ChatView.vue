@@ -121,7 +121,8 @@ function sure() { ui.confirm = { title: t('imSure'), text: t('imSureConfirm'), o
     </div>
 
     <div ref="scroller" class="log">
-      <p class="lock"><Lock :size="13" /> {{ t('encryptedLine') }}</p>
+      <p v-if="state.devCrypto" class="lock" style="color: var(--danger); font-weight: 600"><ShieldAlert :size="13" /> {{ t('devCryptoWarn') }}</p>
+      <p v-else class="lock"><Lock :size="13" /> {{ t('encryptedLine') }}</p>
       <template v-for="(m, i) in msgs" :key="m.id">
         <div v-if="showDay(i)" class="day"><span>{{ dayLabel(m.ts) }}</span></div>
         <div class="msg" :class="m.from === 'me' ? 'out' : 'in'">

@@ -1,11 +1,19 @@
 import { describe, it, expect } from 'vitest'
-import { x25519 } from '@noble/curves/ed25519.js'
-import { seal, unseal } from '../src/crypto/sealed.js'
-import { createIdentity, makeCard, encodeLink, parseLink, deriveIds, formatId } from '../src/crypto/identity.js'
-import { safetyNumber, proofMac } from '../src/crypto/safety.js'
+import QRCode from 'qrcode'
+import jsQR from 'jsqr'
+import { encodeCard, encodeLink, parseLink, checkCard, deriveIds, formatId } from '../src/crypto/identity.js'
+import { createDevSignal } from '../src/mesh/devSignal.js'
 import { encryptFile, decryptFile, chunkCount, chunkPayload, parseChunk, CHUNK } from '../src/crypto/attachment.js'
-import { b64, b64url, utf8, unutf8, concat, random, base32 } from '../src/lib/bytes.js'
+import { b64url, utf8, concat, random, base32 } from '../src/lib/bytes.js'
 import { sha256 } from '@noble/hashes/sha2.js'
+
+const makeLink = async (name = 'Alice') => {
+  const { bundle, ik } = await createDevSignal().signalInit()
+  const card = encodeCard(name, bundle)
+  return { card, ik, link: encodeLink(card) }
+}
+const code = (fn) => { try { fn(); return null } catch (e) { return e.code } }
+const relink = (card) => `ripplo://add/${b64url(card)}.${b64url(sha256(card).slice(0, 6))}`
 
 describe('bytes', () => {
   it('base32 of 10 bytes is 16 chars', () => {
@@ -14,65 +22,57 @@ describe('bytes', () => {
   })
 })
 
-describe('sealed', () => {
-  it('roundtrips and fails with a wrong key', async () => {
-    const id = await createIdentity()
-    const { tag } = deriveIds(id.ik.pub)
-    const s = await seal(id.ik.pub, tag, utf8('hello'))
-    expect(s[0]).toBe(1)
-    expect(unutf8(await unseal(id.ik.priv, tag, s))).toBe('hello')
-    const other = await createIdentity()
-    await expect(unseal(other.ik.priv, tag, s)).rejects.toThrow()
-    s[s.length - 1] ^= 1
-    await expect(unseal(id.ik.priv, tag, s)).rejects.toThrow()
-    expect(x25519.getSharedSecret).toBeTypeOf('function')
-  })
-})
-
 describe('invite link', () => {
   it('roundtrips, tolerates wrapping, rejects tampering', async () => {
-    const id = await createIdentity()
-    const card = makeCard(id, 'Alice')
-    const link = encodeLink(card)
+    const { card, ik, link } = await makeLink()
     const v = parseLink(link)
     expect(v.card).toEqual(card)
-    expect(v.id).toBe(deriveIds(id.ik.pub).ripploId)
+    expect(v.name).toBe('Alice')
+    expect(v.ik).toEqual(ik)
+    expect(v.id).toBe(deriveIds(ik).ripploId)
     expect(formatId(v.id)).toMatch(/^\w{4}-\w{4}-\w{4}-\w{4}$/)
     expect(parseLink(`  ${link.slice(0, 30)}\n ${link.slice(30)} \n`).id).toBe(v.id)
     expect(parseLink(`join me: https://ripplo.app/add?x=${link} thanks`).id).toBe(v.id)
-    const bad = (s) => { try { parseLink(s); return null } catch (e) { return e.code } }
     const [head, sum] = link.split('.')
-    expect(bad(`${head}.${sum.slice(0, 7)}A`)).toBe('bad_checksum')
+    expect(code(() => parseLink(`${head}.${sum.slice(0, 7)}A`))).toBe('bad_checksum')
     const flipped = head.slice(0, 40) + (head[40] === 'A' ? 'B' : 'A') + head.slice(41)
-    expect(bad(`${flipped}.${sum}`)).toBe('bad_checksum')
-    expect(bad('hello')).toBe('bad_link')
-    const forge = (c) => {
-      const j = utf8(JSON.stringify(c))
-      return `ripplo://add/${b64url(j)}.${b64url(sha256(j).slice(0, 6))}`
-    }
-    const ik = new Uint8Array(33).fill(7)
-    expect(bad(forge({ ...card, ik: b64(ik) }))).toBe('bad_link')
-    expect(bad(forge({ ...card, ik: b64(ik.slice(0, 32)) }))).toBe('bad_link')
-    expect(bad(forge({ ...card, n: '  ' }))).toBe('bad_link')
+    expect(code(() => parseLink(`${flipped}.${sum}`))).toBe('bad_checksum')
+    expect(code(() => parseLink('hello'))).toBe('bad_link')
   })
-})
 
-describe('safety', () => {
-  it('safety number matches on both sides and has 60 digits', async () => {
-    const a = await createIdentity(), b = await createIdentity()
-    const ia = deriveIds(a.ik.pub).ripploId, ib = deriveIds(b.ik.pub).ripploId
-    const n1 = safetyNumber(a.ik.pub, ia, b.ik.pub, ib)
-    expect(n1).toMatch(/^\d{60}$/)
-    expect(safetyNumber(b.ik.pub, ib, a.ik.pub, ia)).toBe(n1)
-    const c = await createIdentity()
-    expect(safetyNumber(a.ik.pub, ia, c.ik.pub, deriveIds(c.ik.pub).ripploId)).not.toBe(n1)
+  it('rejects tampered or short cards', async () => {
+    const { card } = await makeLink()
+    const nl = card[1]
+    const bad = (c) => code(() => parseLink(relink(c)))
+    expect(bad(card.slice(0, 100))).toBe('bad_link')
+    expect(bad(card.slice(0, card.length - 1))).toBe('bad_link')
+    expect(bad(concat(card, new Uint8Array(1)))).toBe('bad_link')
+    const v = (i, x) => { const c = card.slice(); c[i] = x; return c }
+    expect(bad(v(0, 1))).toBe('bad_link')
+    expect(bad(v(1, 0))).toBe('bad_link')
+    expect(bad(v(1, 121))).toBe('bad_link')
+    expect(bad(v(2 + nl, 1))).toBe('bad_link')
+    expect(bad(v(2 + nl + 5, 4))).toBe('bad_link')
+    expect(bad(concat(new Uint8Array([2, 2]), utf8('  '), card.subarray(2 + nl)))).toBe('bad_link')
+    expect(code(() => checkCard(new Uint8Array(0)))).toBe('bad_link')
   })
-  it('proof macs agree between holder of either private key only', async () => {
-    const a = await createIdentity(), b = await createIdentity(), m = await createIdentity()
-    const ta = deriveIds(a.ik.pub).tag, tb = deriveIds(b.ik.pub).tag, n = random(32)
-    const fromB = proofMac(b.ik.priv, a.ik.pub, n, ta, tb)
-    expect(proofMac(a.ik.priv, b.ik.pub, n, ta, tb)).toEqual(fromB)
-    expect(proofMac(m.ik.priv, a.ik.pub, n, ta, tb)).not.toEqual(fromB)
+
+  it('renders as a QR code that jsQR decodes', async () => {
+    const { link } = await makeLink('A'.repeat(40))
+    expect(link.length).toBeGreaterThan(2300)
+    const { modules } = QRCode.create(link, { errorCorrectionLevel: 'L' })
+    const px = 4, quiet = 4, n = modules.size, size = (n + quiet * 2) * px
+    const rgba = new Uint8ClampedArray(size * size * 4).fill(255)
+    for (let y = 0; y < size; y++) {
+      for (let x = 0; x < size; x++) {
+        const mx = Math.floor(x / px) - quiet, my = Math.floor(y / px) - quiet
+        if (mx >= 0 && my >= 0 && mx < n && my < n && modules.get(my, mx)) {
+          const o = (y * size + x) * 4
+          rgba[o] = rgba[o + 1] = rgba[o + 2] = 0
+        }
+      }
+    }
+    expect(jsQR(rgba, size, size)?.data).toBe(link)
   })
 })
 

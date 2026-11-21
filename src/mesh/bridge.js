@@ -1,6 +1,7 @@
 import { Capacitor, registerPlugin } from '@capacitor/core'
 import { TYPE, encodePacket } from './packet.js'
 import { Router } from './router.js'
+import { createDevSignal } from './devSignal.js'
 
 const b64 = (u8) => { let s = ''; for (let i = 0; i < u8.length; i += 0x8000) s += String.fromCharCode(...u8.subarray(i, i + 0x8000)); return btoa(s) }
 const unb64 = (s) => Uint8Array.from(atob(s), (c) => c.charCodeAt(0))
@@ -12,6 +13,14 @@ function nativeMesh() {
   const inbound = (e) => ({ packet: unb64(e.packet), from: e.from })
   return {
     isNative: true,
+    devCrypto: false,
+    async signalInit() { const r = await P.signalInit(); return { bundle: unb64(r.bundle), ik: unb64(r.ik) } },
+    signalAddContact: async (bundle) => (await P.signalAddContact({ bundle: b64(bundle) })).tag,
+    signalSeal: async (tag, plaintext) => unb64((await P.signalSeal({ tag, plaintext: b64(plaintext) })).payload),
+    async signalOpen(payload) { const r = await P.signalOpen({ payload: b64(payload) }); return { tag: r.tag, ik: unb64(r.ik), plaintext: unb64(r.plaintext) } },
+    signalProof: async (ik, n, challengerTag, proverTag) => unb64((await P.signalProof({ ik: b64(ik), n: b64(n), challengerTag: b64(challengerTag), proverTag: b64(proverTag) })).mac),
+    signalSafetyNumber: async (ik) => (await P.signalSafetyNumber({ ik: b64(ik) })).digits,
+    signalForget: (tag) => P.signalForget({ tag }),
     start: (selfTag) => P.start({ selfTag: b64(selfTag) }),
     send: (packet) => P.send({ packet: b64(packet) }),
     sendApp: (node, payload) => P.sendApp({ node, payload: b64(payload) }),
@@ -27,6 +36,14 @@ function nativeMesh() {
       const h = P.addListener(event, (e) => cb(event === 'packet' ? inbound(e) : e))
       return () => h.then((x) => x.remove())
     },
+  }
+}
+
+function devStore() {
+  const key = `ripplo-dev-bundle-${new URLSearchParams(location.search).get('profile') || 'default'}`
+  return {
+    get: () => { try { const v = localStorage.getItem(key); return v && unb64(v) } catch { return null } },
+    set: (b) => { try { localStorage.setItem(key, b64(b)) } catch {} },
   }
 }
 
@@ -60,6 +77,8 @@ function webMesh() {
 
   return {
     isNative: false,
+    devCrypto: true,
+    ...createDevSignal(devStore()),
     async start(selfTag) {
       if (router) return { nodeTag }
       router = new Router({

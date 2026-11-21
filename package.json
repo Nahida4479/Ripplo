@@ -23,7 +23,6 @@
     "@capacitor/local-notifications": "^8.3.1",
     "@noble/curves": "^2.4.0",
     "@noble/hashes": "^2.4.0",
-    "@privacyresearch/libsignal-protocol-typescript": "^0.0.16",
     "idb": "^8.0.4",
     "jsqr": "^1.4.0",
     "lucide-vue-next": "^1.0.0",

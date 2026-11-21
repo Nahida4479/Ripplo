@@ -75,7 +75,7 @@ watch(() => ui.add, a => {
 
 async function show() {
   link.value = myInviteLink()
-  qr.value = await QRCode.toDataURL(link.value, { margin: 1, width: 480, errorCorrectionLevel: 'M' })
+  qr.value = await QRCode.toDataURL(link.value, { margin: 1, width: 480, errorCorrectionLevel: 'L' })
 }
 watch([() => ui.add, tab], () => {
   stopScan(); busy = false
