@@ -542,9 +542,20 @@ blokada aplikacji jest włączona, tekst to ogólne „Nowa wiadomość”; na e
 więc aplikacja nie pokazuje drugiego powiadomienia. Stuknięcie powiadomienia otwiera ten czat.
 
 Połączenia: oferta od kontaktu, którego dodałeś/aś, zaakceptowałeś/aś lub do którego pisałeś/aś, nie starsza niż 120 s, z poprawnym id i kluczem, gdy nie dzwoni
-inne natywne połączenie, wywołuje pełnoekranowe powiadomienie na kanale `calls` (Odbierz, Odrzuć) i dzwoni przez `Ringer` przez 45 s zgodnie z systemowymi
-trybami dźwięku. Odbierz uruchamia aplikację z `ripplo.answer`: ekran pokazuje się nad blokadą, a aplikacja odbiera połączenie, gdy tylko pojawi się zapisana
-oferta (w ciągu 20 s). Odrzuć wycisza dzwonek i usuwa ofertę ze skrzynki, więc dzwoniący po prostu nie dostaje odpowiedzi. `end` dla tego samego połączenia
-anuluje dzwonek i pokazuje „Nieodebrane połączenie”. Wymaga powiadomień i, na Androidzie 14+, specjalnego dostępu do powiadomień pełnoekranowych, o który prosi
-ekran uprawnień; bez niego pojawia się baner z tymi samymi akcjami. Otwarcie aplikacji przejmuje sprawę: wycisza natywny dzwonek, a aplikacja dzwoni sama, dopóki
-połączenie trwa. iOS nie ma odpowiednika: bez pusha od Apple, który wymaga serwera, zamknięta aplikacja na iOS nie może zadzwonić.
+inne natywne połączenie (stan dzwonienia wygasa po 45 s, nawet jeśli `end` dzwoniącego nigdy nie dojdzie), wywołuje pełnoekranowe powiadomienie na kanale
+`calls` i dzwoni przez `Ringer` przez 45 s zgodnie z systemowymi trybami dźwięku; wersja powiadomienia na ekranie blokady jest ogólna („Połączenie
+przychodzące”), a przy włączonej blokadzie aplikacji nazwa jest wszędzie zastąpiona przez „Ripplo”. Celem pełnego ekranu jest `CallActivity`, mały natywny
+ekran (dzwoniący, Odbierz, Odrzuć), który może pokazać się nad blokadą; `MainActivity` nigdy, więc czaty zostają za blokadą. Odbierz najpierw prosi system o
+zdjęcie blokady, a potem uruchamia `MainActivity` z `ripplo.chat` i losowym jednorazowym tokenem utworzonym natywnie dla tego dzwonka (`ripplo.answer`).
+Wtyczka zamienia token na id połączenia tylko wtedy, gdy zgadza się z bieżącym dzwonkiem (`Opener.redeem`); aplikacja odbiera automatycznie tylko wtedy, gdy id
+połączenia równa się tej wartości, a połączenie dzwoni w ciągu 20 s, więc inna aplikacja, która wywoła wyeksportowaną aktywność, nie wymusi odebrania.
+`ripplo.chat` jest przyjmowane tylko, gdy wygląda jak ripploId lub id grupy. Odrzuć wycisza dzwonek i usuwa ofertę ze skrzynki, więc dzwoniący po prostu nie
+dostaje odpowiedzi. `end` dla tego samego połączenia anuluje dzwonek i pokazuje „Nieodebrane połączenie”. Wymaga powiadomień i, na Androidzie 14+, specjalnego
+dostępu do powiadomień pełnoekranowych, o który prosi ekran uprawnień; bez niego pojawia się baner z tymi samymi akcjami. Otwarcie aplikacji przejmuje sprawę:
+wycisza natywny dzwonek, a aplikacja dzwoni sama, dopóki połączenie trwa. Silnik sprawdza miejsce w skrzynce, zanim cokolwiek odszyfruje (200 miejsc jest
+zarezerwowanych dla otwartych rekordów, żeby fragmenty załączników ich nie zagłodziły), zapisuje skrzynkę przez plik tymczasowy i zmianę nazwy, trzyma klucz
+bazy w pamięci, dostarcza rekordy do aplikacji poza głównym wątkiem (rekord wraca do skrzynki, gdy klucz jest chwilowo niedostępny) i opróżnia skrzynkę jeszcze raz
+1,5 s po podpięciu aplikacji. Otwieranie nadal odbywa się wewnątrz blokady routera, więc wolne otwarcie na chwilę opóźnia inny ruch. Natywne powiadomienia powtarzają
+własne reguły aplikacji (brak multimediów od obcych, kontrole id i długości, usuwanie znaków sterujących i dwukierunkowych, nazwa z karty nadawcy tylko gdy jego
+klucz daje skrót nadawcy, jedno powiadomienie o zaproszeniu od nadawcy na dobę), więc nie pokazuje się nic, co aplikacja by odrzuciła. iOS nie ma odpowiednika:
+bez pusha od Apple, który wymaga serwera, zamknięta aplikacja na iOS nie może zadzwonić.

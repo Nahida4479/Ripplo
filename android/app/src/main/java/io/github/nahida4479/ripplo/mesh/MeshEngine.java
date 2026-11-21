@@ -329,6 +329,7 @@ public final class MeshEngine implements Router.Host {
     public boolean persist(Packet p, String from) {
         if (jsAttached && listener != null) return true;
         if (p.payload.length > 0 && p.payload[0] == 1) {
+            if (!inbox.hasRoom()) return false;
             Opener.Result r = Opener.process(ctx, p.payload);
             if (r != null) return inbox.addOpened(r.sealed, r.callId);
         }
@@ -340,6 +341,8 @@ public final class MeshEngine implements Router.Host {
     public List<Inbox.Item> drainInbox() { return inbox.drain(); }
 
     public void dropCall(String callId) { inbox.removeCall(callId); }
+
+    public void requeue(Inbox.Item it) { inbox.requeue(it); }
 
     public int sendFromJs(byte[] bytes) {
         Router r = router;

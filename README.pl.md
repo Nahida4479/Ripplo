@@ -17,41 +17,35 @@
 <img src="https://github.com/Nahida4479/Ripplo/actions/workflows/build.yml/badge.svg">
 </div>
 
-> [!NOTE]
-> Ripplo jest na wczesnym etapie rozwoju. Natywne transporty (Kotlin / Swift) nie były jeszcze testowane w terenie. Spodziewaj się niedociągnięć.
-
 # Funkcje
 
-- Bez serwerów, kont i numerów telefonu, nie potrzeba połączenia z internetem.
+- **Bez serwerów, kont i numerów telefonu, nie potrzeba połączenia z internetem.**
 - Telefony tworzą sieć mesh: każdy telefon w zasięgu może przekazywać wiadomości innym.
-- Szyfrowanie end-to-end oficjalną biblioteką Signal `libsignal` dla czatów, grup, wiadomości głosowych, zdjęć i filmów. Ochrona postkwantowa: wymiana kluczy PQXDH (X25519 + Kyber-1024 / ML-KEM) i potrójny ratchet SPQR.
-- Klucze prywatne żyją w kodzie natywnym (Java / Swift) i nigdy nie trafiają do WebView.
-- Sealed sender: przekaźniki nie widzą, kto napisał wiadomość.
+- Szyfrowanie end-to-end oficjalną biblioteką Signal `libsignal` dla czatów, grup, wiadomości głosowych, rozmów, zdjęć i filmów. Ochrona postkwantowa: wymiana kluczy PQXDH (X25519 + Kyber-1024 / ML-KEM).
+- Osoby przekazujące wiadomość nie widzą, kto napisał wiadomość.
 - Zaszyfrowana lokalna baza danych, klucz przechowywany w Android Keystore / iOS Keychain.
-- Kilka transportów naraz (BLE, Bluetooth L2CAP, LAN, Wi-Fi Direct, Wi-Fi Aware, Apple Multipeer). Zawsze używane jest najszybsze działające łącze.
-- Dodawanie znajomych kodem QR, linkiem zaproszenia (bez udziału serwera) lub w zakładce Ludzie.
-- Weryfikacja kluczy: dowód bliskości, porównanie kodów QR osobiście lub ręcznie.
-- Etapy dostarczenia: szyfrowanie, wysyłanie, dostarczono („przez k telefonów”), poza zasięgiem sieci.
-- Przekazywanie działa przy wyłączonym ekranie (natywna usługa pierwszoplanowa na Androidzie).
-- Przekaźniki nigdy nie widzą treści i nigdy nie powiadamiają o przekazywanych wiadomościach.
-- Czaty grupowe, wiadomości głosowe, zdjęcia i filmy (do 20 MB).
-- Motyw ciemny / jasny / systemowy, kolory akcentu i gradienty tła.
-- Podpisane wydania z plikiem `SHA256SUMS`; aplikacja weryfikuje własny APK i na Androidzie może aktualizować się automatycznie.
-- Języki: angielski i polski (język urządzenia, domyślnie angielski).
+- Kilka transportów naraz (BLE, Bluetooth, LAN, Wi-Fi Direct, Wi-Fi Aware, Apple Multipeer). Zawsze używane jest najszybsze działające łącze.
+- Dodawanie znajomych kodem QR, linkiem zaproszenia (bez udziału serwera) lub w zakładce Znajdź osoby.
+- Weryfikacja kluczy: porównanie kodów QR osobiście lub potwierdzając ręcznie.
+- Przekazywanie działa przy wyłączonym ekranie.
+- Zdjęcia i filmy (do 20 MB).
+- Różnorodne motywy aplikacji.
+- Sprawdzanie sum kontrolnych podczas aktualizacji.
+- Język Polski i Angielski.
 
 # Jak używać?
-1. [Zainstaluj Ripplo](#instalacja) na co najmniej dwóch telefonach.
-2. Utwórz profil (wystarczy imię). Klucze są generowane na telefonie i nigdy go nie opuszczają.
+1. [Zainstaluj Ripplo](#instalacja).
+2. Podaj nazwę użytkownika. Klucze są generowane na telefonie i nigdy go nie opuszczają.
 3. Przyznaj uprawnienia (Bluetooth, Wi-Fi w pobliżu / lokalizacja, powiadomienia), a na Androidzie zezwól na przekazywanie w tle.
-4. Dodaj znajomego: otwórz ikonę QR w zakładce **Czaty** i zeskanuj jego kod, wklej link zaproszenia albo wybierz go w zakładce **Ludzie**.
-5. [Zweryfikuj klucz](#weryfikacja-kontaktu) dodanej osoby.
+4. Dodaj znajomego: otwórz ikonę QR w zakładce **Czaty** i zeskanuj jego kod, wklej link zaproszenia albo wybierz go w zakładce **Znajdź osoby**.
+5. [Zweryfikuj klucz](#weryfikacja-kontaktu) dodanej osoby lub poczekaj na automatyczną weryfikację (jeżeli jesteście w pobliżu).
 6. Napisz wiadomość. Jeśli znajomy jest poza bezpośrednim zasięgiem, przekażą ją inne telefony z Ripplo znajdujące się pomiędzy wami.
 
 # Jak to działa
 
 ## Transporty
 
-Każdy transport przenosi ten sam strumień bajtów, więc jeden sąsiad może być osiągalny jednocześnie przez kilka łączy (na przykład BLE i LAN). Co minutę aplikacja mierzy prędkość każdego łącza i zawsze wysyła przez najszybsze działające, a w razie awarii przełącza się na następne.
+Każdy transport przenosi ten sam strumień bajtów, więc jeden sąsiad może być osiągalny jednocześnie przez kilka łączy (na przykład Bluetooth Low Energy i WiFi-Direct). Co minutę aplikacja mierzy prędkość każdego łącza i zawsze wysyła przez najszybciej działające.
 
 | Medium | Android | iOS | Android <-> iOS | Wykrywanie |
 |---|---|---|---|---|
@@ -62,7 +56,6 @@ Każdy transport przenosi ten sam strumień bajtów, więc jeden sąsiad może b
 | Wi-Fi Aware | tak (Android 8+, wymaga wsparcia sprzętowego) | nie | nie | usługa NAN `ripplo` |
 | Apple Multipeer | nie | tak | nie | MultipeerConnectivity |
 
-Klasyczny Bluetooth RFCOMM nie jest używany (iOS nie pozwala na niego bez MFi); L2CAP to wieloplatformowa szybka ścieżka Bluetooth.
 
 ## Szyfrowanie
 

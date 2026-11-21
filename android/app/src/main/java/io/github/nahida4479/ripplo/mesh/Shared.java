@@ -19,6 +19,7 @@ final class Shared {
     private static SignalFileStore signalStore;
     private static SignalCore signalCore;
     private static NativeStore nativeStore;
+    private static byte[] cachedKey;
 
     private Shared() { }
 
@@ -49,6 +50,12 @@ final class Shared {
     }
 
     static synchronized byte[] dbKey(Context ctx) throws Exception {
+        if (cachedKey != null) return cachedKey.clone();
+        cachedKey = loadKey(ctx);
+        return cachedKey.clone();
+    }
+
+    private static byte[] loadKey(Context ctx) throws Exception {
         SharedPreferences sp = ctx.getSharedPreferences("ripplo_keys", Context.MODE_PRIVATE);
         String stored = sp.getString("dbkey", null);
         if (stored == null) {
@@ -79,6 +86,7 @@ final class Shared {
     }
 
     static synchronized void reset() {
+        cachedKey = null;
         signalStore = null;
         signalCore = null;
     }

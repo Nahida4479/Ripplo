@@ -13,6 +13,7 @@ import java.util.List;
 
 final class Inbox {
     static final int MAX = 2000;
+    private static final int RESERVE = 200;
 
     static final String OPENED = "~";
     private static final int MAX_ITEM = 1 << 20;
@@ -54,28 +55,45 @@ final class Inbox {
         return out;
     }
 
+    synchronized boolean requeue(Item it) {
+        return append(it.packet, it.from, MAX);
+    }
+
+    synchronized boolean hasRoom() {
+        load();
+        return count < MAX;
+    }
+
     synchronized boolean addOpened(byte[] sealed, String callId) {
-        return add(sealed, OPENED + (callId == null ? "" : callId));
+        return append(sealed, OPENED + (callId == null ? "" : callId), MAX);
     }
 
     synchronized void removeCall(String callId) {
         List<Item> keep = new ArrayList<>();
         for (Item it : readAll()) if (!(it.opened() && it.callId().equals(callId))) keep.add(it);
-        try (DataOutputStream out = new DataOutputStream(new FileOutputStream(file, false))) {
+        File tmp = new File(file.getPath() + ".tmp");
+        try (DataOutputStream out = new DataOutputStream(new FileOutputStream(tmp, false))) {
             for (Item it : keep) {
                 out.writeUTF(it.from);
                 out.writeInt(it.packet.length);
                 out.write(it.packet);
             }
             out.flush();
-            count = keep.size();
-        } catch (IOException ignored) {
+        } catch (IOException e) {
+            tmp.delete();
+            return;
         }
+        if (tmp.renameTo(file)) count = keep.size();
+        else tmp.delete();
     }
 
     synchronized boolean add(byte[] packet, String from) {
+        return append(packet, from, MAX - RESERVE);
+    }
+
+    private boolean append(byte[] packet, String from, int limit) {
         load();
-        if (count >= MAX) return false;
+        if (count >= limit) return false;
         try (DataOutputStream out = new DataOutputStream(new FileOutputStream(file, true))) {
             out.writeUTF(from);
             out.writeInt(packet.length);

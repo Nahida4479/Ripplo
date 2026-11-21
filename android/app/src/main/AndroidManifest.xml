@@ -48,6 +48,16 @@
             android:exported="false"
             android:foregroundServiceType="connectedDevice" />
 
+        <activity
+            android:name=".mesh.CallActivity"
+            android:exported="false"
+            android:showWhenLocked="true"
+            android:turnScreenOn="true"
+            android:launchMode="singleInstance"
+            android:excludeFromRecents="true"
+            android:taskAffinity=""
+            android:theme="@android:style/Theme.DeviceDefault.NoActionBar" />
+
         <receiver
             android:name=".mesh.CallActionReceiver"
             android:exported="false" />

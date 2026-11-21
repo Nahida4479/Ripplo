@@ -95,7 +95,7 @@ export function createCalls({ state, signal, sendMedia, hasNeighbor, supported, 
     const raw = random(KEY_LEN)
     const c = open(peer, 0, random(ID_LEN))
     cur = c
-    state.call = { peer, dir: 'out', status: 'ringing', muted: false, startedAt: 0 }
+    state.call = { peer, dir: 'out', status: 'ringing', muted: false, startedAt: 0, id: c.idB64 }
     c.key = await importCallKey(raw)
     if (c.done) return
     c.ringTimer = setTimeout(() => finish(c, 'noanswer', 'end'), T.ring)
@@ -116,7 +116,7 @@ export function createCalls({ state, signal, sendMedia, hasNeighbor, supported, 
     }
     const c = open(f, 1, id)
     cur = c
-    state.call = { peer: f, dir: 'in', status: 'ringing', muted: false, startedAt: 0 }
+    state.call = { peer: f, dir: 'in', status: 'ringing', muted: false, startedAt: 0, id: c.idB64 }
     c.key = await importCallKey(raw)
     notify(f)
     c.ringTimer = setTimeout(() => finish(c, 'missed', null), T.ring)

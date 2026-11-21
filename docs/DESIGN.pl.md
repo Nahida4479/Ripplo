@@ -136,4 +136,4 @@ Android: glif na pasku stanu to jednobarwne `ic_stat_ripplo` w kolorze akcentu, 
 `public/icon.svg` przez `scripts/icons.sh`) jest dużą ikoną każdego powiadomienia, natywnego i lokalnego. iOS zawsze pokazuje ikonę aplikacji (`AppIcon`,
 ta sama grafika co `public/icon_ios.png`), której nie można zmienić dla pojedynczego powiadomienia.
 Tytuł to nazwa nadawcy (grupy: „grupa: nazwa”), treść to tekst wiadomości, „Wysłano zdjęcie” lub „Wysłano załącznik”; zaproszenia mają
-„Zaproszenie do kontaktów”; połączenia przychodzące są pełnoekranowe z przyciskami Odbierz i Odrzuć. Na ekranie blokady wiadomości pokazują tylko „Nowa wiadomość”.
+„Zaproszenie do kontaktów”; połączenia przychodzące używają małego natywnego pełnoekranowego ekranu połączenia (nazwa, Odbierz, Odrzuć), który może pojawić się nad ekranem blokady bez odsłaniania czatów; Odbierz najpierw prosi o odblokowanie. Na ekranie blokady wiadomości pokazują tylko „Nowa wiadomość”.

@@ -622,10 +622,20 @@ or call are silent. When app lock is on the text is the generic "New message"; o
 The record carries `notified`, so the app does not show a second notification. Tapping a notification opens that chat.
 
 Calls: an offer from a contact you added, accepted or wrote to, not older than 120 s, with a well-formed id and key, and no other native call
-ringing, raises a full-screen notification on the `calls` channel (Answer, Decline) and rings with `Ringer` for 45 s following the system
-sound modes. Answer starts the app with `ripplo.answer`: the screen shows over the lock screen, the app accepts the call as soon as the
-stored offer shows up (within 20 s). Decline silences the ring and removes the offer from the inbox, so the caller simply gets no answer.
-An `end` for the same call cancels the ring and posts "Missed call". Needs notifications and, on Android 14+, the full-screen-intent
-special access, which the permission screen asks for; without it a heads-up banner with the same actions appears. Opening the app takes
-over: it silences the native ring and the app rings itself while the call is still ringing. iOS has no equivalent: without Apple push,
-which needs a server, a closed iOS app cannot ring.
+ringing (a ring state expires after 45 s even if the caller's `end` never arrives), raises a full-screen notification on the `calls` channel and
+rings with `Ringer` for 45 s following the system sound modes; the lock-screen version of the notification is generic ("Incoming call"), and
+with app lock on the name is replaced by "Ripplo" everywhere. The full-screen target is `CallActivity`, a small native screen (caller, Answer,
+Decline) that may show over the lock screen; `MainActivity` never does, so chats stay behind the lock. Answer asks the system to dismiss the
+keyguard first and then starts `MainActivity` with `ripplo.chat` and a random one-time token created natively for this ring (`ripplo.answer`).
+The plugin turns the token into the call id only if it matches the current ring (`Opener.redeem`); the app accepts a call automatically only
+when its call id equals that value and the call is ringing within 20 s, so another app that fires the exported activity cannot trigger an
+answer. `ripplo.chat` is accepted only when it looks like a ripploId or a group id. Decline silences the ring and removes the offer from the
+inbox, so the caller simply gets no answer. An `end` for the same call cancels the ring and posts "Missed call". Needs notifications and, on
+Android 14+, the full-screen-intent special access, which the permission screen asks for; without it a heads-up banner with the same actions
+appears. Opening the app takes over: it silences the native ring and the app rings itself while the call is still ringing. The engine
+checks for inbox room before it decrypts anything (200 slots are reserved for opened records so attachment chunks cannot starve them), writes
+the inbox with a temporary file and a rename, keeps the DB key in memory, delivers records to the app off the main thread (a record is put back
+when the key is temporarily unavailable) and drains once more 1.5 s after the app attaches. Opening still happens inside the router lock, so a
+slow open delays other routing for that moment. Native notifications repeat the app's own rules (no media from strangers, id and length checks,
+control and bidi characters stripped, a sender's card name accepted only when its key hashes to the sender, one invitation notice per sender per
+day) so nothing is shown that the app would discard. iOS has no equivalent: without Apple push, which needs a server, a closed iOS app cannot ring.

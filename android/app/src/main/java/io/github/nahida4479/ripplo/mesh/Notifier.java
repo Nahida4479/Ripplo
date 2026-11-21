@@ -124,23 +124,34 @@ final class Notifier {
         message(ctx, id, ctx.getString(R.string.invite_title), ctx.getString(R.string.invite_text, name));
     }
 
-    static void incomingCall(Context ctx, String name, String callId, String peerId) {
-        if (!allowed(ctx)) return;
+    static boolean incomingCall(Context ctx, String title, String callId, String peerId, String token) {
+        if (!allowed(ctx)) return false;
         createChannels(ctx);
-        PendingIntent show = openChat(ctx, ID_CALL, peerId, "");
-        PendingIntent answer = openChat(ctx, ID_CALL + 1, peerId, callId);
+        Intent screen = new Intent(ctx, CallActivity.class).setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_NO_USER_ACTION)
+                .putExtra(CallActivity.EXTRA_TITLE, title).putExtra(CallActivity.EXTRA_CALL, callId)
+                .putExtra(CallActivity.EXTRA_PEER, peerId).putExtra(CallActivity.EXTRA_TOKEN, token);
+        PendingIntent show = PendingIntent.getActivity(ctx, ID_CALL, screen, PendingIntent.FLAG_IMMUTABLE | PendingIntent.FLAG_UPDATE_CURRENT);
+        PendingIntent answer = openChat(ctx, ID_CALL + 1, peerId, token);
         PendingIntent decline = PendingIntent.getBroadcast(ctx, ID_CALL + 2,
                 new Intent(ctx, CallActionReceiver.class).setAction(CallActionReceiver.DECLINE).putExtra("callId", callId),
                 PendingIntent.FLAG_IMMUTABLE | PendingIntent.FLAG_UPDATE_CURRENT);
+        Notification generic = new NotificationCompat.Builder(ctx, CH_CALLS)
+                .setSmallIcon(R.drawable.ic_stat_ripplo)
+                .setLargeIcon(large(ctx))
+                .setColor(ACCENT)
+                .setContentTitle(ctx.getString(R.string.app_name))
+                .setContentText(ctx.getString(R.string.incoming_call))
+                .build();
         Notification n = new NotificationCompat.Builder(ctx, CH_CALLS)
                 .setSmallIcon(R.drawable.ic_stat_ripplo)
                 .setLargeIcon(large(ctx))
                 .setColor(ACCENT)
-                .setContentTitle(name)
+                .setContentTitle(title)
                 .setContentText(ctx.getString(R.string.incoming_call))
                 .setCategory(NotificationCompat.CATEGORY_CALL)
                 .setPriority(NotificationCompat.PRIORITY_HIGH)
-                .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+                .setVisibility(NotificationCompat.VISIBILITY_PRIVATE)
+                .setPublicVersion(generic)
                 .setOngoing(true)
                 .setOnlyAlertOnce(true)
                 .setTimeoutAfter(RING_MS)
@@ -151,12 +162,15 @@ final class Notifier {
                 .build();
         try {
             NotificationManagerCompat.from(ctx).notify(ID_CALL, n);
-        } catch (SecurityException ignored) {
+            return true;
+        } catch (SecurityException e) {
+            return false;
         }
     }
 
     static void cancelCall(Context ctx) {
         NotificationManagerCompat.from(ctx).cancel(ID_CALL);
+        CallActivity.dismiss();
     }
 
     static void missedCall(Context ctx, String name, String peerId) {

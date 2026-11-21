@@ -135,4 +135,4 @@ Android: the status-bar glyph is the monochrome `ic_stat_ripplo` tinted with the
 rendered from `public/icon.svg` by `scripts/icons.sh`) is the large icon of every notification, native and local. iOS always shows the app icon
 (`AppIcon`, the same artwork as `public/icon_ios.png`), which cannot be changed per notification.
 Titles are the sender's name (groups: "group: name"), the body is the message text, "Sent a photo" or "Sent an attachment"; invitations read
-"Contact invitation"; incoming calls are full-screen with Answer and Decline. On the lock screen messages show only "New message".
+"Contact invitation"; incoming calls use a small native full-screen call screen (name, Answer, Decline) that can appear over the lock screen without exposing the chats; Answer first asks for the unlock. On the lock screen messages show only "New message".

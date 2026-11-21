@@ -15,6 +15,8 @@ import android.content.pm.Signature;
 import android.database.Cursor;
 import android.net.Uri;
 import android.os.Build;
+import android.os.Handler;
+import android.os.Looper;
 import android.os.PowerManager;
 import android.provider.DocumentsContract;
 import android.provider.Settings;
@@ -86,6 +88,8 @@ public class RipploMeshPlugin extends Plugin implements MeshEngine.Listener {
     private volatile JSObject pendingShare;
     private volatile JSObject pendingOpen;
     private final ExecutorService shareExec = Executors.newSingleThreadExecutor();
+    private final ExecutorService drainExec = Executors.newSingleThreadExecutor();
+    private static final java.util.regex.Pattern CHAT_ID = java.util.regex.Pattern.compile("^[0-9A-HJKMNP-TV-Z]{16}$|^[A-Za-z0-9_-]{6,32}$");
 
     private interface SignalOp {
         JSObject run(SignalCore core) throws Exception;
@@ -116,13 +120,14 @@ public class RipploMeshPlugin extends Plugin implements MeshEngine.Listener {
     private void readOpen(Intent intent) {
         if (intent == null) return;
         String chat = intent.getStringExtra(Notifier.EXTRA_CHAT);
-        if (chat == null) return;
-        String answer = intent.getStringExtra(Notifier.EXTRA_ANSWER);
+        String token = intent.getStringExtra(Notifier.EXTRA_ANSWER);
         intent.removeExtra(Notifier.EXTRA_CHAT);
         intent.removeExtra(Notifier.EXTRA_ANSWER);
+        if (chat == null || !CHAT_ID.matcher(chat).matches()) return;
         JSObject o = new JSObject();
         o.put("chatId", chat);
-        if (answer != null && !answer.isEmpty()) o.put("answer", answer);
+        String callId = Opener.redeem(token);
+        if (callId != null) o.put("answer", callId);
         pendingOpen = o;
         notifyListeners("open", new JSObject());
     }
@@ -136,9 +141,9 @@ public class RipploMeshPlugin extends Plugin implements MeshEngine.Listener {
         call.resolve(r);
     }
 
-    private JSObject openedJson(Inbox.Item it) {
+    private JSObject openedJson(Inbox.Item it, byte[] key) {
         try {
-            byte[] plain = Shared.open(Shared.dbKey(getContext()), it.packet, "inbox");
+            byte[] plain = Shared.open(key, it.packet, "inbox");
             return new JSObject(new String(plain, java.nio.charset.StandardCharsets.UTF_8));
         } catch (Exception e) {
             return null;
@@ -218,9 +223,30 @@ public class RipploMeshPlugin extends Plugin implements MeshEngine.Listener {
         Opener.forgetRinging();
         if (!drained) return;
         engine.setJsAttached(true);
-        for (Inbox.Item it : engine.drainInbox()) {
+        drainExec.execute(this::deliverInbox);
+        lateDrain();
+    }
+
+    private void lateDrain() {
+        new Handler(Looper.getMainLooper()).postDelayed(() -> drainExec.execute(this::deliverInbox), 1500);
+    }
+
+    private byte[] keyOrNull() {
+        try {
+            return Shared.dbKey(getContext());
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    private void deliverInbox() {
+        List<Inbox.Item> items = engine.drainInbox();
+        if (items.isEmpty()) return;
+        byte[] key = keyOrNull();
+        for (Inbox.Item it : items) {
             if (!it.opened()) { onPacket(it.packet, it.from); continue; }
-            JSObject o = openedJson(it);
+            if (key == null) { engine.requeue(it); continue; }
+            JSObject o = openedJson(it, key);
             if (o != null) notifyListeners("opened", o);
         }
     }
@@ -337,10 +363,12 @@ public class RipploMeshPlugin extends Plugin implements MeshEngine.Listener {
         drained = true;
         engine.setJsAttached(true);
         JSArray arr = new JSArray();
+        byte[] key = keyOrNull();
         for (Inbox.Item it : engine.drainInbox()) {
             JSObject o = new JSObject();
             if (it.opened()) {
-                JSObject rec = openedJson(it);
+                if (key == null) { engine.requeue(it); continue; }
+                JSObject rec = openedJson(it, key);
                 if (rec == null) continue;
                 o.put("opened", rec);
             } else {
@@ -352,6 +380,7 @@ public class RipploMeshPlugin extends Plugin implements MeshEngine.Listener {
         JSObject r = new JSObject();
         r.put("packets", arr);
         call.resolve(r);
+        lateDrain();
     }
 
     private String wrapDbKey(byte[] key) throws Exception {
