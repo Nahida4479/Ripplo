@@ -7,6 +7,7 @@ import { RipploError, encodeCard, checkCard, encodeLink, parseLink, deriveIds, c
 import { CHUNK, encryptFile, decryptFile, chunkCount, chunkPayload, parseChunk } from '../crypto/attachment.js'
 import { createState } from './state.js'
 import { notify } from '../services/notifications.js'
+import { t } from '../i18n.js'
 
 export const MAX_TEXT = 1000
 export const MAX_FILE = 20 * 1024 * 1024
@@ -19,6 +20,7 @@ const WINDOW = 4
 const ID_RE = /^[0-9A-HJKMNP-TV-Z]{16}$/
 const WIRE_ID_RE = /^[A-Za-z0-9_-]{1,64}$/
 const KINDS = ['image', 'video', 'voice']
+const RESET_GAP = 10 * 60 * 1000
 const DEFAULT_TIMING = { ack: 300000, discover: 30000, verify: 60000, proof: 5000, poll: 500 }
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
@@ -43,6 +45,7 @@ export function createCore({ mesh, dbName = 'ripplo', state = createState(), not
   const proofs = new Map()
   const running = new Map()
   const seenIds = new Set()
+  const lastReset = new Map()
 
   const enqueue = (fn) => { queue = queue.then(fn).catch(() => {}) }
 
@@ -62,7 +65,7 @@ export function createCore({ mesh, dbName = 'ripplo', state = createState(), not
     state.insecureStorage = vault.insecure
     state.devCrypto = !!mesh.devCrypto
     own = await mesh.signalInit()
-    db = await openDb(dbName, vault)
+    db = await openDb(dbName, vault, mesh)
     Object.assign(state.settings, (await db.get('kv', 'settings')) || {})
     state.contacts = Object.fromEntries((await db.all('contacts')).map(([id, c]) => [id, { ...c, verifyState: 'idle' }]))
     state.chats = (await db.all('chats')).map(([, c]) => c).sort((a, b) => b.lastTs - a.lastTs)
@@ -73,6 +76,10 @@ export function createCore({ mesh, dbName = 'ripplo', state = createState(), not
       loadMe(profile.name)
       await dropExpired()
       await start()
+      if (await db.get('kv', 'needsSessionReset')) {
+        for (const c of Object.values(state.contacts)) await resetSession(c).catch(() => {})
+        await db.del('kv', 'needsSessionReset')
+      }
     }
     state.ready = true
   }
@@ -153,7 +160,30 @@ export function createCore({ mesh, dbName = 'ripplo', state = createState(), not
     w.resolve(result)
   }
 
-  async function buildPacket(c, obj) {
+  async function resetSession(c) {
+    if (!c.card || Date.now() - (lastReset.get(c.id) || 0) < RESET_GAP) return false
+    lastReset.set(c.id, Date.now())
+    const v = checkCard(unb64(c.card))
+    await mesh.signalForget(hex(tagOf(c))).catch(() => {})
+    await mesh.signalAddContact(v.bundle)
+    buildPacket(c, { t: 'reset' }).then(transmit).catch(() => {})
+    return true
+  }
+
+  async function restoreBackup(code) {
+    const r = await mesh.backupRestore({ code })
+    const d = await openDb(dbName, await createVault(mesh), mesh)
+    await d.put('kv', 'needsSessionReset', { at: Date.now() })
+    await d.close()
+    return r
+  }
+
+  async function buildPacket(c, extra) {
+    let obj = extra
+    if (!c.cardAck) {
+      obj = { ...extra, c: b64(me.card) }
+      if (!c.cardSent) { c.cardSent = Date.now(); persistContact(c) }
+    }
     const payload = await mesh.signalSeal(hex(tagOf(c)), utf8(JSON.stringify(obj)))
     return encodePacket({ type: TYPE.DATA, dest: tagOf(c), payload })
   }
@@ -291,12 +321,33 @@ export function createCore({ mesh, dbName = 'ripplo', state = createState(), not
   }
 
   async function onSealed(payload) {
-    const { tag, ik, plaintext } = await mesh.signalOpen(payload)
+    let r
+    try { r = await mesh.signalOpen(payload) } catch (e) { return onOpenFailed(e) }
+    const { tag, ik, plaintext } = r
     const ids = deriveIds(ik)
     const f = ids.ripploId
     if (hex(ids.tag) !== tag || f === me.id) return
     if (!state.contacts[f]) await addContact({ id: f, name: knownName(f) || `Ripplo ${f.slice(0, 4)}`, ik: b64(ik), card: null, addedVia: 'incoming' })
-    await onAppMessage(f, JSON.parse(unutf8(plaintext)))
+    const msg = JSON.parse(unutf8(plaintext))
+    const c = state.contacts[f]
+    if (c.cardSent && !c.cardAck) { c.cardAck = true; persistContact(c) }
+    if (msg && typeof msg.c === 'string' && !c.card) {
+      try {
+        const v = checkCard(unb64(msg.c))
+        if (v.id === f) await learnCard(v, 'incoming')
+      } catch {}
+    }
+    await onAppMessage(f, msg)
+  }
+
+  async function onOpenFailed(e) {
+    const tag = e?.data?.tag || e?.tag
+    if (!['bad_message', 'no_session'].includes(e?.code) || !tag) return
+    const c = Object.values(state.contacts).find((x) => hex(tagOf(x)) === tag)
+    if (!c || !(await resetSession(c))) return
+    const text = t('undecryptable', { name: c.name })
+    const m = addMsg({ id: hex(random(16)), chatId: c.id, from: 'system', ts: Date.now(), status: 'received', text })
+    touchChat(c.id, text, m.ts)
   }
 
   const knownName = (id) => state.neighbors.find((n) => n.card?.id === id)?.card.name || state.people.find((p) => p.id === id)?.name
@@ -651,13 +702,13 @@ export function createCore({ mesh, dbName = 'ripplo', state = createState(), not
   }
 
   async function saveSettings(patch) {
-    for (const k of ['autoUpdate', 'backgroundRelay']) if (typeof patch[k] === 'boolean') state.settings[k] = patch[k]
+    for (const k of ['autoUpdate', 'backgroundRelay', 'appLock']) if (typeof patch[k] === 'boolean') state.settings[k] = patch[k]
     await db.put('kv', 'settings', { ...state.settings })
   }
 
   return {
     state, init, close, createProfile, myInviteLink: () => encodeLink(me.card), addContactFromLink, addPerson,
     verifyNearby, verifyByQr, markVerified, safetyNumber, sendText, sendAttachment, retry, loadMessages,
-    markRead, createGroup, refreshPeople, deleteChat, deleteContact, saveSettings,
+    markRead, createGroup, refreshPeople, deleteChat, deleteContact, saveSettings, restoreBackup,
   }
 }

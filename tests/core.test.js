@@ -5,6 +5,8 @@ import { createCore } from '../src/core/messenger.js'
 import { TYPE, encodePacket, decodePacket, newId } from '../src/mesh/packet.js'
 import { createDevSignal } from '../src/mesh/devSignal.js'
 import { parseLink } from '../src/crypto/identity.js'
+import { createVault } from '../src/crypto/vault.js'
+import { openDb } from '../src/crypto/db.js'
 import { b64, b64url, hex, utf8, unutf8, random, concat } from '../src/lib/bytes.js'
 import { sha256 } from '@noble/hashes/sha2.js'
 
@@ -229,5 +231,81 @@ describe('attachments, groups, people', () => {
     const a = await user('Alice')
     await a.core.saveSettings({ autoUpdate: false })
     expect(a.state.settings).toEqual({ autoUpdate: false, backgroundRelay: true })
+  })
+})
+
+describe('card piggyback and session reset', () => {
+  it('sends the card until the contact answers, and the receiver stores it', async () => {
+    const a = await user('Alice'), b = await user('Bob')
+    const seen = []
+    const seal = a.mesh.signalSeal
+    a.mesh.signalSeal = (tag, pt) => { seen.push(JSON.parse(unutf8(pt))); return seal(tag, pt) }
+    await a.core.addContactFromLink(b.link)
+    await a.core.sendText(b.id, 'one')
+    await waitFor(() => b.state.contacts[a.id]?.card)
+    expect(b.state.contacts[a.id].name).toBe('Alice')
+    expect(seen[0].c).toBeTruthy()
+    await b.core.sendText(a.id, 'reply')
+    await waitFor(() => a.state.contacts[b.id].cardAck)
+    await a.core.sendText(b.id, 'two')
+    await waitFor(() => seen.length >= 2)
+    expect(seen.at(-1).c).toBeUndefined()
+  })
+
+  it('rejects a piggybacked card for another identity', async () => {
+    const a = await user('Alice'), b = await user('Bob'), c = await user('Carol')
+    await b.core.addContactFromLink(a.link)
+    const forged = b.state.contacts[a.id]
+    const seal = a.mesh.signalSeal
+    a.mesh.signalSeal = (tag, pt) => seal(tag, utf8(JSON.stringify({ ...JSON.parse(unutf8(pt)), c: b64(parseLink(c.link).card) })))
+    await a.core.addContactFromLink(b.link)
+    await a.core.sendText(b.id, 'hi')
+    await waitFor(() => b.state.messages[a.id]?.length)
+    expect(forged.card).not.toBe(b64(parseLink(c.link).card))
+  })
+
+  it('resets the session on a decrypt failure once per 10 minutes and tells the user', async () => {
+    const a = await user('Alice'), b = await user('Bob')
+    await a.core.addContactFromLink(b.link)
+    await a.core.sendText(b.id, 'one')
+    await waitFor(() => b.state.contacts[a.id]?.card)
+    const calls = []
+    const forget = b.mesh.signalForget
+    b.mesh.signalForget = (tag) => { calls.push(tag); return forget(tag) }
+    const open = b.mesh.signalOpen
+    b.mesh.signalOpen = async () => { throw Object.assign(new Error('x'), { code: 'bad_message', data: { tag: hex(parseLink(a.link).tag) } }) }
+    await a.core.sendText(b.id, 'two')
+    await waitFor(() => b.state.messages[a.id]?.some((m) => m.from === 'system'))
+    expect(b.state.messages[a.id].find((m) => m.from === 'system').text).toContain('Alice')
+    expect(calls).toEqual([hex(parseLink(a.link).tag)])
+    await a.core.sendText(b.id, 'three')
+    await new Promise((r) => setTimeout(r, 200))
+    expect(b.state.messages[a.id].filter((m) => m.from === 'system')).toHaveLength(1)
+    b.mesh.signalOpen = open
+    await a.core.sendText(b.id, 'four')
+    await waitFor(() => b.state.messages[a.id].some((m) => m.text === 'four'))
+  })
+
+  it('resets every contact with a card after a restore', async () => {
+    const a = await user('Alice'), b = await user('Bob')
+    const mesh = fakeMesh()
+    const key = random(32)
+    mesh.getDbKey = async () => ({ key, insecure: false })
+    mesh.backupRestore = async () => ({ meta: {} })
+    const calls = []
+    const forget = mesh.signalForget
+    mesh.signalForget = (tag) => { calls.push(tag); return forget(tag) }
+    const dbName = `db-restore-${hex(random(4))}`
+    const first = createCore({ mesh, dbName, notifier: () => {}, timing: TIMING })
+    await first.init()
+    await first.createProfile('Carol')
+    await first.addContactFromLink(a.link)
+    await first.addContactFromLink(b.link)
+    await first.restoreBackup('1'.repeat(30))
+    await first.close()
+    const second = createCore({ mesh, dbName, notifier: () => {}, timing: TIMING })
+    await second.init()
+    expect(calls.sort()).toEqual([hex(parseLink(a.link).tag), hex(parseLink(b.link).tag)].sort())
+    expect(await (await openDb(dbName, await createVault(mesh), mesh)).get('kv', 'needsSessionReset')).toBeUndefined()
   })
 })

@@ -1,7 +1,7 @@
 import { ref } from 'vue'
 
 const en = {
-  chats: 'Chats', people: 'People', settings: 'Settings', navigation: 'Navigation', attention: 'Needs attention',
+  chats: 'Chats', people: 'Find people', settings: 'Settings', navigation: 'Navigation', attention: 'Needs attention',
   cancel: 'Cancel', close: 'Close', confirm: 'Confirm', delete: 'Delete', add: 'Add', create: 'Create', back: 'Back', paste: 'Paste', retry: 'Retry', send: 'Send',
   gateWhy: 'Ripplo talks to nearby phones over Bluetooth and Wi-Fi, so it needs these permissions to work without internet.',
   permBluetooth: 'Bluetooth', permWifi: 'Nearby Wi-Fi / location', permNotifications: 'Notifications',
@@ -35,11 +35,21 @@ const en = {
   security: 'Security', integrity: 'App integrity', integrityOk: 'Official build', integrityBad: 'Modified build', integrityUnknown: 'Not checked yet',
   dbEncryption: 'Database encryption', dbSecure: 'Key kept in the system keystore', dbInsecure: 'Web storage: the key is not protected by the system', signal: 'Signal protocol', signalInfo: 'X3DH + Double Ratchet, end to end',
   updates: 'Updates', currentVersion: 'Current version', latestVersion: 'Latest version', checkNow: 'Check now', install: 'Install update', openRelease: 'Open release page', autoUpdate: 'Update automatically',
+  backup: 'Backup', backupWeb: 'Backups are available in the Ripplo app on your phone.', backupIntro: 'Save an encrypted copy of your chats and keys. Only your recovery code can open it.',
+  backupEnable: 'Turn on backup', backupNow: 'Back up now', showCode: 'Show recovery code', backupOff: 'Turn off backup', backupOffConfirm: 'This phone forgets the recovery code and the automatic backup folder. Backup files you already saved stay where they are.',
+  backupNever: 'No backup yet', backupLast: 'Last backup: {time}', backupFolder: 'Folder: {name}', backupNoFolder: 'No automatic backup folder', chooseFolder: 'Choose automatic backup folder', notNow: 'Not now', backupDone: 'Backup saved',
+  codeTitle: 'Your recovery code', codeWarn: 'Keep this code somewhere safe, for example in a password manager. Without it a backup cannot be opened. Fingerprint and face unlock do not move to a new phone: there you restore with this code.',
+  codeWritten: 'I wrote it down', codeCheckTitle: 'Check the code', codeCheckHint: 'Type the last group of digits (the sixth) to confirm you saved the code.', codeMismatch: 'That does not match', continue: 'Continue', done: 'Done',
+  folderTitle: 'Automatic backup', folderHint: 'Pick a folder and Ripplo saves a fresh backup there when you open the app, at most once a day. The last 3 files are kept.',
+  restoreFromBackup: 'Restore from backup', restoreHint: 'Enter your 30-digit recovery code, then choose the backup file.', recoveryCode: 'Recovery code', restore: 'Restore',
+  bk_bad_code: 'That code does not open this backup', bk_bad_file: 'This is not a valid Ripplo backup, or it is damaged', bk_need_factor: 'This backup needs its second factor — not supported in this version yet', bk_auth_failed: 'Authentication failed', bk_failed: 'Something went wrong',
+  appLock: 'App lock', appLockHint: 'Ask for fingerprint, face or screen lock when Ripplo opens, and hide it in the app switcher', unlock: 'Unlock', unlockReason: 'Unlock Ripplo', locked: 'Ripplo is locked',
+  undecryptable: "Couldn't decrypt a message from {name} — ask them to resend",
   about: 'About', tagline: 'Offline end-to-end encrypted mesh messenger', license: 'License', contributors: 'Contributors', githubProfile: 'GitHub profile'
 }
 
 const pl = {
-  chats: 'Czaty', people: 'Ludzie', settings: 'Ustawienia', navigation: 'Nawigacja', attention: 'Wymaga uwagi',
+  chats: 'Czaty', people: 'Znajdź osoby', settings: 'Ustawienia', navigation: 'Nawigacja', attention: 'Wymaga uwagi',
   cancel: 'Anuluj', close: 'Zamknij', confirm: 'Potwierdź', delete: 'Usuń', add: 'Dodaj', create: 'Utwórz', back: 'Wstecz', paste: 'Wklej', retry: 'Ponów', send: 'Wyślij',
   gateWhy: 'Ripplo łączy się z pobliskimi telefonami przez Bluetooth i Wi-Fi, więc potrzebuje tych uprawnień, by działać bez internetu.',
   permBluetooth: 'Bluetooth', permWifi: 'Wi-Fi w pobliżu / lokalizacja', permNotifications: 'Powiadomienia',
@@ -73,6 +83,16 @@ const pl = {
   security: 'Bezpieczeństwo', integrity: 'Integralność aplikacji', integrityOk: 'Oficjalna wersja', integrityBad: 'Zmodyfikowana wersja', integrityUnknown: 'Jeszcze nie sprawdzono',
   dbEncryption: 'Szyfrowanie bazy danych', dbSecure: 'Klucz w systemowym magazynie kluczy', dbInsecure: 'Pamięć przeglądarki: klucz nie jest chroniony przez system', signal: 'Protokół Signal', signalInfo: 'X3DH + Double Ratchet, od końca do końca',
   updates: 'Aktualizacje', currentVersion: 'Obecna wersja', latestVersion: 'Najnowsza wersja', checkNow: 'Sprawdź teraz', install: 'Zainstaluj aktualizację', openRelease: 'Otwórz stronę wydania', autoUpdate: 'Aktualizuj automatycznie',
+  backup: 'Kopia zapasowa', backupWeb: 'Kopie zapasowe są dostępne w aplikacji Ripplo na telefonie.', backupIntro: 'Zapisz zaszyfrowaną kopię rozmów i kluczy. Otworzy ją tylko twój kod odzyskiwania.',
+  backupEnable: 'Włącz kopię zapasową', backupNow: 'Utwórz kopię teraz', showCode: 'Pokaż kod odzyskiwania', backupOff: 'Wyłącz kopię zapasową', backupOffConfirm: 'Ten telefon zapomni kod odzyskiwania i folder kopii automatycznych. Zapisane już pliki kopii pozostaną na miejscu.',
+  backupNever: 'Brak kopii zapasowej', backupLast: 'Ostatnia kopia: {time}', backupFolder: 'Folder: {name}', backupNoFolder: 'Brak folderu kopii automatycznych', chooseFolder: 'Wybierz folder kopii automatycznych', notNow: 'Nie teraz', backupDone: 'Zapisano kopię',
+  codeTitle: 'Twój kod odzyskiwania', codeWarn: 'Przechowuj ten kod w bezpiecznym miejscu, na przykład w menedżerze haseł. Bez niego nie otworzysz kopii zapasowej. Odcisk palca i rozpoznawanie twarzy nie przenoszą się na nowy telefon: tam odzyskasz dane tym kodem.',
+  codeWritten: 'Zapisałem kod', codeCheckTitle: 'Sprawdź kod', codeCheckHint: 'Wpisz ostatnią grupę cyfr (szóstą), aby potwierdzić, że kod został zapisany.', codeMismatch: 'To się nie zgadza', continue: 'Dalej', done: 'Gotowe',
+  folderTitle: 'Kopia automatyczna', folderHint: 'Wybierz folder, a Ripplo zapisze w nim świeżą kopię po otwarciu aplikacji, najwyżej raz dziennie. Zachowywane są 3 ostatnie pliki.',
+  restoreFromBackup: 'Przywróć z kopii zapasowej', restoreHint: 'Wpisz 30-cyfrowy kod odzyskiwania, a potem wybierz plik kopii.', recoveryCode: 'Kod odzyskiwania', restore: 'Przywróć',
+  bk_bad_code: 'Ten kod nie otwiera tej kopii', bk_bad_file: 'To nie jest prawidłowa kopia Ripplo albo plik jest uszkodzony', bk_need_factor: 'Ta kopia wymaga drugiego składnika — ta wersja jeszcze go nie obsługuje', bk_auth_failed: 'Uwierzytelnienie nie powiodło się', bk_failed: 'Coś poszło nie tak',
+  appLock: 'Blokada aplikacji', appLockHint: 'Wymagaj odcisku palca, twarzy lub blokady ekranu przy otwarciu Ripplo i ukryj treść w przełączniku aplikacji', unlock: 'Odblokuj', unlockReason: 'Odblokuj Ripplo', locked: 'Ripplo jest zablokowane',
+  undecryptable: 'Nie udało się odszyfrować wiadomości od {name} — poproś o ponowne wysłanie',
   about: 'O aplikacji', tagline: 'Komunikator mesh działający bez internetu, z szyfrowaniem end-to-end', license: 'Licencja', contributors: 'Współtwórcy', githubProfile: 'Profil GitHub'
 }
 

@@ -6,6 +6,7 @@ import { createDevSignal } from './devSignal.js'
 const b64 = (u8) => { let s = ''; for (let i = 0; i < u8.length; i += 0x8000) s += String.fromCharCode(...u8.subarray(i, i + 0x8000)); return btoa(s) }
 const unb64 = (s) => Uint8Array.from(atob(s), (c) => c.charCodeAt(0))
 const hex = (b) => Array.from(b, (x) => x.toString(16).padStart(2, '0')).join('')
+const unsupported = () => Promise.reject(Object.assign(new Error('unsupported'), { code: 'unsupported' }))
 const GRANTED = { bluetooth: 'granted', wifi: 'granted', notifications: 'granted' }
 
 function nativeMesh() {
@@ -32,6 +33,24 @@ function nativeMesh() {
     requestBatteryExemption: () => P.requestBatteryExemption(),
     checkPermissions: () => P.checkPermissions(),
     requestPermissions: () => P.requestPermissions(),
+    dbPut: ({ store, key, idx, value }) => P.dbPut({ store, key, idx, value: b64(value) }),
+    dbPutMany: ({ rows }) => P.dbPutMany({ rows: rows.map((r) => ({ ...r, value: b64(r.value) })) }),
+    async dbGet(a) { const r = await P.dbGet(a); return r.value == null ? null : unb64(r.value) },
+    dbDel: (a) => P.dbDel(a),
+    async dbKeys(a) { return (await P.dbKeys(a)).keys },
+    async dbAll(a) { return (await P.dbAll(a)).rows.map((r) => ({ key: r.key, value: unb64(r.value) })) },
+    async dbByIdx(a) { return (await P.dbByIdx(a)).rows.map((r) => ({ key: r.key, value: unb64(r.value) })) },
+    async dbCount() { return (await P.dbCount()).count },
+    authAvailable: () => P.authAvailable(),
+    authenticate: (reason) => P.authenticate({ reason }),
+    setSecure: (on) => P.setSecure({ on }),
+    backupStatus: () => P.backupStatus(),
+    backupEnable: () => P.backupEnable(),
+    backupShowCode: () => P.backupShowCode(),
+    backupDisable: () => P.backupDisable(),
+    backupChooseFolder: () => P.backupChooseFolder(),
+    backupCreate: (a) => P.backupCreate(a),
+    backupRestore: (a) => P.backupRestore(a),
     on(event, cb) {
       const h = P.addListener(event, (e) => cb(event === 'packet' ? inbound(e) : e))
       return () => h.then((x) => x.remove())
@@ -107,6 +126,16 @@ function webMesh() {
       return { key: unb64(k), insecure: true }
     },
     selfHash: async () => null,
+    authAvailable: async () => ({ biometric: false, deviceCredential: false }),
+    authenticate: async () => ({ ok: true }),
+    setSecure: async () => ({}),
+    backupStatus: async () => ({ enabled: false, lastAt: 0, folder: null }),
+    backupEnable: unsupported,
+    backupShowCode: unsupported,
+    backupDisable: unsupported,
+    backupChooseFolder: unsupported,
+    backupCreate: unsupported,
+    backupRestore: unsupported,
     installUpdate: async () => { throw new Error('unsupported') },
     requestBatteryExemption: async () => {},
     checkPermissions: async () => GRANTED,

@@ -10,6 +10,8 @@ import { theme, ACCENTS, GRADIENTS } from '../services/theme.js'
 import { checkUpdate, install } from '../services/updater.js'
 import { contributors } from '../contributors.js'
 import Avatar from '../components/Avatar.vue'
+import BackupCard from '../components/BackupCard.vue'
+import { setAppLock } from '../services/lock.js'
 import { Capacitor } from '@capacitor/core'
 
 const android = Capacitor.getPlatform() === 'android'
@@ -77,7 +79,13 @@ const initials = l => l.slice(0, 2).toUpperCase()
         <TriangleAlert v-if="state.insecureStorage" :size="22" /><ShieldCheck v-else :size="22" :stroke-width="1.75" />
         <span class="grow"><span class="label">{{ t('dbEncryption') }}</span><br /><span class="hint">{{ t(state.insecureStorage ? 'dbInsecure' : 'dbSecure') }}</span></span></div>
       <div class="row"><span class="grow"><span class="label">{{ t('signal') }}</span><br /><span class="hint">{{ t('signalInfo') }}</span></span></div>
+      <div v-if="mesh.isNative" class="row">
+        <span class="grow"><span class="label">{{ t('appLock') }}</span><br /><span class="hint">{{ t('appLockHint') }}</span></span>
+        <button class="switch" role="switch" :aria-checked="!!state.settings.appLock" :aria-label="t('appLock')" @click="setAppLock(!state.settings.appLock)" />
+      </div>
     </div>
+
+    <BackupCard />
 
     <h2 class="section">{{ t('updates') }}</h2>
     <div class="card">

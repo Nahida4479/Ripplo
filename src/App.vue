@@ -8,6 +8,9 @@ import { t } from './i18n.js'
 import { ui } from './components/ui.js'
 import { startUpdater } from './services/updater.js'
 import { startScheduler } from './services/scheduler.js'
+import { startLock, lock } from './services/lock.js'
+import { startBackup } from './services/backup.js'
+import LockOverlay from './components/LockOverlay.vue'
 import GateView from './views/GateView.vue'
 import OnboardingView from './views/OnboardingView.vue'
 import AddContactSheet from './components/AddContactSheet.vue'
@@ -24,6 +27,8 @@ async function onGranted() {
   await init()
   startUpdater()
   startScheduler()
+  startLock()
+  startBackup()
 }
 </script>
 <template>
@@ -43,5 +48,6 @@ async function onGranted() {
     <NewChatSheet />
   </template>
   <ConfirmSheet />
+  <LockOverlay v-if="lock.locked" />
   <div v-if="ui.toastText" class="toast" role="status">{{ ui.toastText }}</div>
 </template>

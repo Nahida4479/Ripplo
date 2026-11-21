@@ -125,7 +125,8 @@ function sure() { ui.confirm = { title: t('imSure'), text: t('imSureConfirm'), o
       <p v-else class="lock"><Lock :size="13" /> {{ t('encryptedLine') }}</p>
       <template v-for="(m, i) in msgs" :key="m.id">
         <div v-if="showDay(i)" class="day"><span>{{ dayLabel(m.ts) }}</span></div>
-        <div class="msg" :class="m.from === 'me' ? 'out' : 'in'">
+        <p v-if="m.from === 'system'" class="lock sys">{{ m.text }}</p>
+        <div v-else class="msg" :class="m.from === 'me' ? 'out' : 'in'">
           <div class="bubble" @click="shown = shown === m.id ? null : m.id">
             <img v-if="m.att?.kind === 'image' && m.att.url" :src="m.att.url" class="media" :alt="t('image')" />
             <video v-else-if="m.att?.kind === 'video' && m.att.url" :src="m.att.url" class="media" controls preload="metadata" />
@@ -183,6 +184,7 @@ function sure() { ui.confirm = { title: t('imSure'), text: t('imSureConfirm'), o
 .bacts { display: flex; gap: 6px; flex-wrap: wrap; }
 .log { flex: 1; overflow-y: auto; margin: 0 -16px; padding: 8px 16px; display: flex; flex-direction: column; gap: 4px; }
 .lock { align-self: center; text-align: center; font-size: 12px; color: var(--text-2); margin: 4px 0 8px; }
+.sys { color: var(--warn); margin: 8px 0; }
 .day { align-self: center; margin: 8px 0; }
 .day span { background: var(--surface-2); color: var(--text-2); font-size: 12px; padding: 3px 10px; border-radius: 999px; }
 .msg { display: flex; flex-direction: column; max-width: 78%; }

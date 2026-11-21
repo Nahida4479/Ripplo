@@ -9,5 +9,5 @@ export { state, MAX_TEXT, MAX_FILE }
 export const {
   init, createProfile, myInviteLink, addContactFromLink, addPerson, verifyNearby, verifyByQr, markVerified,
   safetyNumber, sendText, sendAttachment, retry, loadMessages, markRead, createGroup, refreshPeople,
-  deleteChat, deleteContact, saveSettings,
+  deleteChat, deleteContact, saveSettings, restoreBackup,
 } = core
