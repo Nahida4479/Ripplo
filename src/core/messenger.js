@@ -124,12 +124,20 @@ export function createCore({ mesh, dbName = 'ripplo', state = createState(), not
   }
 
   const canCall = (c) => consented(c)
-  const callTiming = Object.fromEntries(Object.entries({ ring: timing.callRing, silence: timing.callSilence, hold: timing.callHold }).filter(([, v]) => v !== undefined))
+  const callTiming = Object.fromEntries(Object.entries({ ring: timing.callRing, silence: timing.callSilence, hold: timing.callHold, warn: timing.callWarn }).filter(([, v]) => v !== undefined))
   const calls = createCalls({
     state,
     timing: callTiming,
     supported: audio.supported,
     newAudio: audio.create,
+    ensureMic: audio.ensureMic || (async () => {
+      if (!mesh.isNative) return
+      const p = await mesh.checkPermissions()
+      if (p && p.microphone && p.microphone !== 'granted') {
+        const r = await mesh.requestPermissions()
+        if (r.microphone !== 'granted') throw new Error('mic')
+      }
+    }),
     hasNeighbor: (id) => state.neighbors.some((n) => n.card?.id === id),
     sendMedia: (id, bytes) => {
       const nb = state.neighbors.find((n) => n.card?.id === id)

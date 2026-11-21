@@ -75,7 +75,8 @@ import org.json.JSONObject;
                         Manifest.permission.ACCESS_FINE_LOCATION}),
                 @Permission(alias = "wifi", strings = {Manifest.permission.NEARBY_WIFI_DEVICES}),
                 @Permission(alias = "wifiLegacy", strings = {Manifest.permission.ACCESS_FINE_LOCATION}),
-                @Permission(alias = "notifications", strings = {Manifest.permission.POST_NOTIFICATIONS})
+                @Permission(alias = "notifications", strings = {Manifest.permission.POST_NOTIFICATIONS}),
+                @Permission(alias = "microphone", strings = {Manifest.permission.RECORD_AUDIO})
         })
 public class RipploMeshPlugin extends Plugin implements MeshEngine.Listener {
     private static final String KEY_ALIAS = "ripplo_db_wrap";
@@ -980,6 +981,7 @@ public class RipploMeshPlugin extends Plugin implements MeshEngine.Listener {
         o.put("bluetooth", state(bt, "bluetooth"));
         o.put("wifi", state(wifi, "wifi"));
         o.put("notifications", state(notif, "notifications"));
+        o.put("microphone", state(granted(Manifest.permission.RECORD_AUDIO), "microphone"));
         PowerManager pm = (PowerManager) getContext().getSystemService(Context.POWER_SERVICE);
         o.put("battery", pm.isIgnoringBatteryOptimizations(getContext().getPackageName()) ? "granted" : "prompt");
         return o;
@@ -998,6 +1000,7 @@ public class RipploMeshPlugin extends Plugin implements MeshEngine.Listener {
         if (!"granted".equals(s.getString("bluetooth"))) { need.add(Build.VERSION.SDK_INT >= 31 ? "bluetooth" : "bluetoothLegacy"); ed.putBoolean("bluetooth", true); }
         if (!"granted".equals(s.getString("wifi"))) { need.add(Build.VERSION.SDK_INT >= 33 ? "wifi" : "wifiLegacy"); ed.putBoolean("wifi", true); }
         if (Build.VERSION.SDK_INT >= 33 && !"granted".equals(s.getString("notifications"))) { need.add("notifications"); ed.putBoolean("notifications", true); }
+        if (!"granted".equals(s.getString("microphone"))) { need.add("microphone"); ed.putBoolean("microphone", true); }
         ed.apply();
         if (need.isEmpty()) { call.resolve(s); return; }
         requestPermissionForAliases(need.toArray(new String[0]), call, "permissionsDone");

@@ -4,7 +4,7 @@ export const REQUIRED = ['bluetooth', 'wifi', 'notifications']
 export const allGranted = p => REQUIRED.every(k => p[k] === 'granted')
 
 export async function checkPermissions() {
-  if (!mesh.isNative) return { bluetooth: 'granted', wifi: 'granted', notifications: 'granted' }
+  if (!mesh.isNative) return { bluetooth: 'granted', wifi: 'granted', notifications: 'granted', microphone: 'granted' }
   return mesh.checkPermissions()
 }
 

@@ -52,8 +52,13 @@ Relays never see plaintext, never decrypt and never notify their user.
 
 `card = 0x02 | nameLen u8 | name UTF-8 (≤ 120 bytes, ≤ 40 chars) | bundle(1776)`
 
-`ripplo://add/<base64url(card)>.<base64url(SHA-256(card)[0..6])>` — about 2.4 KB. The QR code
-encodes the same string with error correction level **L** (it does not fit M).
+`ripplo://add/<base64url(card)>.<base64url(SHA-256(card)[0..6])>` — about 2.4 KB. A single QR for it would be version 40
+(177 × 177 modules), which no phone camera reads reliably, so the QR is an animated sequence of frames (error correction **L**):
+the link is cut into pieces of 420 characters, each shown as `ripplo://p/<set>.<i>.<n>.<piece>` (`set` = base64url of
+SHA-256(link)[0..6]; about 6 frames, QR version 13, 69 × 69 modules) and the frames repeat every 700 ms. The scanner collects pieces
+in any order (up to 20 per set, 4 sets in flight, repeats ignored), joins them when all are present, checks the set id against
+SHA-256 of the result and only then handles the link as if it had been pasted. A mismatching set is discarded with a checksum error.
+The verification QR (60 digits) stays a single small code.
 
 The suffix is an integrity checksum (catches truncation / corruption). It is NOT authentication —
 anyone can recompute it. Authenticity comes from verification (section 5). No server ever sees the
@@ -392,7 +397,7 @@ Binary values are base64 (standard) strings; node tags are lowercase hex.
 | `startRing` / `stopRing` | – (Android) — ring and vibrate an incoming call following the system sound settings (§13) |
 | `takeShare` | → `{ share? }` — pending Android share-sheet content, cleared after reading |
 | `setAutoUpdate` | `{ enabled }` — Android: stores the setting and schedules / cancels the background update job (§10) |
-| `checkPermissions` / `requestPermissions` | aliases `bluetooth`, `wifi`, `notifications`; the result also has `battery` (`granted` when exempt from battery optimization, Android only; not required to continue) |
+| `checkPermissions` / `requestPermissions` | aliases `bluetooth`, `wifi`, `notifications`, `microphone` (Android `RECORD_AUDIO`, requested explicitly with the others and again before a call, not required to enter the app); the result also has `battery` (`granted` when exempt from battery optimization, Android only; not required to continue) |
 | `signalInit` | → `{ bundle, ik }` — creates the identity on first call, then returns the same bundle (§1) |
 | `signalAddContact` | `{ bundle }` → `{ tag }` — verifies both prekey signatures, runs `processPreKeyBundle` (PQXDH), saves the identity |
 | `signalSeal` | `{ tag, plaintext }` → `{ payload }` — Signal-encrypt for `hex(tag)` then seal (§2); `payload` is the sealed bytes, used directly as the DATA payload (its leading `0x01` is the DATA kind) |
@@ -582,7 +587,10 @@ malformed is dropped silently.
 Audio (JS, WebCodecs): microphone with echo cancellation, noise suppression and AGC at 48 kHz, an `AudioWorklet`
 (`public/call-worklet.js`) cuts 20 ms frames, `AudioEncoder` Opus 16 kb/s, three frames per packet (about 17
 packets and 4.5 kB/s each way), `AudioDecoder` and a 100 ms jitter buffer on the playback side; frames that would
-queue more than 400 ms ahead are dropped. The encoder and decoder are rebuilt after an error and the PCM format is read as delivered, so one bad frame cannot silence a call for good; the call screen shows
+queue more than 400 ms ahead are dropped. Once a second the call engine reports the peak level of the captured and of the decoded audio. For 4 s of silence on the local microphone
+(while not muted) the screen warns "your microphone seems silent"; frames arriving but decoding to silence gives "sound is arriving but silent";
+no frame at all 4 s after the call went live gives "no sound has arrived yet". Starting or answering a call first checks the microphone
+permission and asks for it natively, because the WebView otherwise may hand over a silent stream. The encoder and decoder are rebuilt after an error and the PCM format is read as delivered, so one bad frame cannot silence a call for good; the call screen shows
 sent / received / played / error frame counts for diagnosis. Muting disables the track, so silence is still sent and keeps the link alive. The call
 ends with `lost` after 6 s without an authenticated frame (30 s before the first one, while the peer's microphone permission
 prompt may be open) or when the neighbor disappears.

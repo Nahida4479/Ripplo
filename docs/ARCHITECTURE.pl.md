@@ -52,8 +52,13 @@ Przekaźniki nigdy nie widzą treści, nigdy nie odszyfrowują i nigdy nie powia
 
 `card = 0x02 | nameLen u8 | name UTF-8 (≤ 120 bytes, ≤ 40 chars) | bundle(1776)`
 
-`ripplo://add/<base64url(card)>.<base64url(SHA-256(card)[0..6])>` — około 2,4 KB. Kod QR zawiera ten sam
-ciąg znaków, z poziomem korekcji błędów **L** (przy M się nie mieści).
+`ripplo://add/<base64url(card)>.<base64url(SHA-256(card)[0..6])>` — około 2,4 KB. Pojedynczy QR dla niego miałby wersję 40
+(177 × 177 modułów), której żaden aparat telefonu nie czyta niezawodnie, więc QR to animowana sekwencja klatek (korekcja błędów **L**):
+link jest cięty na kawałki po 420 znaków, każdy pokazywany jako `ripplo://p/<zestaw>.<i>.<n>.<kawałek>` (`zestaw` = base64url z
+SHA-256(link)[0..6]; około 6 klatek, QR wersja 13, 69 × 69 modułów), a klatki powtarzają się co 700 ms. Skaner zbiera kawałki
+w dowolnej kolejności (do 20 na zestaw, 4 zestawy naraz, powtórzenia ignorowane), skleja je, gdy są wszystkie, sprawdza id zestawu względem
+SHA-256 wyniku i dopiero wtedy obsługuje link tak, jakby został wklejony. Niezgodny zestaw jest odrzucany z błędem sumy kontrolnej.
+QR weryfikacji (60 cyfr) zostaje pojedynczym, małym kodem.
 
 Przyrostek to suma kontrolna integralności (wychwytuje obcięcie / uszkodzenie). NIE jest to uwierzytelnienie —
 każdy może ją przeliczyć. Autentyczność zapewnia weryfikacja (sekcja 5). Żaden serwer nigdy nie widzi
@@ -391,7 +396,7 @@ Wartości binarne to ciągi base64 (standardowego); tagi węzłów to małe lite
 | `startRing` / `stopRing` | – (Android) — dzwoni i wibruje przy połączeniu przychodzącym zgodnie z systemowymi ustawieniami dźwięku (§13) |
 | `takeShare` | → `{ share? }` — oczekująca zawartość z menu udostępniania Androida, czyszczona po odczycie |
 | `setAutoUpdate` | `{ enabled }` — Android: zapisuje ustawienie i planuje / anuluje zadanie aktualizacji w tle (§10) |
-| `checkPermissions` / `requestPermissions` | aliasy `bluetooth`, `wifi`, `notifications`; wynik zawiera też `battery` (`granted`, gdy aplikacja jest zwolniona z optymalizacji baterii, tylko Android; nie blokuje przejścia dalej) |
+| `checkPermissions` / `requestPermissions` | aliasy `bluetooth`, `wifi`, `notifications`, `microphone` (Android `RECORD_AUDIO`, pytane jawnie razem z pozostałymi i jeszcze raz przed połączeniem, niewymagane do wejścia do aplikacji); wynik zawiera też `battery` (`granted`, gdy aplikacja jest zwolniona z optymalizacji baterii, tylko Android; nie blokuje przejścia dalej) |
 | `signalInit` | → `{ bundle, ik }` — creates the identity on first call, then returns the same bundle (§1) |
 | `signalAddContact` | `{ bundle }` → `{ tag }` — verifies both prekey signatures, runs `processPreKeyBundle` (PQXDH), saves the identity |
 | `signalSeal` | `{ tag, plaintext }` → `{ payload }` — Signal-encrypt for `hex(tag)` then seal (§2); `payload` is the sealed bytes, used directly as the DATA payload (its leading `0x01` is the DATA kind) |
@@ -500,7 +505,11 @@ zniekształcone jest po cichu odrzucane.
 Audio (JS, WebCodecs): mikrofon z usuwaniem echa, redukcją szumu i AGC przy 48 kHz, `AudioWorklet`
 (`public/call-worklet.js`) tnie 20 ms ramki, `AudioEncoder` Opus 16 kb/s, trzy ramki na pakiet (około 17
 pakietów i 4,5 kB/s w każdą stronę), `AudioDecoder` i bufor jitter 100 ms po stronie odtwarzania; ramki, które
-stałyby w kolejce dalej niż 400 ms, są porzucane. Koder i dekoder są odbudowywane po błędzie, a format PCM jest czytany tak, jak przyszedł, więc jedna zła ramka nie wycisza rozmowy na stałe; ekran połączenia pokazuje
+stałyby w kolejce dalej niż 400 ms, są porzucane. Raz na sekundę silnik połączenia raportuje szczytowy poziom nagranego i zdekodowanego dźwięku. Przy 4 s ciszy na lokalnym mikrofonie
+(gdy nie jest wyciszony) ekran ostrzega „twój mikrofon wydaje się milczeć”; ramki, które przychodzą, ale dekodują się do ciszy, dają „dźwięk
+dochodzi, ale jest cichy”; brak jakiejkolwiek ramki przez 4 s po uruchomieniu rozmowy daje „nie dotarł jeszcze żaden dźwięk”. Rozpoczęcie
+lub odebranie połączenia najpierw sprawdza uprawnienie do mikrofonu i prosi o nie natywnie, bo WebView może inaczej oddać cichy strumień.
+Koder i dekoder są odbudowywane po błędzie, a format PCM jest czytany tak, jak przyszedł, więc jedna zła ramka nie wycisza rozmowy na stałe; ekran połączenia pokazuje
 liczby ramek wysłanych / odebranych / odtworzonych / błędów do diagnozy. Wyciszenie wyłącza ścieżkę, więc cisza jest nadal wysyłana i podtrzymuje łącze.
 Rozmowa kończy się `lost` po 6 s bez uwierzytelnionej ramki (30 s przed pierwszą, gdy u rozmówcy może być otwarte pytanie o
 mikrofon) albo gdy sąsiad zniknie.

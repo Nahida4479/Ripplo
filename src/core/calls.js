@@ -2,7 +2,8 @@ import { b64, unb64, random } from '../lib/bytes.js'
 import { importCallKey, sealFrame, openFrame, packFrames, unpackFrames, createReplay } from '../crypto/callFrame.js'
 import { RipploError } from '../crypto/identity.js'
 
-const DEFAULT_TIMING = { ring: 45000, silence: 6000, first: 30000, hold: 2500, stale: 120000 }
+const DEFAULT_TIMING = { ring: 45000, silence: 6000, first: 30000, hold: 2500, stale: 120000, warn: 4 }
+const QUIET = 0.003
 const ID_LEN = 8
 const KEY_LEN = 32
 
@@ -15,13 +16,13 @@ const decode = (s, len) => {
   }
 }
 
-export function createCalls({ state, signal, sendMedia, hasNeighbor, supported, newAudio, notify, log, timing = {} }) {
+export function createCalls({ state, signal, sendMedia, hasNeighbor, supported, newAudio, ensureMic = async () => {}, notify, log, timing = {} }) {
   const T = { ...DEFAULT_TIMING, ...timing }
   let cur = null
 
   const open = (peer, role, id) => ({
     peer, role, id, idB64: b64(id), key: null, audio: null, seq: 0, live: false, done: false, heard: false,
-    replay: createReplay(), lastRx: 0, ringTimer: null, watch: null,
+    replay: createReplay(), lastRx: 0, liveAt: 0, ringTimer: null, watch: null, micQuiet: 0, outQuiet: 0, lastRecv: 0,
   })
 
   function finish(c, reason, tell) {
@@ -44,6 +45,7 @@ export function createCalls({ state, signal, sendMedia, hasNeighbor, supported, 
     clearTimeout(c.ringTimer)
     state.call = { ...state.call, status: 'connecting' }
     try {
+      await ensureMic()
       c.audio = await newAudio()
       if (c.done) {
         c.audio.stop()
@@ -65,9 +67,17 @@ export function createCalls({ state, signal, sendMedia, hasNeighbor, supported, 
     }
     c.live = true
     c.lastRx = Date.now()
+    c.liveAt = Date.now()
     state.call = { ...state.call, status: 'active', startedAt: Date.now() }
     c.watch = setInterval(() => {
-      if (c.audio.stats) state.call = { ...state.call, stats: c.audio.stats() }
+      if (c.audio.stats) {
+        const st = c.audio.stats()
+        c.micQuiet = !state.call?.muted && st.mic < QUIET ? c.micQuiet + 1 : 0
+        c.outQuiet = st.recv > c.lastRecv && st.out < QUIET ? c.outQuiet + 1 : 0
+        c.lastRecv = st.recv
+        const warn = c.micQuiet >= T.warn ? 'mic' : c.outQuiet >= T.warn ? 'out' : !c.heard && Date.now() - c.liveAt > T.warn * 1000 ? 'none' : ''
+        state.call = { ...state.call, stats: st, warn }
+      }
       if (Date.now() - c.lastRx > (c.heard ? T.silence : T.first) || !hasNeighbor(c.peer)) finish(c, 'lost', 'end')
     }, 1000)
   }
@@ -75,6 +85,7 @@ export function createCalls({ state, signal, sendMedia, hasNeighbor, supported, 
   async function start(peer) {
     if (cur) throw new RipploError('call_busy')
     if (!supported()) throw new RipploError('call_unsupported')
+    try { await ensureMic() } catch { throw new RipploError('call_mic') }
     if (!hasNeighbor(peer)) throw new RipploError('call_no_link')
     const raw = random(KEY_LEN)
     const c = open(peer, 0, random(ID_LEN))

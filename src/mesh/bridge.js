@@ -7,7 +7,7 @@ const b64 = (u8) => { let s = ''; for (let i = 0; i < u8.length; i += 0x8000) s 
 const unb64 = (s) => Uint8Array.from(atob(s), (c) => c.charCodeAt(0))
 const hex = (b) => Array.from(b, (x) => x.toString(16).padStart(2, '0')).join('')
 const unsupported = () => Promise.reject(Object.assign(new Error('unsupported'), { code: 'unsupported' }))
-const GRANTED = { bluetooth: 'granted', wifi: 'granted', notifications: 'granted' }
+const GRANTED = { bluetooth: 'granted', wifi: 'granted', notifications: 'granted', microphone: 'granted' }
 
 function nativeMesh() {
   const P = registerPlugin('RipploMesh')

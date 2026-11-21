@@ -44,7 +44,7 @@ Safe areas: `env(safe-area-inset-*)` on header and tab bar.
   when an update is available or the integrity check failed.
 - Permission gate (blocking, full screen before anything else): logo, one-line why, list of
   required permissions with status chips (Bluetooth, Nearby Wi-Fi / location, Notifications) and
-  one **Grant permissions** button, which also opens the system battery-exemption prompt after the other permissions (the "Allow background relay" row shows its state but never blocks).
+  one **Grant permissions** button, which also opens the system battery-exemption prompt after the other permissions (the "Allow background relay" row shows its state but never blocks). The list also has a Microphone row (Android) that the same button requests; it never blocks either.
 - Onboarding: name field + generate identity ("Your keys are created on this phone and never leave it").
 
 ## Chats tab
@@ -103,7 +103,7 @@ immediately and opens that chat.
 
 ## Add contact sheet
 
-Tabs: **My code** (large QR of invite link + ripploId + Share link button via Web Share API /
+Tabs: **My code** (animated QR of the invite link, about 6 frames of 700 ms with progress dots and a hint to keep the other phone on it until it finishes, + ripploId + Share link button via Web Share API /
 copy), **Scan** (camera viewfinder with rounded mask; continuous automatic detection, native `BarcodeDetector` when it works, otherwise ZXing compiled to WebAssembly (jsQR only while it loads); no button to press. A match closes the sheet at once with "Keys verified successfully" or "Added to contacts" and a short vibration), **Paste link**.
 
 ## Contact page
@@ -124,7 +124,7 @@ monospace) + QR of it, actions: Verify with QR, Retry nearby, I'm sure it's them
   (Android foreground service); "Relayed messages are never shown". The battery exemption is asked only on the permission screen.
 - **Security**: app integrity (Official build ✓ / Modified ✗ / Not checked yet), DB encryption
   status, Signal protocol info.
-- **Updates**: current version, latest version, Check now, Auto-update toggle (Android), progress.
+- **Updates**: current version, latest version, Check now (accent-colored button so it is easy to see; the label changes to "Checking…" for at least 0.8 s and there is no "up to date" line), Auto-update toggle (Android), progress.
 - **About**: app name + tagline, version, GitHub link, License, **Contributors** cards: avatar
   (GitHub avatar when online, initials offline), login bold, "GitHub profile" sub-text, external-link
   icon on the right; card = `--surface`, 1 px border, radius 14.

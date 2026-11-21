@@ -581,6 +581,7 @@ function fakeAudio() {
   e.play = (f) => { e.frames.push(...f) }
   e.setMuted = (m) => { e.muted = m }
   e.stop = () => { e.stopped = true }
+  e.stats = () => ({ sent: 0, recv: e.frames.length, played: e.frames.length, errors: 0, mic: e.mic ?? 0.2, out: e.out ?? 0.2 })
   e.api = { supported: () => true, create: async () => e }
   return e
 }
@@ -1069,5 +1070,51 @@ describe('unsending messages', () => {
     await waitFor(() => !b.state.messages[a.id].some((x) => x.att))
     const quoted = b.state.messages[a.id].find((x) => x.text === 'what is this')
     expect(quoted.re.text).toBeUndefined()
+  })
+})
+
+describe('call diagnostics and microphone permission', () => {
+  async function pairWith(optsA = {}, optsB = {}) {
+    const ea = Object.assign(fakeAudio(), optsA), eb = Object.assign(fakeAudio(), optsB)
+    const t = { ...TIMING, callWarn: 1, callHold: 100 }
+    const a = await user('Alice', t, ea.api), b = await user('Bob', t, eb.api)
+    await a.core.addContactFromLink(b.link)
+    await b.core.addContactFromLink(a.link)
+    connect(a.mesh, b.mesh)
+    await waitFor(() => a.state.neighbors[0]?.card && b.state.neighbors[0]?.card)
+    return { a, b, ea, eb }
+  }
+
+  it('warns when the local microphone delivers only silence', async () => {
+    const { a, b } = await pairWith({ mic: 0 })
+    await a.core.startCall(b.id)
+    await waitFor(() => b.state.call?.status === 'ringing')
+    await b.core.acceptCall()
+    await waitFor(() => a.state.call?.warn === 'mic', 5000)
+    await a.core.setMuted(true)
+    await waitFor(() => a.state.call?.warn !== 'mic', 5000)
+  })
+
+  it('warns when audio arrives but decodes to silence, and when nothing arrives', async () => {
+    const { a, b, ea, eb } = await pairWith({}, { out: 0 })
+    await a.core.startCall(b.id)
+    await waitFor(() => b.state.call?.status === 'ringing')
+    await b.core.acceptCall()
+    await waitFor(() => a.state.call?.status === 'active' && b.state.call?.status === 'active')
+    await waitFor(() => a.state.call?.warn === 'none', 5000)
+    await ea.handler([new Uint8Array([1, 2, 3])])
+    await waitFor(() => eb.frames.length === 1)
+    await waitFor(() => b.state.call?.warn === 'out', 5000)
+  })
+
+  it('refuses to start a call when the microphone permission is refused', async () => {
+    const e = fakeAudio()
+    e.api.ensureMic = async () => { throw new Error('mic') }
+    const a = await user('Alice', TIMING, e.api), b = await user('Bob')
+    await a.core.addContactFromLink(b.link)
+    connect(a.mesh, b.mesh)
+    await waitFor(() => a.state.neighbors[0]?.card)
+    expect(await codeOf(a.core.startCall(b.id))).toBe('call_mic')
+    expect(a.state.call).toBeNull()
   })
 })

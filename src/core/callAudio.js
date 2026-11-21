@@ -36,6 +36,7 @@ export async function createAudio() {
   let tsIn = 0
   const pending = []
   const counts = { sent: 0, recv: 0, played: 0, errors: 0 }
+  const peaks = { mic: 0, out: 0 }
 
   function makeEncoder(onFrames) {
     encoder = new AudioEncoder({
@@ -77,6 +78,9 @@ export async function createAudio() {
     } finally {
       data.close()
     }
+    let top = 0
+    for (let i = 0; i < pcm.length; i++) top = Math.max(top, Math.abs(pcm[i]))
+    peaks.out = Math.max(peaks.out, top)
     if (stopped || !ctx) return
     if (ctx.state === 'suspended') ctx.resume().catch(() => {})
     const now = ctx.currentTime
@@ -109,6 +113,9 @@ export async function createAudio() {
       makeDecoder()
       node.port.onmessage = (e) => {
         if (stopped) return
+        let top = 0
+        for (let i = 0; i < e.data.length; i++) top = Math.max(top, Math.abs(e.data[i]))
+        peaks.mic = Math.max(peaks.mic, top)
         try {
           if (encoder.state === 'closed') makeEncoder(onFrames)
           const data = new AudioData({ format: 'f32-planar', sampleRate: RATE, numberOfFrames: FRAME, numberOfChannels: 1, timestamp: tsOut, data: e.data })
@@ -137,7 +144,12 @@ export async function createAudio() {
       }
     },
 
-    stats: () => ({ ...counts }),
+    stats() {
+      const out = { ...counts, mic: peaks.mic, out: peaks.out }
+      peaks.mic = 0
+      peaks.out = 0
+      return out
+    },
 
     setMuted(muted) {
       if (stream) for (const t of stream.getAudioTracks()) t.enabled = !muted

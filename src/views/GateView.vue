@@ -1,13 +1,14 @@
 <script setup>
-import { ref, onMounted } from 'vue'
-import { Bluetooth, Wifi, Bell, BatteryCharging, Check } from 'lucide-vue-next'
+import { ref, computed, onMounted } from 'vue'
+import { Bluetooth, Wifi, Bell, Mic, BatteryCharging, Check } from 'lucide-vue-next'
 import { checkPermissions, requestPermissions, allGranted } from '../services/permissions.js'
 import { mesh } from '../mesh/bridge.js'
 import { t } from '../i18n.js'
 
 const emit = defineEmits(['granted'])
 const perms = ref({})
-const rows = [['bluetooth', Bluetooth, 'permBluetooth'], ['wifi', Wifi, 'permWifi'], ['notifications', Bell, 'permNotifications']]
+const all = [['bluetooth', Bluetooth, 'permBluetooth'], ['wifi', Wifi, 'permWifi'], ['notifications', Bell, 'permNotifications'], ['microphone', Mic, 'permMicrophone']]
+const rows = computed(() => all.filter(([k]) => k !== 'microphone' || perms.value.microphone))
 
 async function apply(p) { perms.value = p; if (allGranted(p)) emit('granted') }
 onMounted(async () => apply(await checkPermissions()))

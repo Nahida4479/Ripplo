@@ -33,6 +33,7 @@ onBeforeUnmount(() => { clearInterval(tick); stopRing() })
       <Avatar :name="peer?.name" :photo="peer?.avatar" :size="112" />
       <h2>{{ peer?.name }}</h2>
       <p role="status">{{ status }}</p>
+      <p v-if="call.warn" class="warn" role="alert">{{ t('callWarn_' + call.warn) }}</p>
       <small v-if="call.status === 'active' && call.stats" class="stats">{{ t('callStats', call.stats) }}</small>
     </div>
     <div v-if="call.status !== 'ended'" class="acts">
@@ -54,6 +55,7 @@ onBeforeUnmount(() => { clearInterval(tick); stopRing() })
 .who { display: flex; flex-direction: column; align-items: center; gap: 8px; }
 .who h2 { margin: 12px 0 0; font-size: 26px; }
 .who p { margin: 0; color: var(--text-2); font-size: 16px; font-variant-numeric: tabular-nums; }
+.warn { max-width: 300px; text-align: center; color: var(--warn); font-size: 14px; }
 .stats { color: var(--text-2); font-size: 12px; font-variant-numeric: tabular-nums; }
 .acts { display: flex; gap: 40px; }
 .round { width: 68px; height: 68px; border-radius: 50%; display: grid; place-items: center; background: var(--surface-2); color: var(--text); }

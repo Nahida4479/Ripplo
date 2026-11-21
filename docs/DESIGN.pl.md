@@ -44,7 +44,7 @@ Strefy bezpieczne: `env(safe-area-inset-*)` w nagłówku i pasku zakładek.
   czerwoną kropkę, gdy dostępna jest aktualizacja lub kontrola integralności się nie powiodła.
 - Bramka uprawnień (blokująca, pełny ekran przed wszystkim innym): logo, jednozdaniowe wyjaśnienie po co, lista
   wymaganych uprawnień z plakietkami statusu (Bluetooth, Wi-Fi w pobliżu / lokalizacja, Powiadomienia) i
-  jeden przycisk **Przyznaj uprawnienia**, który po pozostałych uprawnieniach otwiera też systemowe okno zwolnienia z optymalizacji baterii (wiersz „Zezwól na przekazywanie w tle” pokazuje stan, ale nigdy nie blokuje).
+  jeden przycisk **Przyznaj uprawnienia**, który po pozostałych uprawnieniach otwiera też systemowe okno zwolnienia z optymalizacji baterii (wiersz „Zezwól na przekazywanie w tle” pokazuje stan, ale nigdy nie blokuje). Na liście jest też wiersz Mikrofon (Android), o który prosi ten sam przycisk; on też nigdy nie blokuje.
 - Onboarding: pole na imię + utworzenie tożsamości („Twoje klucze powstają na tym telefonie i nigdy go nie opuszczają”).
 
 ## Zakładka Czaty
@@ -104,7 +104,7 @@ czatu wysyła od razu i otwiera ten czat.
 
 ## Arkusz dodawania kontaktu
 
-Zakładki: **Mój kod** (duży QR linku zaproszenia + ripploId + przycisk Udostępnij link przez Web Share API /
+Zakładki: **Mój kod** (animowany QR linku zaproszenia, około 6 klatek po 700 ms z kropkami postępu i podpowiedzią, by trzymać drugi telefon na nim do końca, + ripploId + przycisk Udostępnij link przez Web Share API /
 kopiowanie), **Skanuj** (wizjer kamery z zaokrągloną maską; ciągłe automatyczne wykrywanie, natywny `BarcodeDetector`, gdy działa, w przeciwnym razie ZXing skompilowany do WebAssembly (jsQR tylko podczas ładowania); bez przycisku. Trafienie od razu zamyka arkusz z komunikatem „Klucze zostały poprawnie zweryfikowane” lub „Dodano do kontaktów” i krótką wibracją), **Wklej link**.
 
 ## Strona kontaktu
@@ -125,7 +125,7 @@ czcionką monospace) + jego QR, akcje: Zweryfikuj kodem QR, Ponów sprawdzenie w
   (usługa pierwszoplanowa Androida); „Przekazywane wiadomości nigdy nie są wyświetlane”. Zwolnienie z optymalizacji baterii jest pytane tylko na ekranie uprawnień.
 - **Bezpieczeństwo**: integralność aplikacji (Oficjalna wersja ✓ / Zmodyfikowana wersja ✗ / Jeszcze nie sprawdzono), stan
   szyfrowania bazy danych, informacje o protokole Signal.
-- **Aktualizacje**: obecna wersja, najnowsza wersja, Sprawdź teraz, przełącznik Aktualizuj automatycznie (Android), postęp.
+- **Aktualizacje**: obecna wersja, najnowsza wersja, Sprawdź teraz (przycisk w kolorze akcentu, żeby był dobrze widoczny; napis zmienia się na „Sprawdzanie…” na co najmniej 0,8 s, bez linii „masz najnowszą wersję”), przełącznik Aktualizuj automatycznie (Android), postęp.
 - **O aplikacji**: nazwa aplikacji + hasło, wersja, link do GitHuba, Licencja, karty **Współtwórcy**: awatar
   (awatar z GitHuba online, inicjały offline), login pogrubiony, podtekst „Profil GitHub”, ikona linku zewnętrznego
   po prawej; karta = `--surface`, obramowanie 1 px, promień 14.

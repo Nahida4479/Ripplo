@@ -2,6 +2,7 @@
 import { ref, watch, onBeforeUnmount, computed, nextTick } from 'vue'
 import QRCode from 'qrcode'
 import { startScanner } from '../lib/scanner.js'
+import { splitLink, createAssembler } from '../lib/qrparts.js'
 import { useRouter } from 'vue-router'
 import { state } from '../core/state.js'
 import { myInviteLink, addContactFromLink, verifyByQr } from '../core/api.js'
@@ -11,21 +12,37 @@ import { t } from '../i18n.js'
 const router = useRouter()
 const tab = ref('code')
 const qr = ref('')
+const frame = ref(0)
+const frameCount = ref(0)
+const progress = ref('')
 const link = ref('')
 const pasted = ref('')
 const video = ref(null)
 const canvas = ref(null)
-let stopper, busy = false
+let stopper, busy = false, frames = [], cycle, assembler = createAssembler()
 const verify = computed(() => ui.add?.mode === 'verify')
 
 function stopScan() {
   stopper?.()
   stopper = null
 }
-function close() { stopScan(); ui.add = null }
+function stopCycle() {
+  clearInterval(cycle)
+  cycle = null
+}
+function close() { stopScan(); stopCycle(); ui.add = null }
 
-async function handle(text, via) {
+async function handle(raw, via) {
   if (busy) return
+  const part = assembler.add(raw)
+  let text = raw
+  if (part) {
+    if (part.have) progress.value = `${part.have}/${part.total}`
+    if (part.bad) { toast(t('err_bad_checksum')); progress.value = '' }
+    if (!part.link) return
+    text = part.link
+    progress.value = ''
+  }
   busy = true
   try {
     if (verify.value) {
@@ -61,14 +78,23 @@ watch(() => ui.add, a => {
 
 async function show() {
   link.value = myInviteLink()
-  qr.value = await QRCode.toDataURL(link.value, { margin: 1, width: 480, errorCorrectionLevel: 'L' })
+  const parts = splitLink(link.value)
+  frames = await Promise.all(parts.map((p) => QRCode.toDataURL(p, { margin: 2, width: 560, errorCorrectionLevel: 'L' })))
+  frameCount.value = frames.length
+  frame.value = 0
+  qr.value = frames[0]
+  stopCycle()
+  cycle = setInterval(() => {
+    frame.value = (frame.value + 1) % frames.length
+    qr.value = frames[frame.value]
+  }, 700)
 }
 watch([() => ui.add, tab], () => {
-  stopScan(); busy = false
+  stopScan(); stopCycle(); busy = false; progress.value = ''; assembler = createAssembler()
   if (!ui.add) return
   tab.value === 'scan' ? startScan() : tab.value === 'code' && show()
 }, { immediate: true, flush: 'post' })
-onBeforeUnmount(stopScan)
+onBeforeUnmount(() => { stopScan(); stopCycle() })
 
 async function share() {
   try {
@@ -92,6 +118,8 @@ async function paste() {
 
       <div v-if="tab === 'code'" class="center" style="padding: 0; gap: 12px">
         <img v-if="qr" :src="qr" class="qr" :alt="t('myCode')" />
+        <div v-if="frameCount > 1" class="dots" aria-hidden="true"><i v-for="n in frameCount" :key="n" :class="{ on: n - 1 === frame }" /></div>
+        <p v-if="frameCount > 1" class="hint" style="margin: 0; text-align: center">{{ t('codeFramesHint') }}</p>
         <div style="font-weight: 600">{{ state.profile?.name }}</div>
         <div class="mono hint">{{ state.profile?.ripploId }}</div>
         <button class="btn block" @click="share">{{ t('shareLink') }}</button>
@@ -99,7 +127,7 @@ async function paste() {
 
       <div v-else-if="tab === 'scan'">
         <p v-if="verify">{{ t('scanSafetyHint') }}</p>
-        <div class="view"><video ref="video" muted playsinline /><canvas ref="canvas" hidden /></div>
+        <div class="view"><video ref="video" muted playsinline /><canvas ref="canvas" hidden /><span v-if="progress" class="prog">{{ t('scanParts', { n: progress }) }}</span></div>
       </div>
 
       <div v-else>
@@ -117,6 +145,10 @@ async function paste() {
 <style scoped>
 .qr { width: min(72vw, 280px); border-radius: 14px; background: #fff; padding: 8px; image-rendering: pixelated; }
 .hint { color: var(--text-2); font-size: 13px; }
+.dots { display: flex; gap: 6px; }
+.dots i { width: 8px; height: 8px; border-radius: 50%; background: var(--surface-2); }
+.dots i.on { background: var(--accent); }
+.prog { position: absolute; left: 50%; bottom: 14px; transform: translateX(-50%); z-index: 1; padding: 4px 12px; border-radius: 999px; background: rgba(0, 0, 0, .6); color: #fff; font-size: 13px; font-variant-numeric: tabular-nums; }
 .view { position: relative; aspect-ratio: 1; border-radius: 22px; overflow: hidden; background: var(--surface); }
 .view video { width: 100%; height: 100%; object-fit: cover; }
 .view::after { content: ''; position: absolute; inset: 18%; border: 3px solid var(--accent); border-radius: 18px; box-shadow: 0 0 0 100vmax rgba(0, 0, 0, .45); }
