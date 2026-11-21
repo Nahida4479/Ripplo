@@ -1,5 +1,7 @@
 # Ripplo
 
+🇬🇧 English | [🇵🇱 Polski](README.pl.md)
+
 <p align="center"><img src="./public/icon_android.png" width="120"></p>
 
 <p align="center" style="text-align: center; font-weight: bold;">An offline, end-to-end encrypted mesh messenger. No servers, no accounts, no internet: messages hop from phone to phone over Bluetooth and Wi-Fi.</p>

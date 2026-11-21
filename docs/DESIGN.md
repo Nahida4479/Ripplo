@@ -1,5 +1,7 @@
 # Ripplo UI design
 
+🇬🇧 English | [🇵🇱 Polski](DESIGN.pl.md)
+
 Messenger look (Signal / WhatsApp), mobile-first, dark by default. Icons: `lucide-vue-next`,
 1.75 stroke, 22 px. Font: system stack (`-apple-system, "SF Pro Text", Roboto, Inter, sans-serif`).
 UI strings live in `src/i18n.js` (`en`, `pl`; device language, fallback `en`).

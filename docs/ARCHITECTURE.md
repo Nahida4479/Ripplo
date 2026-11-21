@@ -1,5 +1,7 @@
 # Ripplo architecture
 
+🇬🇧 English | [🇵🇱 Polski](ARCHITECTURE.pl.md)
+
 Ripplo is an offline-first, end-to-end encrypted mesh messenger.
 Vue 3 (JS) UI + crypto in a Capacitor 8 WebView; transports and the relay router are native
 (Kotlin / Swift) so phones keep relaying with the screen off.
