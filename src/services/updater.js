@@ -33,6 +33,7 @@ export async function checkUpdate() {
   const cur = await version()
   if (!navigator.onLine || u.checking) return
   u.checking = true; u.error = null
+  const t0 = Date.now()
   try {
     const rel = await getJson(`${REPO}/latest`)
     u.latest = rel.tag_name.replace(/^v/, '')
@@ -41,10 +42,12 @@ export async function checkUpdate() {
     const apk = rel.assets.find(a => a.name === `Ripplo-${rel.tag_name}.apk`)
     u.apkUrl = apk?.browser_download_url || null
     u.sha256 = hashOf(rel, `Ripplo-${rel.tag_name}.apk`)
+    u.checkedAt = Date.now()
     if (u.available && native && state.settings.autoUpdate && u.apkUrl && u.sha256) await install()
   } catch (e) {
     u.error = e.message
   } finally {
+    await new Promise(r => setTimeout(r, Math.max(0, 800 - (Date.now() - t0))))
     u.checking = false
   }
 }

@@ -44,7 +44,7 @@ Safe areas: `env(safe-area-inset-*)` on header and tab bar.
   when an update is available or the integrity check failed.
 - Permission gate (blocking, full screen before anything else): logo, one-line why, list of
   required permissions with status chips (Bluetooth, Nearby Wi-Fi / location, Notifications) and
-  one **Grant permissions** button; plus a non-blocking "Allow background relay" (battery) row.
+  one **Grant permissions** button, which also opens the system battery-exemption prompt after the other permissions (the "Allow background relay" row shows its state but never blocks).
 - Onboarding: name field + generate identity ("Your keys are created on this phone and never leave it").
 
 ## Chats tab

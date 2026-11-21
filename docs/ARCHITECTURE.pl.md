@@ -278,7 +278,7 @@ Wartości binarne to ciągi base64 (standardowego); tagi węzłów to małe lite
 | `selfHash` | → `{ sha256 }` hex of the installed APK (Android only) |
 | `installUpdate` | `{ url, sha256 }` → `{ status }` — download, verify SHA-256 + signing cert, install |
 | `requestBatteryExemption` | – (Android) |
-| `checkPermissions` / `requestPermissions` | aliases `bluetooth`, `wifi`, `notifications` |
+| `checkPermissions` / `requestPermissions` | aliasy `bluetooth`, `wifi`, `notifications`; wynik zawiera też `battery` (`granted`, gdy aplikacja jest zwolniona z optymalizacji baterii, tylko Android; nie blokuje przejścia dalej) |
 | `signalInit` | → `{ bundle, ik }` — creates the identity on first call, then returns the same bundle (§1) |
 | `signalAddContact` | `{ bundle }` → `{ tag }` — verifies both prekey signatures, runs `processPreKeyBundle` (PQXDH), saves the identity |
 | `signalSeal` | `{ tag, plaintext }` → `{ payload }` — Signal-encrypt for `hex(tag)` then seal (§2); `payload` is the sealed bytes, used directly as the DATA payload (its leading `0x01` is the DATA kind) |

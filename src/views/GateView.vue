@@ -11,7 +11,11 @@ const rows = [['bluetooth', Bluetooth, 'permBluetooth'], ['wifi', Wifi, 'permWif
 
 async function apply(p) { perms.value = p; if (allGranted(p)) emit('granted') }
 onMounted(async () => apply(await checkPermissions()))
-const grant = async () => apply(await requestPermissions())
+async function grant() {
+  const p = await requestPermissions()
+  if (p.battery === 'prompt') await mesh.requestBatteryExemption()
+  apply(p.battery === 'prompt' ? await checkPermissions() : p)
+}
 </script>
 <template>
   <main class="page center">
@@ -29,6 +33,9 @@ const grant = async () => apply(await requestPermissions())
       <button class="row" :aria-label="t('allowBackground')" @click="mesh.requestBatteryExemption()">
         <BatteryCharging :size="22" :stroke-width="1.75" />
         <span class="grow"><span class="label">{{ t('allowBackground') }}</span><br /><span class="hint">{{ t('optional') }}</span></span>
+        <span v-if="perms.battery" class="chip" :class="perms.battery === 'granted' ? 'ok' : ''">
+          <Check v-if="perms.battery === 'granted'" :size="12" />{{ t('perm_' + perms.battery) }}
+        </span>
       </button>
     </div>
     <button class="btn" style="width: 100%; max-width: 420px" @click="grant">{{ t('grantPermissions') }}</button>

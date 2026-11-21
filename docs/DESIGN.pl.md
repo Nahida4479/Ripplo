@@ -44,7 +44,7 @@ Strefy bezpieczne: `env(safe-area-inset-*)` w nagłówku i pasku zakładek.
   czerwoną kropkę, gdy dostępna jest aktualizacja lub kontrola integralności się nie powiodła.
 - Bramka uprawnień (blokująca, pełny ekran przed wszystkim innym): logo, jednozdaniowe wyjaśnienie po co, lista
   wymaganych uprawnień z plakietkami statusu (Bluetooth, Wi-Fi w pobliżu / lokalizacja, Powiadomienia) i
-  jeden przycisk **Przyznaj uprawnienia**; plus nieblokujący wiersz „Zezwól na przekazywanie w tle” (bateria).
+  jeden przycisk **Przyznaj uprawnienia**, który po pozostałych uprawnieniach otwiera też systemowe okno zwolnienia z optymalizacji baterii (wiersz „Zezwól na przekazywanie w tle” pokazuje stan, ale nigdy nie blokuje).
 - Onboarding: pole na imię + utworzenie tożsamości („Twoje klucze powstają na tym telefonie i nigdy go nie opuszczają”).
 
 ## Zakładka Czaty

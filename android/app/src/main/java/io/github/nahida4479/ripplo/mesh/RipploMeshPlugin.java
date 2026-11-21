@@ -885,6 +885,8 @@ public class RipploMeshPlugin extends Plugin implements MeshEngine.Listener {
         o.put("bluetooth", state(bt, "bluetooth"));
         o.put("wifi", state(wifi, "wifi"));
         o.put("notifications", state(notif, "notifications"));
+        PowerManager pm = (PowerManager) getContext().getSystemService(Context.POWER_SERVICE);
+        o.put("battery", pm.isIgnoringBatteryOptimizations(getContext().getPackageName()) ? "granted" : "prompt");
         return o;
     }
 

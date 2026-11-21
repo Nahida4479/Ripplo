@@ -105,6 +105,7 @@ const initials = l => l.slice(0, 2).toUpperCase()
       <div class="row"><span class="grow label">{{ t('currentVersion') }}</span><span class="val">{{ state.update.current || '–' }}</span></div>
       <div class="row"><span class="grow label">{{ t('latestVersion') }}</span><span class="val">{{ state.update.latest || '–' }}</span></div>
       <div v-if="state.update.error" class="row hint">{{ state.update.error }}</div>
+      <div v-else-if="state.update.checkedAt && !state.update.available && !state.update.checking" class="row hint">{{ t('upToDate') }}</div>
       <div v-if="state.update.progress != null" class="row"><progress class="grow" max="1" :value="state.update.progress" /></div>
       <div class="row">
         <button class="btn sm ghost" :disabled="state.update.checking" @click="checkUpdate">{{ t(state.update.checking ? 'checking' : 'checkNow') }}</button>
