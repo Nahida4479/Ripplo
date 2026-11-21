@@ -79,9 +79,10 @@ import org.json.JSONObject;
         })
 public class RipploMeshPlugin extends Plugin implements MeshEngine.Listener {
     private static final String KEY_ALIAS = "ripplo_db_wrap";
-    private static final String ACTION_INSTALL = "io.github.nahida4479.ripplo.INSTALL_RESULT";
-    private static volatile PluginCall installCall;
-    private static final AtomicBoolean updating = new AtomicBoolean();
+    static volatile PluginCall installCall;
+    static volatile boolean foreground;
+    private volatile JSObject pendingShare;
+    private final ExecutorService shareExec = Executors.newSingleThreadExecutor();
 
     private interface SignalOp {
         JSObject run(SignalCore core) throws Exception;
@@ -101,15 +102,82 @@ public class RipploMeshPlugin extends Plugin implements MeshEngine.Listener {
     public void load() {
         engine = MeshEngine.get(getContext());
         engine.setListener(this);
+        readShare(getActivity() == null ? null : getActivity().getIntent());
+    }
+
+    @Override
+    protected void handleOnNewIntent(Intent intent) {
+        super.handleOnNewIntent(intent);
+        readShare(intent);
+    }
+
+    private void readShare(Intent intent) {
+        if (intent == null || !Intent.ACTION_SEND.equals(intent.getAction())) return;
+        final String type = intent.getType();
+        final String text = intent.getStringExtra(Intent.EXTRA_TEXT);
+        final Uri stream = Build.VERSION.SDK_INT >= 33
+                ? intent.getParcelableExtra(Intent.EXTRA_STREAM, Uri.class)
+                : (Uri) intent.getParcelableExtra(Intent.EXTRA_STREAM);
+        intent.setAction(Intent.ACTION_MAIN);
+        shareExec.execute(() -> {
+            try {
+                JSObject o = new JSObject();
+                if (stream != null) {
+                    if (!"content".equals(stream.getScheme()) || stream.getAuthority() == null
+                            || stream.getAuthority().startsWith(getContext().getPackageName())) return;
+                    String mime = getContext().getContentResolver().getType(stream);
+                    if (mime == null) mime = type;
+                    if (mime == null || !(mime.startsWith("image/") || mime.startsWith("video/") || mime.startsWith("audio/"))) return;
+                    File dir = new File(getContext().getCacheDir(), "share");
+                    File[] old = dir.listFiles();
+                    if (old != null) for (File f : old) f.delete();
+                    dir.mkdirs();
+                    File out = new File(dir, "s" + System.nanoTime());
+                    long total = 0;
+                    try (InputStream in = getContext().getContentResolver().openInputStream(stream); OutputStream os = new FileOutputStream(out)) {
+                        if (in == null) return;
+                        byte[] buf = new byte[65536];
+                        int n;
+                        while ((n = in.read(buf)) > 0) {
+                            total += n;
+                            if (total > 20L * 1024 * 1024) { out.delete(); return; }
+                            os.write(buf, 0, n);
+                        }
+                    }
+                    o.put("kind", mime.startsWith("image/") ? "image" : mime.startsWith("video/") ? "video" : "voice");
+                    o.put("mime", mime);
+                    o.put("path", out.getAbsolutePath());
+                } else if (text != null && !text.trim().isEmpty()) {
+                    o.put("kind", "text");
+                    o.put("text", text);
+                } else {
+                    return;
+                }
+                pendingShare = o;
+                notifyListeners("share", new JSObject());
+            } catch (Exception ignored) {
+            }
+        });
+    }
+
+    @PluginMethod
+    public void takeShare(PluginCall call) {
+        JSObject s = pendingShare;
+        pendingShare = null;
+        JSObject r = new JSObject();
+        if (s != null) r.put("share", s);
+        call.resolve(r);
     }
 
     @Override
     protected void handleOnPause() {
+        foreground = false;
         engine.setJsAttached(false);
     }
 
     @Override
     protected void handleOnResume() {
+        foreground = true;
         Notifier.cancelUpdated(getContext());
         if (!drained) return;
         engine.setJsAttached(true);
@@ -659,6 +727,8 @@ public class RipploMeshPlugin extends Plugin implements MeshEngine.Listener {
         return out.n;
     }
 
+    private static final String BACKUP_FILE = "Ripplo-backup.rbk";
+
     private static String backupName() {
         return "Ripplo-backup-" + new SimpleDateFormat("yyyyMMdd-HHmm", Locale.US).format(new Date()) + ".rbk";
     }
@@ -674,63 +744,72 @@ public class RipploMeshPlugin extends Plugin implements MeshEngine.Listener {
     @PluginMethod
     public void backupCreate(PluginCall call) {
         if (!backup().enabled()) { call.reject("not_enabled", "not_enabled"); return; }
-        if (!"auto".equals(call.getString("mode", "pick"))) {
+        String mode = call.getString("mode", "pick");
+        SharedPreferences sp = backup().prefs();
+        final String folder = sp.getString("folder", null);
+        if ("pick".equals(mode) || ("now".equals(mode) && folder == null)) {
             Intent i = new Intent(Intent.ACTION_CREATE_DOCUMENT).addCategory(Intent.CATEGORY_OPENABLE)
                     .setType("application/octet-stream").putExtra(Intent.EXTRA_TITLE, backupName());
             startActivityForResult(call, i, "createPicked");
             return;
         }
-        SharedPreferences sp = backup().prefs();
-        String folder = sp.getString("folder", null);
         if (folder == null) { call.reject("no_folder", "no_folder"); return; }
-        if (System.currentTimeMillis() - sp.getLong("lastAt", 0) < 24L * 3600 * 1000) {
+        if ("auto".equals(mode) && System.currentTimeMillis() - sp.getLong("lastAt", 0) < 24L * 3600 * 1000) {
             JSObject r = new JSObject();
             r.put("skipped", true);
             call.resolve(r);
             return;
         }
-        run(backupExec, call, () -> {
-            ContentResolver cr = getContext().getContentResolver();
-            Uri tree = Uri.parse(folder);
-            String treeId = DocumentsContract.getTreeDocumentId(tree);
-            String name = backupName();
-            Uri doc;
-            try {
-                doc = DocumentsContract.createDocument(cr, DocumentsContract.buildDocumentUriUsingTree(tree, treeId), "application/octet-stream", name);
-            } catch (RuntimeException e) {
-                throw new IllegalStateException("folder_unavailable");
-            }
-            if (doc == null) throw new IllegalStateException("folder_unavailable");
-            long size;
-            try (OutputStream o = cr.openOutputStream(doc, "wt")) {
-                size = writeBackup(o, call);
-            } catch (Exception e) {
-                try {
-                    DocumentsContract.deleteDocument(cr, doc);
-                } catch (Exception ignored) {
-                }
-                throw e;
-            }
-            rotate(cr, tree, treeId);
-            return created(name, size);
-        });
+        run(backupExec, call, () -> writeToFolder(folder, call));
     }
 
-    private void rotate(ContentResolver cr, Uri tree, String treeId) {
-        List<String[]> found = new ArrayList<>();
+    private JSObject writeToFolder(String folder, PluginCall call) throws Exception {
+        ContentResolver cr = getContext().getContentResolver();
+        Uri tree = Uri.parse(folder);
+        String treeId = DocumentsContract.getTreeDocumentId(tree);
+        Uri parent = DocumentsContract.buildDocumentUriUsingTree(tree, treeId);
+        String tmpName = BACKUP_FILE + ".tmp";
+        deleteNamed(cr, tree, treeId, tmpName);
+        Uri tmp;
+        try {
+            tmp = DocumentsContract.createDocument(cr, parent, "application/octet-stream", tmpName);
+        } catch (RuntimeException e) {
+            throw new IllegalStateException("folder_unavailable");
+        }
+        if (tmp == null) throw new IllegalStateException("folder_unavailable");
+        long size;
+        try (OutputStream o = cr.openOutputStream(tmp, "wt")) {
+            if (o == null) throw new IllegalStateException("folder_unavailable");
+            size = writeBackup(o, call);
+        } catch (Exception e) {
+            try {
+                DocumentsContract.deleteDocument(cr, tmp);
+            } catch (Exception ignored) {
+            }
+            throw e;
+        }
+        deleteNamed(cr, tree, treeId, BACKUP_FILE);
+        Uri done;
+        try {
+            done = DocumentsContract.renameDocument(cr, tmp, BACKUP_FILE);
+        } catch (RuntimeException e) {
+            done = null;
+        }
+        if (done == null) throw new IllegalStateException("folder_unavailable");
+        return created(BACKUP_FILE, size);
+    }
+
+    private void deleteNamed(ContentResolver cr, Uri tree, String treeId, String name) {
+        List<String> ids = new ArrayList<>();
         try (Cursor c = cr.query(DocumentsContract.buildChildDocumentsUriUsingTree(tree, treeId),
                 new String[]{DocumentsContract.Document.COLUMN_DOCUMENT_ID, DocumentsContract.Document.COLUMN_DISPLAY_NAME}, null, null, null)) {
-            while (c != null && c.moveToNext()) {
-                String n = c.getString(1);
-                if (n != null && n.startsWith("Ripplo-backup-") && n.contains(".rbk")) found.add(new String[]{c.getString(0), n});
-            }
+            while (c != null && c.moveToNext()) if (name.equals(c.getString(1))) ids.add(c.getString(0));
         } catch (RuntimeException e) {
             return;
         }
-        Collections.sort(found, (a, b) -> b[1].compareTo(a[1]));
-        for (int i = 3; i < found.size(); i++) {
+        for (String id : ids) {
             try {
-                DocumentsContract.deleteDocument(cr, DocumentsContract.buildDocumentUriUsingTree(tree, found.get(i)[0]));
+                DocumentsContract.deleteDocument(cr, DocumentsContract.buildDocumentUriUsingTree(tree, id));
             } catch (Exception ignored) {
             }
         }
@@ -917,11 +996,20 @@ public class RipploMeshPlugin extends Plugin implements MeshEngine.Listener {
     }
 
     @PluginMethod
+    public void setAutoUpdate(PluginCall call) {
+        boolean on = call.getBoolean("enabled", true);
+        getContext().getSharedPreferences(UpdateEngine.PREFS, Context.MODE_PRIVATE).edit().putBoolean("auto", on).apply();
+        if (on) UpdateJobService.schedule(getContext());
+        else UpdateJobService.cancel(getContext());
+        call.resolve();
+    }
+
+    @PluginMethod
     public void installUpdate(final PluginCall call) {
         final String url = call.getString("url", "");
         final String sha = call.getString("sha256", "").toLowerCase();
         if (!url.startsWith("https://") || !sha.matches("[0-9a-f]{64}")) { call.reject("bad arguments"); return; }
-        if (Build.VERSION.SDK_INT >= 26 && !getContext().getPackageManager().canRequestPackageInstalls()) {
+        if (!UpdateEngine.canInstall(getContext())) {
             if (call.getBoolean("prompt", false)) {
                 try {
                     getActivity().startActivity(new Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, Uri.parse("package:" + getContext().getPackageName())));
@@ -931,109 +1019,22 @@ public class RipploMeshPlugin extends Plugin implements MeshEngine.Listener {
             call.reject("install_permission");
             return;
         }
-        if (!updating.compareAndSet(false, true)) { call.reject("busy"); return; }
+        if (!UpdateEngine.busy.compareAndSet(false, true)) { call.reject("busy"); return; }
         Thread t = new Thread(() -> {
-            File apk = new File(getContext().getCacheDir(), "update.apk");
             try {
-                download(url, apk, sha);
-                verifyCerts(apk);
-                install(apk, call);
+                UpdateEngine.apply(getContext(), url, sha, p -> {
+                    JSObject o = new JSObject();
+                    o.put("progress", p);
+                    notifyListeners("updateProgress", o);
+                }, call);
             } catch (Exception e) {
-                apk.delete();
                 call.reject(e.getMessage() == null ? "update failed" : e.getMessage());
             } finally {
-                updating.set(false);
+                UpdateEngine.busy.set(false);
             }
         }, "ripplo-update");
         t.setDaemon(true);
         t.start();
-    }
-
-    private void download(String url, File out, String sha) throws Exception {
-        HttpURLConnection c = (HttpURLConnection) new URL(url).openConnection();
-        c.setConnectTimeout(15000);
-        c.setReadTimeout(30000);
-        c.setInstanceFollowRedirects(true);
-        try {
-            if (c.getResponseCode() != 200 || !"https".equals(c.getURL().getProtocol())) throw new Exception("download failed");
-            long total = c.getContentLengthLong();
-            if (total > 300L * 1024 * 1024) throw new Exception("too large");
-            MessageDigest md = MessageDigest.getInstance("SHA-256");
-            long got = 0;
-            int lastPct = -1;
-            try (InputStream in = c.getInputStream(); OutputStream os = new FileOutputStream(out)) {
-                byte[] buf = new byte[65536];
-                int n;
-                while ((n = in.read(buf)) > 0) {
-                    md.update(buf, 0, n);
-                    os.write(buf, 0, n);
-                    got += n;
-                    if (got > 300L * 1024 * 1024) throw new Exception("too large");
-                    if (total > 0) {
-                        int pct = (int) (got * 100 / total);
-                        if (pct != lastPct) {
-                            lastPct = pct;
-                            JSObject o = new JSObject();
-                            o.put("progress", pct / 100.0);
-                            notifyListeners("updateProgress", o);
-                        }
-                    }
-                }
-            }
-            if (!hex(md.digest()).equals(sha)) throw new Exception("hash mismatch");
-        } finally {
-            c.disconnect();
-        }
-    }
-
-    @SuppressWarnings("deprecation")
-    private static Set<String> certs(PackageInfo pi) throws Exception {
-        Set<String> out = new HashSet<>();
-        Signature[] sigs;
-        if (Build.VERSION.SDK_INT >= 28) {
-            if (pi.signingInfo == null) throw new Exception("no signature");
-            sigs = pi.signingInfo.getApkContentsSigners();
-        } else {
-            sigs = pi.signatures;
-        }
-        if (sigs == null || sigs.length == 0) throw new Exception("no signature");
-        for (Signature s : sigs) out.add(hex(MessageDigest.getInstance("SHA-256").digest(s.toByteArray())));
-        return out;
-    }
-
-    @SuppressWarnings("deprecation")
-    private void verifyCerts(File apk) throws Exception {
-        PackageManager pm = getContext().getPackageManager();
-        int flags = Build.VERSION.SDK_INT >= 28 ? PackageManager.GET_SIGNING_CERTIFICATES : PackageManager.GET_SIGNATURES;
-        PackageInfo archive = pm.getPackageArchiveInfo(apk.getAbsolutePath(), flags);
-        if (archive == null || !getContext().getPackageName().equals(archive.packageName)) throw new Exception("wrong package");
-        PackageInfo installed = pm.getPackageInfo(getContext().getPackageName(), flags);
-        if (!certs(archive).equals(certs(installed))) throw new Exception("signature mismatch");
-    }
-
-    private void install(File apk, PluginCall call) throws Exception {
-        Context ctx = getContext();
-        PackageInstaller pi = ctx.getPackageManager().getPackageInstaller();
-        PackageInstaller.SessionParams params = new PackageInstaller.SessionParams(PackageInstaller.SessionParams.MODE_FULL_INSTALL);
-        params.setAppPackageName(ctx.getPackageName());
-        if (Build.VERSION.SDK_INT >= 31) params.setRequireUserAction(PackageInstaller.SessionParams.USER_ACTION_NOT_REQUIRED);
-        int id = pi.createSession(params);
-        try (PackageInstaller.Session session = pi.openSession(id)) {
-            try (InputStream in = new FileInputStream(apk); OutputStream os = session.openWrite("base.apk", 0, apk.length())) {
-                byte[] buf = new byte[65536];
-                int n;
-                while ((n = in.read(buf)) > 0) os.write(buf, 0, n);
-                session.fsync(os);
-            }
-            installCall = call;
-            Intent i = new Intent(ctx, InstallReceiver.class).setAction(ACTION_INSTALL);
-            int flags = PendingIntent.FLAG_UPDATE_CURRENT | (Build.VERSION.SDK_INT >= 31 ? PendingIntent.FLAG_MUTABLE : 0);
-            PendingIntent pending = PendingIntent.getBroadcast(ctx, id, i, flags);
-            session.commit(pending.getIntentSender());
-        } catch (Exception e) {
-            pi.abandonSession(id);
-            throw e;
-        }
     }
 
     static void installResult(boolean ok, int status, String message) {

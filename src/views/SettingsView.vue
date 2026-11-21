@@ -1,6 +1,6 @@
 <script setup>
 import { ref, computed } from 'vue'
-import { QrCode, ExternalLink, ShieldCheck, ShieldAlert, ShieldQuestion, TriangleAlert } from 'lucide-vue-next'
+import { QrCode, ExternalLink, ShieldCheck, ShieldAlert, ShieldQuestion, TriangleAlert, Lock } from 'lucide-vue-next'
 import { state } from '../core/state.js'
 import { saveSettings, setAvatar, setName } from '../core/api.js'
 import { mesh } from '../mesh/bridge.js'
@@ -55,6 +55,10 @@ const initials = l => l.slice(0, 2).toUpperCase()
         <input ref="photoInput" type="file" accept="image/*" hidden @change="pickPhoto" />
       </div>
       <div class="row hint">{{ t('photoHint') }}</div>
+      <div class="row">
+        <span class="grow"><span class="label">{{ t('discoverable') }}</span><br /><span class="hint">{{ t('discoverableHint') }}</span></span>
+        <button class="switch" role="switch" :aria-checked="!state.settings.hidden" :aria-label="t('discoverable')" @click="saveSettings({ hidden: !state.settings.hidden })" />
+      </div>
       <button class="row" @click="ui.add = { mode: 'add' }"><QrCode :size="22" :stroke-width="1.75" /><span class="grow label">{{ t('myCode') }}</span></button>
     </div>
 
@@ -101,7 +105,7 @@ const initials = l => l.slice(0, 2).toUpperCase()
       <div class="row" :style="state.insecureStorage ? 'color: var(--warn)' : ''">
         <TriangleAlert v-if="state.insecureStorage" :size="22" /><ShieldCheck v-else :size="22" :stroke-width="1.75" />
         <span class="grow"><span class="label">{{ t('dbEncryption') }}</span><br /><span class="hint">{{ t(state.insecureStorage ? 'dbInsecure' : 'dbSecure') }}</span></span></div>
-      <div class="row"><span class="grow"><span class="label">{{ t('signal') }}</span><br /><span class="hint">{{ t('signalInfo') }}</span></span></div>
+      <div class="row"><Lock :size="22" :stroke-width="1.75" /><span class="grow"><span class="label">{{ t('signal') }}</span><br /><span class="hint">{{ t('signalInfo') }}</span></span></div>
       <div v-if="mesh.isNative" class="row">
         <span class="grow"><span class="label">{{ t('appLock') }}</span><br /><span class="hint">{{ t('appLockHint') }}</span></span>
         <button class="switch" role="switch" :aria-checked="!!state.settings.appLock" :aria-label="t('appLock')" @click="setAppLock(!state.settings.appLock)" />

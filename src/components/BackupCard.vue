@@ -34,20 +34,22 @@ const verify = () => {
   step.value = 'folder'
 }
 const folder = () => run(async () => { await mesh.backupChooseFolder(); close(); await refresh() })
-const now = () => run(async () => { if (!(await mesh.authenticate(t('unlockReason'))).ok) return; await mesh.backupCreate({ mode: 'pick', meta: backupMeta() }); toast(t('backupDone')); await refresh() })
+const now = () => run(async () => { if (!(await mesh.authenticate(t('unlockReason'))).ok) return; await mesh.backupCreate({ mode: 'now', meta: backupMeta() }); toast(t('backupDone')); await refresh() })
 const off = () => { ui.confirm = { title: t('backupOff'), text: t('backupOffConfirm'), ok: t('backupOff'), danger: true, onOk: () => run(async () => { await mesh.backupDisable(); await refresh() }) } }
 </script>
 <template>
   <h2 class="section">{{ t('backup') }}</h2>
   <div class="card pad">
     <p v-if="!mesh.isNative" class="hint">{{ t('backupWeb') }}</p>
-    <!-- <template v-else-if="step === 'code'">
+    <template v-else-if="step === 'code'">
       <b>{{ t('codeTitle') }}</b>
       <div class="code mono" :aria-label="t('codeTitle')"><span v-for="(g, i) in groups" :key="i">{{ g }}</span></div>
-      <p class="hint">{{ t('codeWarn') }}</p>
-      <button v-if="setup" class="btn block" @click="wrote">{{ t('codeWritten') }}</button>
+      <template v-if="setup">
+        <p class="hint">{{ t('codeWarn') }}</p>
+        <button class="btn block" @click="wrote">{{ t('codeWritten') }}</button>
+      </template>
       <button v-else class="btn block" @click="close">{{ t('done') }}</button>
-    </template> -->
+    </template>
     <form v-else-if="step === 'check'" class="stack" @submit.prevent="verify">
       <b>{{ t('codeCheckTitle') }}</b>
       <p class="hint">{{ t('codeCheckHint') }}</p>

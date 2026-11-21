@@ -1,8 +1,10 @@
+import { watch } from 'vue'
 import { App } from '@capacitor/app'
 import { Capacitor } from '@capacitor/core'
 import { state } from '../core/state.js'
 import { mesh } from '../mesh/bridge.js'
 import { t } from '../i18n.js'
+import { ui } from '../components/ui.js'
 
 const REPO = 'https://api.github.com/repos/Nahida4479/Ripplo/releases'
 const native = Capacitor.getPlatform() === 'android'
@@ -44,12 +46,25 @@ export async function checkUpdate() {
     u.apkUrl = apk?.browser_download_url || null
     u.sha256 = hashOf(rel, `Ripplo-${rel.tag_name}.apk`)
     u.checkedAt = Date.now()
-    if (u.available && native && state.settings.autoUpdate && u.apkUrl && u.sha256) await install(false)
+    if (u.available) promptUpdate()
   } catch (e) {
     u.error = e.message
   } finally {
     await new Promise(r => setTimeout(r, Math.max(0, 800 - (Date.now() - t0))))
     u.checking = false
+  }
+}
+
+const PROMPT_GAP = 6 * 3600e3
+function promptUpdate() {
+  const u = state.update
+  if (ui.confirm || Date.now() - u.promptedAt < PROMPT_GAP) return
+  u.promptedAt = Date.now()
+  const direct = native && u.apkUrl && u.sha256
+  ui.confirm = {
+    title: t('updateFound', { version: u.latest }), text: t(direct ? 'updateAsk' : 'updateAskWeb'),
+    ok: t(direct ? 'updateNow' : 'openRelease'), cancel: t('later'),
+    onOk: () => direct ? install() : window.open(u.url, '_blank', 'noopener')
   }
 }
 
@@ -84,5 +99,6 @@ export function startUpdater() {
   run()
   setInterval(run, 6 * 3600e3)
   window.addEventListener('online', run)
-  App.addListener('resume', () => { if (!state.update.latest) run() })
+  App.addListener('resume', () => { if (Date.now() - state.update.checkedAt > 10 * 60e3) run() })
+  if (native) watch(() => state.settings.autoUpdate, on => mesh.setAutoUpdate(!!on).catch(() => {}), { immediate: true })
 }

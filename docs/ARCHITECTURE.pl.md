@@ -238,6 +238,14 @@ Odbiorca stosuje `nm` po `cleanName` (≤ 40 znaków) i ponownie sprawdza konfli
 NIE są podpisane, więc nazwa z karty, `hello` lub `REPLY` nigdy nie nadpisuje nazwy istniejącego kontaktu.
 `ripploId` i klucze się nie zmieniają.
 
+### Wiadomości głosowe
+
+Nagrywane przez `MediaRecorder` (`audio/webm;codecs=opus`, w razie braku `audio/mp4`, `audio/ogg`), paczki co 250 ms.
+Pasek poziomu na żywo (analizator WebAudio) zasila kreski podczas nagrywania oraz `wave`, do 64 bajtów (40 używanych),
+każdy 0-255 względem najgłośniejszej próbki. Prawdziwy czas jest mierzony, a nie czytany z Blob. Wiadomość-wskaźnik niesie
+`duration` (s, ≤ 3600) i `wave` (base64, ≤ 96 znaków); odbiorca waliduje oba i rysuje kreski z `wave`. Nagranie krótsze niż
+~800 bajtów lub ze szczytem < 0.02 nie jest wysyłane („Nie nagrano dźwięku”).
+
 ### Zdjęcie profilowe
 
 Opcjonalne, ustawiane w Ustawienia → Profil: kadrowane do JPEG 160×160, ≤ 16 KiB, zapisane w `kv/profile.avatar`
@@ -253,15 +261,61 @@ Podróżuje tylko jako pole `av` w wiadomości szyfrowanej Signalem, więc przek
 
 ## 6. Wiadomości APP link-local (JSON)
 
-- `{ "t": "hello", "card": "<b64 card bytes>" }` — wysyłana do każdego nowego sąsiada; wypełnia sekcję „W pobliżu” w zakładce Ludzie
-  i umożliwia dowód bliskości.
+- `{ "t": "hello", "card": "<b64 card bytes>", "r": 1? }` — wysyłana do każdego nowego sąsiada; wypełnia sekcję „W pobliżu”
+  w zakładce Ludzie i umożliwia dowód bliskości. `r` = „nie mam jeszcze twojej karty, odpowiedz”: odbiorca odsyła hello
+  bez `r`. Nadawca, który nadal nie ma karty sąsiada, ponawia z `r` po 3, 10 i 30 s, a hello, które przyjdzie przed
+  zdarzeniem sąsiada, jest buforowane per węzeł, więc wykrywanie jest symetryczne. Gdy użytkownik jest ukryty (niżej),
+  hello idzie tylko do sąsiadów, których karta należy do kontaktu (jedna odpowiedź na łącze, więc dwa ukryte kontakty
+  nie odbijają się w nieskończoność).
 - `{ "t": "challenge" ... }`, `{ "t": "proof" ... }` — sekcja 5.
+
+## 6.1 Zaproszenia (zakładka Ludzie)
+
+Zamiast dodawać obcego od razu, „Zaproś” wysyła prośbę, którą druga osoba przyjmuje lub odrzuca. Wszystko jest
+szyfrowane Signalem; karta jedzie jak zwykle jako piggyback `c`.
+- Nadawca: zapisuje kontakt z `request: "out"` (jeszcze bez czatu) i wysyła `{ "t": "invite" }`. Nieudane doręczenie
+  ustawia `inviteFailed`, a wiersz oferuje Ponów.
+- Odbiorca: `invite` od nieznanego nadawcy tworzy kontakt z `request: "in"` bez czatu oraz powiadomienie. Liczba
+  oczekujących próśb jest nieograniczona (limit 20 osób dotyczy tylko wyszukiwania). Od kontaktu z `request: "in"` każda wiadomość poza `invite` jest odrzucana. Czaty → „Zaproszenia”
+  (pod polem szukaj) pokazuje Akceptuj / Odrzuć.
+- Akceptacja: flaga prośby jest zdejmowana, powstaje czat, startuje weryfikacja nearby, wysyłane jest `{ "t": "accept" }`.
+  Odrzucenie: wysyłane jest `{ "t": "decline" }`, potem kontakt i sesja są usuwane; nadawca usuwa oczekujący kontakt.
+  Każda inna wiadomość od kontaktu z `request: "out"` albo wzajemne `invite` liczy się jako akceptacja.
+- Kontakty z flagą prośby są ukryte w Nowym czacie, nie można ich dodać do grup, nigdy nie dostają wysyłek profilu
+  (`profile`, ponowne `hello`) i dostają goły `{ "t": "decline" }` bez karty, nazwy i zdjęcia. Pisanie do kogoś, kogo tylko
+  zaprosiłeś, jest odrzucane, a zeskanowanie QR lub otwarcie linku osoby, która cię zaprosiła, akceptuje prośbę.
+  Ktoś spoza kontaktów nadal może otworzyć zwykły czat, pisząc pierwszy (QR/link); mogą pisać tekst, ale
+  żadne połączenie nie zadzwoni (§13) i żaden wskaźnik multimediów nie jest przyjmowany, dopóki im nie odpiszesz. Lustrzana reguła
+  dla nadawcy: `sendAttachment` w czacie bezpośrednim rzuca `media_locked`, dopóki druga osoba nie odpowie (`cardAck`), chyba że
+  napisała pierwsza (`addedVia: "incoming"`); tekst jest zawsze dozwolony. Grupy nie są bramkowane.
 
 ## 7. Zakładka Ludzie (wykrywanie w całej sieci mesh)
 
 Payload DISCOVER = `{ "t": "who" }`; każdy węzeł odpowiada payloadem REPLY = bajty swojej wizytówki (§1).
-Odświeżane automatycznie raz na 24 h między 02:00 a 05:00 czasu lokalnego albo gdy użytkownik stuknie
-odśwież. DISCOVER zalewa całą sieć mesh, stąd nocny harmonogram. Osoba dodana stąd jest
+Ustawienia → Profil → „Widoczność w Znajdź osoby” (domyślnie włączona). Wyłączona: DISCOVER nie dostaje odpowiedzi
+(węzeł nadal go przekazuje), a hello idzie tylko do zaakceptowanych kontaktów (§6). Ograniczenia: sąsiad, który powtórzy publiczną
+kartę kontaktu, dostanie twoje hello, więc obecność nie jest ukryta przed aktywnym atakującym, a dwa ukryte kontakty nie znajdą się
+w pobliżu (żaden nie wysyła pierwszy), więc nie zweryfikują się w pobliżu ani nie zadzwonią.
+
+Ładunek DISCOVER: `{ "t": "who", "h"?: n, "lo"?: n, "q"?: hash }`. `h` / `lo` = odpowiedz tylko, gdy odległość `d`
+(liczba łączy od pytającego, `packet.hops + 1`) spełnia `lo < d <= h`; `q` = `b64url(SHA-256("ripplo-find-v1\0" | norm)[0..8])`,
+gdzie `norm` to nazwa po NFKC, małymi literami, ze zwiniętymi odstępami, albo ripploId bez myślników wielkimi literami;
+węzeł odpowiada tylko, gdy `q` równa się skrótowi jego nazwy lub id. Szukanie wymaga więc dokładnej pełnej nazwy lub id. Skrót jest krótki i bez soli, więc ukrywa nazwę tylko przed
+przypadkowymi obserwatorami: kto zgadnie nazwę (albo ma już kartę z wcześniejszego REPLY, w przypadku id), dopasuje go.
+To nie jest gwarancja prywatności. Pytający sprawdza też każdą odpowiedź względem zapytania.
+Lista odświeżenia (automatycznego i ręcznego) ma najwyżej 20 osób i jest przeszukiwana pierścieniami (h = 1, 3, 8,
+potem bez limitu; każdy pierścień to osobny DISCOVER, następny tylko gdy znaleziono mniej niż 20). W liście wygrywają
+najbliżsi: gdy jest pełna, odpowiedź z mniejszą liczbą przeskoków zastępuje najdalszą osobę, a lista jest posortowana
+po przeskokach. Szukanie po nazwie trzyma najwyżej 50 trafień, pokazuje je zamiast listy, a wyczyszczenie przywraca
+poprzednią listę.
+
+Odświeżane automatycznie raz w nocy albo gdy użytkownik stuknie odśwież. DISCOVER zalewa całą sieć mesh, stąd
+harmonogram: okno 02:00-05:00 czasu lokalnego jest pocięte na 720 slotów po 15 s, a każdy telefon ma swój slot
+`parseInt(tag[0..4 bajty]) mod 720` (stały, więc telefony skanują jeden po drugim, a nie wszystkie naraz). Telefon,
+który spał w swoim slocie, skanuje, gdy tylko aplikacja obudzi się w oknie, najwyżej raz na 20 h.
+Wyszukiwanie kończy się po 30 s albo wcześniej, gdy przyszedł zagregowany DEAD_END i przez 10 s nie dotarła żadna
+odpowiedź REPLY (telefon na końcu łańcucha od razu odsyła ślepy zaułek, ale jego REPLY buduje JS chwilę później, więc
+sam ślepy zaułek nie może kończyć wyszukiwania), albo od razu, gdy DISCOVER nie dotarł do żadnego sąsiada. Osoba dodana stąd jest
 niezweryfikowana (przekaźnik mógł podmienić wizytówkę) i dostaje to samo ostrzeżenie co przy linku zaproszenia.
 
 ## 8. Cykl życia wiadomości (co widzi nadawca)
@@ -288,6 +342,8 @@ Wartości binarne to ciągi base64 (standardowego); tagi węzłów to małe lite
 | `selfHash` | → `{ sha256 }` hex of the installed APK (Android only) |
 | `installUpdate` | `{ url, sha256, prompt? }` → `{ status }` — pobranie, weryfikacja SHA-256 i certyfikatu, instalacja. Odrzuca `install_permission` (przed pobraniem), gdy Ripplo nie ma zgody „instaluj nieznane aplikacje”; z `prompt` otwiera ten ekran ustawień |
 | `requestBatteryExemption` | – (Android) |
+| `takeShare` | → `{ share? }` — oczekująca zawartość z menu udostępniania Androida, czyszczona po odczycie |
+| `setAutoUpdate` | `{ enabled }` — Android: zapisuje ustawienie i planuje / anuluje zadanie aktualizacji w tle (§10) |
 | `checkPermissions` / `requestPermissions` | aliasy `bluetooth`, `wifi`, `notifications`; wynik zawiera też `battery` (`granted`, gdy aplikacja jest zwolniona z optymalizacji baterii, tylko Android; nie blokuje przejścia dalej) |
 | `signalInit` | → `{ bundle, ik }` — creates the identity on first call, then returns the same bundle (§1) |
 | `signalAddContact` | `{ bundle }` → `{ tag }` — verifies both prekey signatures, runs `processPreKeyBundle` (PQXDH), saves the identity |
@@ -301,7 +357,14 @@ Wszystkie wywołania `signal*` działają na jednej kolejce szeregowej w natywny
 `bad_bundle`, `no_session`, `bad_message`, `untrusted_identity`.
 
 Zdarzenia (`addListener`): `packet` `{ packet, from }` (from = węzeł w hex, `"self"` dla dostarczeń
-ruchu pochodzącego z JS), `neighbor` `{ node, up, medium, kbps }`, `updateProgress` `{ progress }`.
+ruchu pochodzącego z JS), `neighbor` `{ node, up, medium, kbps }`, `updateProgress` `{ progress }`, `share` `{}` (nadeszło udostępnienie, wywołaj `takeShare`).
+
+Cel udostępniania (Android): `MainActivity` przyjmuje `ACTION_SEND` dla `text/plain`, `image/*`, `video/*`, `audio/*`. Plugin
+czyta go przy starcie i w `onNewIntent`, przyjmuje tylko URI `content://` innych aplikacji (nigdy `file://` ani własnego
+providera Ripplo), kopiuje strumień (≤ 20 MiB) do `cache/share` i trzyma jedno oczekujące udostępnienie;
+`takeShare` → `{ share?: { kind: text|image|video|voice, text | mime + path } }` zwraca je i czyści. JS pokazuje
+„Wyślij do…” (czaty i grupy, bez oczekujących próśb) po odblokowaniu aplikacji; wybór czatu od razu wysyła tekst lub
+załącznik i otwiera ten czat. Bez tego wyboru nic nie jest wysyłane. iOS nie ma jeszcze rozszerzenia udostępniania.
 
 Gdy nie ma podłączonego listenera JS, silnik trzyma pakiety dla siebie w trwałej skrzynce (inbox, maks. 2000)
 i pokazuje pozbawione treści powiadomienie *„Nowa wiadomość”* dla payloadów `0x01`.
@@ -317,6 +380,19 @@ i pokazuje pozbawione treści powiadomienie *„Nowa wiadomość”* dla payload
 - Skróty wydania pochodzą z pola `digest` zasobu w odpowiedzi API (zapasowo: blok `SHA256SUMS` w opisie wydania);
   `SHA256SUMS` nie jest pobierany z WebView, bo przekierowania pobierania z github.com nie mają nagłówków CORS.
   Obecna wersja to natywne `versionName` (`App.getInfo()`), a nie wersja z `package.json`.
+- Aktualizacje w tle (Android, ustawienie „Aktualizuj automatycznie”, domyślnie włączone): `UpdateJobService`
+  (`JobScheduler`, co 6 h, sieć bez limitu, bateria nie niska, przetrwa restart; ponownie planowany przez
+  `UpdatedReceiver`) uruchamia `UpdateEngine.background` w kodzie natywnym także przy zamkniętej aplikacji. Pomija
+  uruchomienie, gdy aplikacja jest na pierwszym planie, czyta najnowsze wydanie i gdy jest nowsze niż zainstalowane
+  `versionName`, pobiera APK, weryfikuje SHA-256 i certyfikat podpisu i instaluje przez `PackageInstaller`, raz na
+  wersję (`attempted`) i rezygnuje z wersji po 3 nieudanych próbach. Tuż przed instalacją ponownie sprawdza, czy
+  aplikacja nadal jest w tle. Powiadomienia mają własny kanał „Aktualizacje”. Bez zgody „instaluj nieznane aplikacje” tylko pokazuje powiadomienie „Dostępne Ripplo X.
+  Otwórz aplikację, aby zaktualizować.” (raz na wersję). Jeśli system prosi o potwierdzenie
+  (`STATUS_PENDING_USER_ACTION`), a nie ma UI, `InstallReceiver` pokazuje „Aktualizacja gotowa. Dotknij, aby
+  zainstalować.”, którego dotknięcie otwiera systemowe potwierdzenie.
+- W aplikacji: przy starcie i wznowieniu (najwyżej co 10 min) JS sprawdza wydanie; gdy jest nowsze, pokazuje okno
+  „Dostępna aktualizacja X. Zaktualizować teraz? / Później” (najwyżej raz na 6 h), niezależnie od ustawienia
+  automatycznej aktualizacji. Android instaluje z okna; pozostałe platformy otwierają stronę wydania.
 - Po samoaktualizacji system zamyka aplikację. `UpdatedReceiver` (`MY_PACKAGE_REPLACED`) uruchamia ponownie
   `MainActivity` po każdej aktualizacji pakietu. Android 10+ może zablokować
   start aktywności z tła, więc dodatkowo pokazuje powiadomienie „Ripplo zostało zaktualizowane. Dotknij, aby otworzyć.”,
@@ -353,3 +429,33 @@ src/services/*              updater, notifications, permissions, scheduler, them
 `safetyNumber(id)`, `sendText(chatId, text)`, `sendAttachment(chatId, file, kind)`,
 `retry(msgId)`, `loadMessages(chatId)`, `markRead(chatId)`, `createGroup(name, memberIds)`,
 `refreshPeople()`, `deleteChat(chatId)`, `deleteContact(id)`.
+
+
+## 13. Połączenia głosowe (tylko łącza bezpośrednie, najpierw Android)
+
+Sygnalizacja to wiadomość szyfrowana Signalem (zwykła ścieżka DATA, od kontaktu, który nie jest oczekującą prośbą):
+`{ "t": "call", "k": "offer"|"accept"|"decline"|"end", "id": <b64 8 bajtów>, "key"?: <b64 32 bajty>, "r"?: "busy" }`.
+Tylko `offer` niesie `key`, losowy 32-bajtowy klucz rozmowy, więc przekaźniki go nie widzą. Odbiorca dzwoni 45 s
+(potem `missed`); `decline` z `r: "busy"` odpowiada na ofertę, gdy już trwa rozmowa (dwa telefony dzwoniące do siebie
+naraz dostają „Zajęty”). Oferta niesie `ts`; starsza niż 120 s jest ignorowana (oferta, która leżała w skrzynce, nie dzwoni z opóźnieniem). Połączenia są
+przyjmowane tylko od kontaktów, które dodałeś, zaakceptowałeś lub do których pisałeś; obcy, który tylko napisał pierwszy, nie
+zadzwoni. Obie strony zapisują w czacie linię systemową (nieodebrane, odrzucone, czas trwania).
+
+Dźwięk idzie jako pakiety APP link-local do sąsiada, którego karta z hello to kontakt, więc połączenie wymaga łącza
+bezpośredniego (LAN, Wi-Fi Direct/Aware, L2CAP, BLE); w przeciwnym razie przycisk Zadzwoń to mówi. Ładunek (pierwszy bajt
+`0x01`, JSON-owe ładunki APP zaczynają się od `{`):
+`0x01 | callId(8) | seq u32 | AES-256-GCM(callKey, nonce = role(1) 0 0 0 | seq u32 | 0 0 0 0, AAD = callId | seq, frames)`
+gdzie `role` 0 = dzwoniący, 1 = odbierający (więc dwa kierunki nigdy nie używają tego samego nonce) oraz
+`frames = count u8 | (len u16 | opus)*`, najwyżej 8 ramek po najwyżej 1275 bajtów. Odbiorca odszyfrowuje rolą
+partnera, potem przyjmuje każde `seq` raz w oknie 64 pakietów; wszystko nieuwierzytelnione, z innej rozmowy, powtórzone lub
+zniekształcone jest po cichu odrzucane.
+
+Audio (JS, WebCodecs): mikrofon z usuwaniem echa, redukcją szumu i AGC przy 48 kHz, `AudioWorklet`
+(`public/call-worklet.js`) tnie 20 ms ramki, `AudioEncoder` Opus 16 kb/s, trzy ramki na pakiet (około 17
+pakietów i 4,5 kB/s w każdą stronę), `AudioDecoder` i bufor jitter 100 ms po stronie odtwarzania; ramki, które
+stałyby w kolejce dalej niż 400 ms, są porzucane. Wyciszenie wyłącza ścieżkę, więc cisza jest nadal wysyłana i podtrzymuje łącze.
+Rozmowa kończy się `lost` po 6 s bez uwierzytelnionej ramki (30 s przed pierwszą, gdy u rozmówcy może być otwarte pytanie o
+mikrofon) albo gdy sąsiad zniknie.
+
+Jeszcze nie: dzwonienie przy zamkniętej aplikacji, rozmowy przez kilka telefonów, iOS (ścieżka WebCodecs nietestowana).
+iOS nigdy nie zadzwoni do zamkniętej aplikacji bez pusha od Apple, a on wymaga serwera.

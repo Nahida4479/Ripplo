@@ -1,9 +1,9 @@
 <script setup>
 import { ref, computed, watch, nextTick, onMounted, onBeforeUnmount } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ChevronLeft, Lock, Check, CheckCheck, CloudOff, CircleAlert, Plus, Mic, Send, X, Play, Pause, ShieldAlert } from 'lucide-vue-next'
+import { ChevronLeft, Phone, Lock, Check, CheckCheck, CloudOff, CircleAlert, Plus, Mic, Send, X, Play, Pause, ShieldAlert } from 'lucide-vue-next'
 import { state } from '../core/state.js'
-import { loadMessages, markRead, sendText, sendAttachment, retry, verifyNearby, markVerified, MAX_TEXT, MAX_FILE } from '../core/api.js'
+import { startCall, loadMessages, markRead, sendText, sendAttachment, retry, verifyNearby, markVerified, MAX_TEXT, MAX_FILE } from '../core/api.js'
 import { ui, toast } from '../components/ui.js'
 import { t, locale } from '../i18n.js'
 import Avatar from '../components/Avatar.vue'
@@ -14,6 +14,10 @@ const chat = computed(() => state.chats.find(c => c.id === id))
 const contact = computed(() => state.contacts[id])
 const name = computed(() => chat.value?.name || contact.value?.name || '')
 const isGroup = computed(() => chat.value?.type === 'group')
+const mediaLocked = computed(() => !isGroup.value && !!contact.value && contact.value.addedVia !== 'incoming' && !contact.value.cardAck)
+const fail = e => toast(e.code === 'media_locked' ? t('err_media_locked') : e.message)
+const canCall = computed(() => !isGroup.value && !!contact.value && !contact.value.request && (contact.value.addedVia !== 'incoming' || !!contact.value.cardSent))
+async function call() { try { await startCall(id) } catch (e) { toast(t('err_' + (e.code || 'call_unsupported'))) } }
 const msgs = computed(() => state.messages[id] || [])
 const text = ref('')
 const scroller = ref(null)
@@ -34,7 +38,9 @@ const day = ts => new Date(ts).toDateString()
 const dayLabel = ts => new Date(ts).toLocaleDateString(locale.value, { weekday: 'long', day: 'numeric', month: 'long' })
 const time = ts => new Date(ts).toLocaleTimeString(locale.value, { hour: '2-digit', minute: '2-digit' })
 const showDay = i => i === 0 || day(msgs.value[i - 1].ts) !== day(msgs.value[i].ts)
-const bars = m => [...m.id].map((c, i) => 6 + ((c.charCodeAt(0) * (i + 3)) % 18)).slice(0, 28)
+const bars = m => m.att?.wave?.length
+  ? m.att.wave.map(v => 4 + Math.round(v / 255 * 22))
+  : [...m.id].map((c, i) => 6 + ((c.charCodeAt(0) * (i + 3)) % 18)).slice(0, 28)
 const dur = s => `${Math.floor((s || 0) / 60)}:${String(Math.round((s || 0) % 60)).padStart(2, '0')}`
 
 function toBottom() { nextTick(() => scroller.value && (scroller.value.scrollTop = scroller.value.scrollHeight)) }
@@ -52,25 +58,64 @@ async function pickFile(e) {
   e.target.value = ''
   if (!f) return
   if (f.size > MAX_FILE) return toast(t('fileTooBig'))
-  try { await sendAttachment(id, f, f.type.startsWith('video') ? 'video' : 'image') } catch (err) { toast(err.message) }
+  try { await sendAttachment(id, f, f.type.startsWith('video') ? 'video' : 'image') } catch (err) { fail(err) }
 }
 
 const rec = ref(false)
 const recSec = ref(0)
-let recorder, chunks, tick, cancelled
+const live = ref([])
+const MIMES = ['audio/webm;codecs=opus', 'audio/mp4', 'audio/ogg;codecs=opus', 'audio/webm']
+const WAVE_BARS = 40
+let recorder, chunks, tick, cancelled, actx, meter, samples, startedAt
+function summarize() {
+  if (!samples.length) return { peak: null, wave: undefined }
+  const peak = Math.max(...samples)
+  const size = samples.length / WAVE_BARS
+  const wave = Array.from({ length: Math.min(WAVE_BARS, samples.length) }, (_, i) => {
+    const part = samples.slice(Math.floor(i * Math.max(size, 1)), Math.max(Math.floor((i + 1) * Math.max(size, 1)), Math.floor(i * Math.max(size, 1)) + 1))
+    return Math.round(Math.max(...part) / (peak || 1) * 255)
+  })
+  return { peak, wave }
+}
+function stopMeter() {
+  clearInterval(meter)
+  actx?.close().catch(() => {})
+  actx = null
+}
 async function startRec() {
+  if (mediaLocked.value) return toast(t('err_media_locked'))
   try {
     const s = await navigator.mediaDevices.getUserMedia({ audio: true })
-    recorder = new MediaRecorder(s); chunks = []; cancelled = false
-    recorder.ondataavailable = e => chunks.push(e.data)
+    const mimeType = MIMES.find(m => MediaRecorder.isTypeSupported(m))
+    recorder = new MediaRecorder(s, mimeType ? { mimeType } : undefined); chunks = []; cancelled = false; samples = []; live.value = []
+    try {
+      actx = new AudioContext()
+      await actx.resume()
+      const an = actx.createAnalyser()
+      an.fftSize = 512
+      actx.createMediaStreamSource(s).connect(an)
+      const buf = new Uint8Array(an.fftSize)
+      meter = setInterval(() => {
+        an.getByteTimeDomainData(buf)
+        let peak = 0
+        for (const v of buf) peak = Math.max(peak, Math.abs(v - 128) / 128)
+        samples.push(peak)
+        live.value = [...live.value, 3 + Math.round(Math.min(1, peak * 2.5) * 22)].slice(-32)
+      }, 100)
+    } catch { actx = null }
+    recorder.ondataavailable = e => { if (e.data?.size) chunks.push(e.data) }
     recorder.onstop = async () => {
       s.getTracks().forEach(x => x.stop())
+      stopMeter()
       if (cancelled || !chunks.length) return
-      const blob = new Blob(chunks, { type: recorder.mimeType })
+      const seconds = Math.max(1, Math.round((Date.now() - startedAt) / 1000))
+      const blob = new Blob(chunks, { type: recorder.mimeType || mimeType || 'audio/webm' })
+      const { peak, wave } = summarize()
+      if (blob.size < 800 || (peak !== null && peak < 0.02)) return toast(t('noSound'))
       if (blob.size > MAX_FILE) return toast(t('fileTooBig'))
-      try { await sendAttachment(id, blob, 'voice') } catch (err) { toast(err.message) }
+      try { await sendAttachment(id, blob, 'voice', { duration: seconds, wave }) } catch (err) { fail(err) }
     }
-    recorder.start(); rec.value = true; recSec.value = 0
+    recorder.start(250); startedAt = Date.now(); rec.value = true; recSec.value = 0
     tick = setInterval(() => recSec.value++, 1000)
   } catch { toast(t('micDenied')) }
 }
@@ -78,6 +123,7 @@ function stopRec(cancel) {
   cancelled = cancel
   clearInterval(tick); rec.value = false
   if (recorder?.state === 'recording') recorder.stop()
+  else stopMeter()
 }
 onBeforeUnmount(() => rec.value && stopRec(true))
 
@@ -88,6 +134,7 @@ function play(m) {
   if (playing.value === m.id) { playing.value = null; return }
   audio = new Audio(m.att.url)
   audio.onended = () => { playing.value = null }
+  audio.onerror = () => { playing.value = null; toast(t('playFailed')) }
   audio.play().catch(() => toast(t('playFailed')))
   playing.value = m.id
 }
@@ -106,6 +153,7 @@ function sure() { ui.confirm = { title: t('imSure'), text: t('imSureConfirm'), o
         <Avatar :name="name" :photo="contact?.avatar" :size="38" :group="isGroup" />
         <span><b>{{ name }}</b><br /><small>{{ sub }}</small></span>
       </button>
+      <button v-if="canCall" class="icon-btn" style="margin-left: auto" :aria-label="t('callAction')" :disabled="!!state.call" @click="call"><Phone :size="22" /></button>
     </header>
 
     <div v-if="banner" class="banner" :class="banner" role="alert">
@@ -158,11 +206,11 @@ function sure() { ui.confirm = { title: t('imSure'), text: t('imSureConfirm'), o
     <footer class="comp">
       <template v-if="rec">
         <button class="icon-btn" :aria-label="t('cancel')" @click="stopRec(true)"><X :size="22" /></button>
-        <span class="recd"><i /> {{ dur(recSec) }}</span>
+        <span class="recd"><i /> {{ dur(recSec) }}<span class="wave live" aria-hidden="true"><i v-for="(h, k) in live" :key="k" :style="{ height: h + 'px' }" /></span></span>
         <button class="send" :aria-label="t('send')" @click="stopRec(false)"><Send :size="20" /></button>
       </template>
       <template v-else>
-        <button class="icon-btn" :aria-label="t('attach')" @click="fileIn.click()"><Plus :size="22" /></button>
+        <button class="icon-btn" :aria-label="t('attach')" @click="mediaLocked ? toast(t('err_media_locked')) : fileIn.click()"><Plus :size="22" /></button>
         <input ref="fileIn" type="file" accept="image/*,video/*" hidden @change="pickFile" />
         <div class="box">
           <textarea v-model="text" rows="1" :placeholder="t('message')" :aria-label="t('message')" @keydown.enter.exact.prevent="send" @input="e => { e.target.style.height = 'auto'; e.target.style.height = e.target.scrollHeight + 'px' }" />
@@ -212,5 +260,7 @@ function sure() { ui.confirm = { title: t('imSure'), text: t('imSureConfirm'), o
 .box small.over { color: var(--danger); }
 .send { width: 44px; height: 44px; border-radius: 50%; background: var(--accent); color: var(--on-accent); display: grid; place-items: center; flex: none; }
 .recd { flex: 1; display: flex; align-items: center; gap: 8px; }
-.recd i { width: 10px; height: 10px; border-radius: 50%; background: var(--danger); }
+.recd .live { flex: 1; justify-content: flex-end; height: 28px; color: var(--accent); }
+.recd .live i { width: 3px; height: auto; border-radius: 2px; background: currentColor; }
+.recd > i { width: 10px; height: 10px; border-radius: 50%; background: var(--danger); }
 </style>

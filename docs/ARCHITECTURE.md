@@ -239,6 +239,14 @@ a failed send resets `nameSent`. The receiver applies `nm` after `cleanName` (�
 the same-name conflict check. Names inside cards are NOT signed, so a name from a card, `hello` or
 `REPLY` never overrides the name of an existing contact. The `ripploId` and keys do not change.
 
+### Voice messages
+
+Recorded with `MediaRecorder` (`audio/webm;codecs=opus`, else `audio/mp4`, `audio/ogg`), 250 ms slices. A live
+level meter (WebAudio analyser) feeds both the recording bars and `wave`, up to 64 bytes (40 used), each
+0-255 relative to the loudest sample. The real duration is measured, not read from the Blob. The pointer message
+carries `duration` (s, ≤ 3600) and `wave` (base64, ≤ 96 chars); the receiver validates both and draws the bars from
+`wave`. A recording shorter than ~800 bytes or with peak < 0.02 is not sent ("No sound was recorded").
+
 ### Profile picture
 
 Optional, set in Settings → Profile: cropped to a 160×160 JPEG, ≤ 16 KiB, stored in `kv/profile.avatar`
@@ -254,15 +262,60 @@ strangers). It travels only as the field `av` of a Signal-encrypted message, so 
 
 ## 6. Link-local APP messages (JSON)
 
-- `{ "t": "hello", "card": "<b64 card bytes>" }` — sent on every new neighbor; fills the People tab "nearby"
-  section and enables the nearby proof.
+- `{ "t": "hello", "card": "<b64 card bytes>", "r": 1? }` — sent on every new neighbor; fills the People tab "nearby"
+  section and enables the nearby proof. `r` = "I do not have your card yet, answer": the receiver replies with a hello
+  without `r`. A sender that still lacks the neighbor's card retries with `r` after 3, 10 and 30 s, and a hello that
+  arrives before the neighbor event is cached per node, so discovery is symmetric. When the user is hidden (below),
+  hellos are sent only to neighbors whose card belongs to a contact (one answer per link, so two hidden contacts
+  do not ping-pong).
 - `{ "t": "challenge" ... }`, `{ "t": "proof" ... }` — section 5.
+
+## 6.1 Invitations (People tab)
+
+Instead of adding a stranger directly, "Invite" sends a request; the other person accepts or declines.
+Everything is Signal-encrypted; the card rides along as the usual `c` piggyback.
+- Sender: stores a contact with `request: "out"` (no chat yet) and sends `{ "t": "invite" }`. A failed
+  delivery sets `inviteFailed` and the row offers Retry.
+- Receiver: an `invite` from an unknown sender creates a contact with `request: "in"` and no chat, plus a
+  notification. The number of pending requests is unlimited (the 20-person limit applies only to searching). From a `request: "in"` contact every message except `invite`
+  is dropped. Chats tab → "Requests" (under the search field) shows Accept / Decline.
+- Accept: the request flag is cleared, the chat is created, a nearby verification starts, `{ "t": "accept" }` is sent.
+  Decline: `{ "t": "decline" }` is sent, then the contact and its session are deleted; the sender removes the
+  pending contact. Any other message from a `request: "out"` contact, or a mutual `invite`, counts as acceptance.
+- Contacts with a request flag are hidden from New chat, cannot be put in groups, never receive profile pushes (`profile`,
+  `hello` re-sends) and get a bare `{ "t": "decline" }` without card, name or photo. Writing to someone you only invited
+  is refused, and scanning the QR or opening the link of someone who invited you accepts the request.
+  Anyone not yet in your contacts can still open a normal chat by writing first (QR/link flow); they can send text,
+  but no call rings (§13) and no media pointer is accepted until you have written back. The mirror rule holds for the sender:
+  `sendAttachment` in a direct chat throws `media_locked` until the other person has answered (`cardAck`), unless they wrote
+  first (`addedVia: "incoming"`); text is always allowed. Groups are not gated.
 
 ## 7. People tab (mesh-wide discovery)
 
 DISCOVER payload = `{ "t": "who" }`; every node answers with REPLY payload = its card bytes (§1).
-Refreshed automatically once every 24 h between 02:00 and 05:00 local time, or when the user taps
-refresh. DISCOVER floods the whole mesh, hence the nightly schedule. A person added from here is
+Settings → Profile → "Visible in Find people" (on by default). Off: DISCOVER is not answered (the node still
+forwards it) and hello is sent only to accepted contacts (§6). Limits: a neighbor that replays a contact's public card gets your
+hello back, so presence is not hidden from an active attacker, and two hidden contacts do not find each other nearby (neither
+sends first), so they cannot verify nearby or call.
+
+DISCOVER payload: `{ "t": "who", "h"?: n, "lo"?: n, "q"?: hash }`. `h` / `lo` = answer only when the distance `d`
+(links from the requester, `packet.hops + 1`) satisfies `lo < d <= h`; `q` = `b64url(SHA-256("ripplo-find-v1\0" | norm)[0..8])`
+where `norm` is the NFKC-lowercased, whitespace-collapsed name, or the ripploId without dashes in upper case; a node
+answers only when `q` equals the hash of its own name or id. Searching therefore needs the exact full name or id. The hash is short and unsalted, so it hides the name only from casual
+observers: whoever guesses the name (or already holds the card from an earlier REPLY, for an id) can match it. It is not a
+privacy guarantee. The requester also checks every reply against the query.
+The list of an automatic or manual refresh holds at most 20 people and is searched in rings (h = 1, 3, 8, then
+unbounded; each ring is a separate DISCOVER, the next one only when fewer than 20 were found). Inside the list the
+nearest win: when it is full, a reply with fewer hops replaces the farthest person and the list stays sorted by hops.
+A name search keeps at most 50 matches, shows them instead of the list, and clearing it restores the previous list.
+
+Refreshed automatically once a night, or when the user taps refresh. DISCOVER floods the whole mesh, hence
+the schedule: the 02:00-05:00 local window is cut into 720 slots of 15 s and each phone owns the slot
+`parseInt(tag[0..4 bytes]) mod 720` (stable, so phones scan one after another instead of all at once). A phone that
+was asleep at its slot scans as soon as the app wakes inside the window, at most once per 20 h.
+The search ends after 30 s, or earlier when the aggregated DEAD_END has arrived and no REPLY came for 10 s
+(a leaf phone dead-ends immediately but its REPLY is built by JS a moment later, so a dead end alone must not
+end the search), or at once when the DISCOVER reached no neighbor. A person added from here is
 unverified (a relay could have swapped the card) and gets the same warning as an invite link.
 
 ## 8. Message lifecycle (what the sender sees)
@@ -289,6 +342,8 @@ Binary values are base64 (standard) strings; node tags are lowercase hex.
 | `selfHash` | → `{ sha256 }` hex of the installed APK (Android only) |
 | `installUpdate` | `{ url, sha256, prompt? }` → `{ status }` — download, verify SHA-256 + signing cert, install. Rejects `install_permission` (before downloading) when "install unknown apps" is not allowed for Ripplo; with `prompt` it opens that settings screen |
 | `requestBatteryExemption` | – (Android) |
+| `takeShare` | → `{ share? }` — pending Android share-sheet content, cleared after reading |
+| `setAutoUpdate` | `{ enabled }` — Android: stores the setting and schedules / cancels the background update job (§10) |
 | `checkPermissions` / `requestPermissions` | aliases `bluetooth`, `wifi`, `notifications`; the result also has `battery` (`granted` when exempt from battery optimization, Android only; not required to continue) |
 | `signalInit` | → `{ bundle, ik }` — creates the identity on first call, then returns the same bundle (§1) |
 | `signalAddContact` | `{ bundle }` → `{ tag }` — verifies both prekey signatures, runs `processPreKeyBundle` (PQXDH), saves the identity |
@@ -302,7 +357,14 @@ All `signal*` calls run on one serial queue in the native `SignalCore`. Errors r
 `bad_bundle`, `no_session`, `bad_message`, `untrusted_identity`.
 
 Events (`addListener`): `packet` `{ packet, from }` (from = node hex, `"self"` for deliveries of
-JS-originated traffic), `neighbor` `{ node, up, medium, kbps }`, `updateProgress` `{ progress }`.
+JS-originated traffic), `neighbor` `{ node, up, medium, kbps }`, `updateProgress` `{ progress }`, `share` `{}` (a share arrived, call `takeShare`).
+
+Share target (Android): `MainActivity` accepts `ACTION_SEND` for `text/plain`, `image/*`, `video/*`, `audio/*`. The
+plugin reads it on start and on `onNewIntent`, accepts only `content://` URIs of other apps (never `file://` or
+Ripplo's own provider), copies the stream (≤ 20 MiB) into `cache/share` and keeps one pending share;
+`takeShare` → `{ share?: { kind: text|image|video|voice, text | mime + path } }` returns and clears it. JS shows
+"Send to…" (chats and groups, not pending requests) once the app is unlocked; picking a chat sends the text or
+attachment right away and opens that chat. Nothing is sent without that pick. iOS has no share extension yet.
 
 When no JS listener is attached the engine keeps packets for self in a persisted inbox (max 2000)
 and shows a content-free notification *"New message"* for `0x01` payloads.
@@ -319,6 +381,20 @@ and shows a content-free notification *"New message"* for `0x01` payloads.
   `SHA256SUMS` block in the release notes); `SHA256SUMS` is never fetched from the WebView because
   github.com download redirects carry no CORS headers. The current version is the native
   `versionName` (`App.getInfo()`), not the bundled `package.json` version.
+- Background updates (Android, setting "Update automatically", on by default): `UpdateJobService`
+  (`JobScheduler`, every 6 h, unmetered network, battery not low, persisted over reboot; re-scheduled by
+  `UpdatedReceiver`) runs `UpdateEngine.background` in native code even when the app is closed. It skips
+  while the app is in the foreground, reads the latest release, and when it is newer than the installed
+  `versionName` downloads the APK, verifies SHA-256 and signing certificate and installs via
+  `PackageInstaller`, once per version (`attempted`) and gives up on a version after 3 failed attempts. It
+  re-checks that the app is still in the background right before the install. Notices use their own
+  "Updates" channel. Without the "install unknown apps" permission it only
+  posts a notification "Ripplo X is available. Open the app to update." (once per version). If the system
+  asks for confirmation (`STATUS_PENDING_USER_ACTION`) with no UI around, `InstallReceiver` posts
+  "Update ready. Tap to install." whose tap opens the system confirmation.
+- In the app: on start and on resume (at most every 10 min) JS checks for a release; when one is newer it
+  shows a dialog "Update X available. Update now? / Later" (at most once per 6 h), regardless of the
+  automatic-update setting. Android installs from the dialog; other platforms open the release page.
 - After a self-update the system kills the app. `UpdatedReceiver` (`MY_PACKAGE_REPLACED`) relaunches
   `MainActivity` after every update of the package. Android 10+ may block starting an
   activity from the background, so it also posts a "Ripplo was updated. Tap to open." notification,
@@ -405,7 +481,11 @@ rejected.
 Destinations: manual = system "Save as" (Android `ACTION_CREATE_DOCUMENT`, iOS document picker) —
 the user can pick Google Drive, iCloud Drive, Proton Drive, a USB stick. Automatic = a folder picked
 once (Android `ACTION_OPEN_DOCUMENT_TREE` with a persisted permission, iOS security-scoped bookmark),
-written at most once per 24 h when the app is opened; keeps the last 3 files.
+written at most once per 24 h when the app is opened. Both automatic and "Back up now" (when a folder is set) write
+the single file `Ripplo-backup.rbk` and replace the previous one: the new copy is written to `Ripplo-backup.rbk.tmp`
+first, then the old file is deleted and the temp file renamed (iOS: `replaceItemAt`), so a failed write never
+destroys the last good backup. Without a folder "Back up now" opens "Save as" and creates a timestamped file.
+Timestamped files from older versions are left alone.
 
 Restore (onboarding → "Restore from backup"): pick file → enter code → [second factor] → native
 wipes local state, writes the DB key, Signal records and rows, restarts JS. Because the Signal
@@ -430,3 +510,33 @@ A passkey or security key that supports the WebAuthn PRF extension (CTAP2 `hmac-
 Password Manager, a password manager acting as a credential provider (e.g. Proton Pass), or a YubiKey.
 Its PRF output for `prfSalt` is mixed into `backupKey` (§12.2). Created while enabling backups with
 a "skip" option; the OS asks where to save it. Details depend on provider support (see README).
+
+
+## 13. Voice calls (direct links only, Android first)
+
+Signalling is a Signal-encrypted message (normal DATA path, from a contact that is not a pending request):
+`{ "t": "call", "k": "offer"|"accept"|"decline"|"end", "id": <b64 8 bytes>, "key"?: <b64 32 bytes>, "r"?: "busy" }`.
+Only `offer` carries `key`, a random 32-byte call key, so relays never see it. The callee rings for 45 s
+(`missed` afterwards); `decline` with `r: "busy"` answers an offer while already in a call (two phones calling each
+other at once both get "Busy"). An offer carries `ts`; one older than 120 s is ignored (an offer that sat in the inbox does not ring late). Calls are accepted only
+from contacts you added, accepted, or have written to; a stranger who only wrote first cannot ring you. Both sides write a
+system line in the chat (missed call, declined, duration).
+
+Media goes as link-local APP packets to the neighbor whose hello card is the contact, so the call needs a direct
+link (LAN, Wi-Fi Direct/Aware, L2CAP, BLE); the Call button says so otherwise. Payload (first byte `0x01`, JSON APP
+payloads start with `{`):
+`0x01 | callId(8) | seq u32 | AES-256-GCM(callKey, nonce = role(1) 0 0 0 | seq u32 | 0 0 0 0, AAD = callId | seq, frames)`
+with `role` 0 = caller, 1 = callee (so the two directions never reuse a nonce) and
+`frames = count u8 | (len u16 | opus)*`, at most 8 frames of at most 1275 bytes. The receiver decrypts with the
+peer's role, then accepts each `seq` once inside a 64-packet window; anything unauthenticated, from another call, a replay or
+malformed is dropped silently.
+
+Audio (JS, WebCodecs): microphone with echo cancellation, noise suppression and AGC at 48 kHz, an `AudioWorklet`
+(`public/call-worklet.js`) cuts 20 ms frames, `AudioEncoder` Opus 16 kb/s, three frames per packet (about 17
+packets and 4.5 kB/s each way), `AudioDecoder` and a 100 ms jitter buffer on the playback side; frames that would
+queue more than 400 ms ahead are dropped. Muting disables the track, so silence is still sent and keeps the link alive. The call
+ends with `lost` after 6 s without an authenticated frame (30 s before the first one, while the peer's microphone permission
+prompt may be open) or when the neighbor disappears.
+
+Not yet: ringing while the app is closed, calls across several phones, iOS (the WebCodecs path is untested there).
+iOS can never ring a closed app without Apple push, which needs a server.

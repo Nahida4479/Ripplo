@@ -2,7 +2,10 @@
 <resources>
     <string name="channel_relay">Przekazywanie w tle</string>
     <string name="channel_messages">Wiadomości</string>
+    <string name="channel_updates">Aktualizacje</string>
     <string name="relay_text">Ripplo działa w tle</string>
     <string name="new_message">Nowa wiadomość</string>
+    <string name="update_available">Dostępne Ripplo %1$s. Otwórz aplikację, aby zaktualizować.</string>
+    <string name="update_ready">Aktualizacja gotowa. Dotknij, aby zainstalować.</string>
     <string name="updated_text">Ripplo zostało zaktualizowane. Dotknij, aby otworzyć.</string>
 </resources>

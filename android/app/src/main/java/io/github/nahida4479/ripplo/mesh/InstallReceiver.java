@@ -15,6 +15,11 @@ public class InstallReceiver extends BroadcastReceiver {
             Intent confirm = Build.VERSION.SDK_INT >= 33
                     ? intent.getParcelableExtra(Intent.EXTRA_INTENT, Intent.class)
                     : (Intent) intent.getParcelableExtra(Intent.EXTRA_INTENT);
+            if (confirm != null && (RipploMeshPlugin.installCall == null || !RipploMeshPlugin.foreground)) {
+                confirm.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                Notifier.updateReady(ctx, confirm);
+                return;
+            }
             if (confirm != null) {
                 confirm.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
                 try {

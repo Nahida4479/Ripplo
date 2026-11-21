@@ -10,7 +10,7 @@ enum BackupEngine {
     private static let iterations: UInt32 = 600_000
     private static let chunk = 1 << 20
     private static let maxRecord = 128 << 20
-    private static let keepFiles = 3
+    private static let fixedName = "Ripplo-backup.rbk"
     private static let udLast = "ripplo.backup.lastAt"
     private static let udMark = "ripplo.backup.bookmark"
     private static let udName = "ripplo.backup.folder"
@@ -240,24 +240,18 @@ enum BackupEngine {
         return "Ripplo-backup-" + f.string(from: Date()) + ".rbk"
     }
 
-    private static func prune(_ folder: URL) {
-        let fm = FileManager.default
-        guard let all = try? fm.contentsOfDirectory(at: folder, includingPropertiesForKeys: nil) else { return }
-        let mine = all.filter { $0.lastPathComponent.hasPrefix("Ripplo-backup-") && $0.pathExtension == "rbk" }
-            .sorted { $0.lastPathComponent > $1.lastPathComponent }
-        for u in mine.dropFirst(keepFiles) { try? fm.removeItem(at: u) }
-    }
-
     static func create(mode: String, meta: Data, from vc: UIViewController?, _ done: @escaping (Result<[String: Any], SignalFail>) -> Void) {
         queue.async {
             do {
                 guard let s = secret() else { throw fail("not_enabled") }
-                let name = fileName()
+                let folder = folderURL()
+                let toFolder = mode == "auto" || (mode == "now" && folder != nil)
+                let name = toFolder ? fixedName : fileName()
                 let tmp = FileManager.default.temporaryDirectory.appendingPathComponent(name)
                 let now = Date().timeIntervalSince1970 * 1000
-                if mode == "auto" {
-                    guard let folder = folderURL() else { throw fail("no_folder") }
-                    if now - UserDefaults.standard.double(forKey: udLast) < 24 * 3600 * 1000 {
+                if toFolder {
+                    guard let folder = folder else { throw fail("no_folder") }
+                    if mode == "auto" && now - UserDefaults.standard.double(forKey: udLast) < 24 * 3600 * 1000 {
                         done(.success(["skipped": true]))
                         return
                     }
@@ -267,9 +261,11 @@ enum BackupEngine {
                     let on = folder.startAccessingSecurityScopedResource()
                     defer { if on { folder.stopAccessingSecurityScopedResource() } }
                     let dest = folder.appendingPathComponent(name)
-                    try? FileManager.default.removeItem(at: dest)
-                    try FileManager.default.copyItem(at: tmp, to: dest)
-                    prune(folder)
+                    if FileManager.default.fileExists(atPath: dest.path) {
+                        _ = try FileManager.default.replaceItemAt(dest, withItemAt: tmp)
+                    } else {
+                        try FileManager.default.copyItem(at: tmp, to: dest)
+                    }
                     UserDefaults.standard.set(now, forKey: udLast)
                     done(.success(["ok": true, "name": name, "size": size]))
                 } else {

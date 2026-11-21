@@ -10,7 +10,7 @@ const ok = async () => { const c = ui.confirm; close(); await c.onOk() }
       <h3>{{ ui.confirm.title }}</h3>
       <p>{{ ui.confirm.text }}</p>
       <div class="actions">
-        <button class="btn ghost" @click="close">{{ t('cancel') }}</button>
+        <button class="btn ghost" @click="close">{{ ui.confirm.cancel || t('cancel') }}</button>
         <button class="btn" :class="{ danger: ui.confirm.danger }" @click="ok">{{ ui.confirm.ok }}</button>
       </div>
     </div>

@@ -12,7 +12,7 @@ const router = useRouter()
 const group = computed(() => ui.newChat === 'group')
 const name = ref('')
 const picked = ref([])
-const contacts = computed(() => Object.values(state.contacts).sort((a, b) => a.name.localeCompare(b.name)))
+const contacts = computed(() => Object.values(state.contacts).filter(c => !c.request).sort((a, b) => a.name.localeCompare(b.name)))
 const close = () => { ui.newChat = null; name.value = ''; picked.value = [] }
 
 async function pick(c) {

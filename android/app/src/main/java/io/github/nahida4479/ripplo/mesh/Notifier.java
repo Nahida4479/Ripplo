@@ -18,9 +18,11 @@ import io.github.nahida4479.ripplo.R;
 final class Notifier {
     static final String CH_RELAY = "mesh_relay";
     static final String CH_MESSAGES = "messages";
+    static final String CH_UPDATES = "updates";
     static final int ID_RELAY = 4101;
     static final int ID_MESSAGE = 4102;
     static final int ID_UPDATED = 4103;
+    static final int ID_UPDATE_INFO = 4104;
 
     private Notifier() { }
 
@@ -32,6 +34,7 @@ final class Notifier {
         nm.createNotificationChannel(relay);
         NotificationChannel msg = new NotificationChannel(CH_MESSAGES, ctx.getString(R.string.channel_messages), NotificationManager.IMPORTANCE_HIGH);
         nm.createNotificationChannel(msg);
+        nm.createNotificationChannel(new NotificationChannel(CH_UPDATES, ctx.getString(R.string.channel_updates), NotificationManager.IMPORTANCE_DEFAULT));
     }
 
     private static PendingIntent open(Context ctx) {
@@ -70,7 +73,35 @@ final class Notifier {
         }
     }
 
+    private static void post(Context ctx, int id, String text, PendingIntent target) {
+        if (Build.VERSION.SDK_INT >= 33
+                && ContextCompat.checkSelfPermission(ctx, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) return;
+        createChannels(ctx);
+        Notification n = new NotificationCompat.Builder(ctx, CH_UPDATES)
+                .setSmallIcon(R.drawable.ic_stat_ripplo)
+                .setContentTitle(ctx.getString(R.string.app_name))
+                .setContentText(text)
+                .setAutoCancel(true)
+                .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+                .setContentIntent(target)
+                .build();
+        try {
+            NotificationManagerCompat.from(ctx).notify(id, n);
+        } catch (SecurityException ignored) {
+        }
+    }
+
+    static void updateAvailable(Context ctx, String tag) {
+        post(ctx, ID_UPDATE_INFO, ctx.getString(R.string.update_available, tag), open(ctx));
+    }
+
+    static void updateReady(Context ctx, Intent confirm) {
+        PendingIntent pi = PendingIntent.getActivity(ctx, 1, confirm, PendingIntent.FLAG_IMMUTABLE | PendingIntent.FLAG_UPDATE_CURRENT);
+        post(ctx, ID_UPDATE_INFO, ctx.getString(R.string.update_ready), pi);
+    }
+
     static void cancelUpdated(Context ctx) {
+        NotificationManagerCompat.from(ctx).cancel(ID_UPDATE_INFO);
         NotificationManagerCompat.from(ctx).cancel(ID_UPDATED);
     }
 

@@ -3,6 +3,7 @@ import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { QrCode, Pencil, Mic, Waves } from 'lucide-vue-next'
 import { state } from '../core/state.js'
+import { acceptRequest, declineRequest } from '../core/api.js'
 import { ui } from '../components/ui.js'
 import { t } from '../i18n.js'
 import Avatar from '../components/Avatar.vue'
@@ -10,6 +11,7 @@ import Avatar from '../components/Avatar.vue'
 const router = useRouter()
 const q = ref('')
 const list = computed(() => state.chats.filter(c => c.name.toLowerCase().includes(q.value.toLowerCase())))
+const requests = computed(() => Object.values(state.contacts).filter(c => c.request === 'in' && c.name.toLowerCase().includes(q.value.toLowerCase())))
 const shield = c => c.type === 'direct' && state.contacts[c.id]?.verification === 'none'
 const fmt = ts => {
   if (!ts) return ''
@@ -30,7 +32,19 @@ const fmt = ts => {
       <button class="icon-btn" :aria-label="t('newChat')" @click="ui.newChat = 'chat'"><Pencil :size="22" :stroke-width="1.75" /></button>
     </header>
     <input v-model="q" class="field search" type="search" :placeholder="t('search')" :aria-label="t('search')" />
-    <div v-if="!state.chats.length" class="center">
+    <section v-if="requests.length" :aria-label="t('requests')">
+      <h2 class="section">{{ t('requests') }} · {{ requests.length }}</h2>
+      <div v-for="c in requests" :key="c.id" class="list-row">
+        <Avatar :name="c.name" :photo="c.avatar" :shield="true" />
+        <span class="grow">
+          <span class="name" style="display: block">{{ c.name }}</span>
+          <span class="prev">{{ t('wantsToAdd') }}</span>
+        </span>
+        <button class="btn sm ghost" @click="declineRequest(c.id)">{{ t('decline') }}</button>
+        <button class="btn sm" @click="acceptRequest(c.id)">{{ t('accept') }}</button>
+      </div>
+    </section>
+    <div v-if="!state.chats.length && !requests.length" class="center">
       <Waves :size="72" :stroke-width="1" color="var(--accent)" />
       <p>{{ t('emptyChats') }}</p>
       <button class="btn" @click="ui.add = { mode: 'add' }">{{ t('addContact') }}</button>

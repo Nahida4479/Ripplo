@@ -1,11 +1,14 @@
 import { sha256 } from '@noble/hashes/sha2.js'
 import { TYPE, newId, encodePacket, decodePacket } from '../mesh/packet.js'
-import { b64, unb64, hex, unhex, utf8, unutf8, concat, random, equal } from '../lib/bytes.js'
+import { b64, b64url, unb64, hex, unhex, utf8, unutf8, concat, random, equal } from '../lib/bytes.js'
 import { createVault } from '../crypto/vault.js'
 import { openDb } from '../crypto/db.js'
 import { RipploError, encodeCard, checkCard, encodeLink, parseLink, deriveIds, cleanName } from '../crypto/identity.js'
 import { CHUNK, encryptFile, decryptFile, chunkCount, chunkPayload, parseChunk } from '../crypto/attachment.js'
 import { isAvatar } from '../lib/avatar.js'
+import { createCalls } from './calls.js'
+import { FRAME_TAG } from '../crypto/callFrame.js'
+import { createAudio, audioSupported } from './callAudio.js'
 import { createState } from './state.js'
 import { notify } from '../services/notifications.js'
 import { t } from '../i18n.js'
@@ -17,12 +20,17 @@ const MAX_PENDING = 100 * 1024 * 1024
 const PENDING_TTL = 24 * 3600 * 1000
 const MAX_CHUNKS = 700
 const MAX_GROUP = 30
+const MAX_WAVE = 64
+const MAX_SCAN = 20
+const MAX_SEARCH = 50
+const RINGS = [1, 3, 8, 255]
+const MAX_HELLOS = 64
 const WINDOW = 4
 const ID_RE = /^[0-9A-HJKMNP-TV-Z]{16}$/
 const WIRE_ID_RE = /^[A-Za-z0-9_-]{1,64}$/
 const KINDS = ['image', 'video', 'voice']
 const RESET_GAP = 10 * 60 * 1000
-const DEFAULT_TIMING = { ack: 300000, discover: 30000, verify: 60000, proof: 5000, poll: 500 }
+const DEFAULT_TIMING = { ack: 300000, discover: 30000, quiet: 10000, ring: 8000, quietRing: 3000, verify: 60000, proof: 5000, poll: 500 }
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
 const latin1 = (bytes) => Array.from(bytes, (b) => String.fromCharCode(b)).join('')
@@ -32,7 +40,7 @@ const safeMime = (m) => {
   return /^(image|video|audio)\/[a-z0-9.+-]{1,40}$/.test(base) ? base : 'application/octet-stream'
 }
 
-export function createCore({ mesh, dbName = 'ripplo', state = createState(), notifier = notify, timing = {} }) {
+export function createCore({ mesh, dbName = 'ripplo', state = createState(), notifier = notify, timing = {}, audio = { supported: audioSupported, create: createAudio } }) {
   const T = { ...DEFAULT_TIMING, ...timing }
   let db = null
   let own = null
@@ -41,12 +49,16 @@ export function createCore({ mesh, dbName = 'ripplo', state = createState(), not
   let queue = Promise.resolve()
   let pending = {}
   let discover = null
+  let searchText = ''
+  let peopleBase = null
   const loaded = new Set()
   const waits = new Map()
   const proofs = new Map()
   const running = new Map()
   const seenIds = new Set()
   const lastReset = new Map()
+  const helloCards = new Map()
+  const greeted = new Set()
 
   const enqueue = (fn) => { queue = queue.then(fn).catch(() => {}) }
 
@@ -54,6 +66,37 @@ export function createCore({ mesh, dbName = 'ripplo', state = createState(), not
   const persistChat = (c) => db.put('chats', c.id, { ...c })
   const persistMsg = (m) => db.putMsg({ ...m, att: m.att && { ...m.att, url: undefined } })
   const tagOf = (c) => deriveIds(unb64(c.ik)).tag
+  const fmtDur = (ms) => {
+    const s = Math.round(ms / 1000)
+    return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`
+  }
+  const canCall = (c) => !!c && !c.request && (c.addedVia !== 'incoming' || !!c.cardSent)
+  const callTiming = Object.fromEntries(Object.entries({ ring: timing.callRing, silence: timing.callSilence, hold: timing.callHold }).filter(([, v]) => v !== undefined))
+  const calls = createCalls({
+    state,
+    timing: callTiming,
+    supported: audio.supported,
+    newAudio: audio.create,
+    hasNeighbor: (id) => state.neighbors.some((n) => n.card?.id === id),
+    sendMedia: (id, bytes) => {
+      const nb = state.neighbors.find((n) => n.card?.id === id)
+      if (!nb) return false
+      mesh.sendApp(nb.node, bytes).catch(() => {})
+      return true
+    },
+    signal: async (id, body) => {
+      const c = state.contacts[id]
+      if (!c || c.request) return { ok: false }
+      try { return await transmit(await buildPacket(c, body)) } catch { return { ok: false } }
+    },
+    notify: (id) => notifier({ title: state.contacts[id]?.name || '', body: t('incomingCall') }),
+    log: (id, reason, ms) => {
+      if (!state.contacts[id]) return
+      const text = reason === 'ended' ? t('callLog', { time: fmtDur(ms) }) : t('call_' + reason)
+      const m = addMsg({ id: hex(random(16)), chatId: id, from: 'system', ts: Date.now(), status: 'received', text })
+      touchChat(id, text, m.ts)
+    },
+  })
 
   function loadMe(name, avatar = '') {
     const { tag, ripploId } = deriveIds(own.ik)
@@ -95,8 +138,9 @@ export function createCore({ mesh, dbName = 'ripplo', state = createState(), not
   }
 
   function pushProfile() {
-    for (const n of state.neighbors) mesh.sendApp(n.node, utf8(JSON.stringify({ t: 'hello', card: b64(me.card) }))).catch(() => {})
+    for (const n of state.neighbors) sendHello(n.node, false)
     for (const c of Object.values(state.contacts)) {
+      if (c.request) continue
       const fail = () => { c.avSent = c.nameSent = '?' }
       buildPacket(c, { t: 'profile' }).then(transmit).then((r) => { if (!r.ok) fail() }).catch(fail)
     }
@@ -134,15 +178,39 @@ export function createCore({ mesh, dbName = 'ripplo', state = createState(), not
     return db && db.close()
   }
 
+  function sendHello(node, ask) {
+    if (state.settings.hidden) {
+      const id = (state.neighbors.find((n) => n.node === node)?.card || helloCards.get(node))?.id
+      if (!id || !state.contacts[id] || state.contacts[id].request) return
+    }
+    greeted.add(node)
+    mesh.sendApp(node, utf8(JSON.stringify({ t: 'hello', card: b64(me.card), ...(ask && { r: 1 }) }))).catch(() => {})
+  }
+
+  function later(ms, fn) {
+    const timer = setTimeout(fn, ms)
+    if (timer.unref) timer.unref()
+  }
+
   function onNeighbor({ node, up, medium, kbps, rttMs }) {
     const i = state.neighbors.findIndex((n) => n.node === node)
     if (!up) {
       if (i >= 0) state.neighbors.splice(i, 1)
+      helloCards.delete(node)
+      greeted.delete(node)
       return
     }
     if (i >= 0) Object.assign(state.neighbors[i], { medium, kbps, rttMs })
-    else state.neighbors.push({ node, medium, kbps, rttMs })
-    mesh.sendApp(node, utf8(JSON.stringify({ t: 'hello', card: b64(me.card) }))).catch(() => {})
+    else {
+      state.neighbors.push({ node, medium, kbps, rttMs })
+      for (const ms of [3000, 10000, 30000]) later(ms, () => {
+        const nb = state.neighbors.find((n) => n.node === node)
+        if (nb && !nb.card) sendHello(node, true)
+      })
+    }
+    const nb = state.neighbors.find((n) => n.node === node)
+    if (!nb.card && helloCards.has(node)) nb.card = helloCards.get(node)
+    sendHello(node, !nb.card)
   }
 
   function onPacket(bytes, from) {
@@ -159,7 +227,7 @@ export function createCore({ mesh, dbName = 'ripplo', state = createState(), not
         break
       case TYPE.ACK: settle(hex(p.dest), { ok: true, hops: p.hops }); break
       case TYPE.DEAD_END:
-        if (discover && hex(p.dest) === discover.id) discover.finish()
+        if (discover && hex(p.dest) === discover.id) discover.settle()
         else settle(hex(p.dest), { ok: false })
         break
       case TYPE.DISCOVER: onDiscover(p); break
@@ -203,8 +271,12 @@ export function createCore({ mesh, dbName = 'ripplo', state = createState(), not
     return r
   }
 
-  async function buildPacket(c, extra) {
+  async function buildPacket(c, extra, bare = false) {
     let obj = extra
+    if (bare) {
+      const payload = await mesh.signalSeal(hex(tagOf(c)), utf8(JSON.stringify(obj)))
+      return encodePacket({ type: TYPE.DATA, dest: tagOf(c), payload })
+    }
     if (!c.cardAck) {
       obj = { ...extra, c: b64(me.card) }
       if (!c.cardSent) { c.cardSent = Date.now(); persistContact(c) }
@@ -255,6 +327,7 @@ export function createCore({ mesh, dbName = 'ripplo', state = createState(), not
 
   function recipientsOf(chatId) {
     let chat = state.chats.find((c) => c.id === chatId)
+    if (state.contacts[chatId]?.request) throw new RipploError('no_chat')
     if (!chat && state.contacts[chatId]) chat = ensureChat(chatId, 'direct', state.contacts[chatId].name)
     if (!chat) throw new RipploError('no_chat')
     return chat.type === 'group' ? [...chat.members] : [chatId]
@@ -299,14 +372,18 @@ export function createCore({ mesh, dbName = 'ripplo', state = createState(), not
     return m
   }
 
-  async function sendAttachment(chatId, file, kind) {
+  async function sendAttachment(chatId, file, kind, meta = {}) {
     if (!KINDS.includes(kind)) throw new RipploError('bad_kind')
     if (file.size > MAX_FILE) throw new RipploError('too_big')
+    const peer = state.contacts[chatId]
+    if (peer && peer.addedVia !== 'incoming' && !peer.cardAck) throw new RipploError('media_locked')
     const bytes = new Uint8Array(await file.arrayBuffer())
     const attId = hex(random(16))
     await db.putBin('blobs', attId, bytes)
     const att = { kind, mime: safeMime(file.type), size: bytes.length, attId, url: URL.createObjectURL(file) }
-    if (file.duration) att.duration = file.duration
+    const duration = meta.duration ?? file.duration
+    if (Number.isFinite(duration) && duration > 0) att.duration = Math.min(duration, 3600)
+    if (Array.isArray(meta.wave) && meta.wave.length <= MAX_WAVE) att.wave = meta.wave.map((v) => Math.max(0, Math.min(255, v | 0)))
     const { m, recips } = newOutgoing(chatId, { att, progress: 0 })
     touchChat(chatId, '', m.ts, 0, kind)
     runAttachment(m, bytes, recips).catch(() => { m.status = 'failed'; persistMsg(m) })
@@ -342,7 +419,7 @@ export function createCore({ mesh, dbName = 'ripplo', state = createState(), not
     const g = groupOf(m.chatId)
     const body = {
       t: 'att', id: m.id, attId: hex(attId), kind: m.att.kind, mime: m.att.mime, size: m.att.size,
-      sha256: hex(hash), key: b64(key), chunks: total, ts: m.ts, ...(g && { g }), ...(m.att.duration && { duration: m.att.duration }),
+      sha256: hex(hash), key: b64(key), chunks: total, ts: m.ts, ...(g && { g }), ...(m.att.duration && { duration: m.att.duration }), ...(m.att.wave && { wave: b64(Uint8Array.from(m.att.wave)) }),
     }
     await fanout(m, body, okRecips)
   }
@@ -363,9 +440,13 @@ export function createCore({ mesh, dbName = 'ripplo', state = createState(), not
     const ids = deriveIds(ik)
     const f = ids.ripploId
     if (hex(ids.tag) !== tag || f === me.id) return
-    if (!state.contacts[f]) await addContact({ id: f, name: knownName(f) || `Ripplo ${f.slice(0, 4)}`, ik: b64(ik), card: null, addedVia: 'incoming' })
     const msg = JSON.parse(unutf8(plaintext))
+    if (!state.contacts[f]) {
+      const asking = msg?.t === 'invite'
+      await addContact({ id: f, name: knownName(f) || `Ripplo ${f.slice(0, 4)}`, ik: b64(ik), card: null, addedVia: 'incoming', ...(asking && { request: 'in' }) })
+    }
     const c = state.contacts[f]
+    const fresh = c.request === 'in' && !c.notified
     if (c.cardSent && !c.cardAck) { c.cardAck = true; persistContact(c) }
     if (typeof msg?.av === 'string' && (msg.av === '' || isAvatar(msg.av)) && (c.avatar || '') !== msg.av) {
       c.avatar = msg.av
@@ -380,9 +461,23 @@ export function createCore({ mesh, dbName = 'ripplo', state = createState(), not
     const nm = typeof msg?.nm === 'string' ? cleanName(msg.nm) : ''
     if (nm && nm !== c.name) {
       c.name = nm
-      ensureChat(c.id, 'direct', nm)
+      if (!c.request) ensureChat(c.id, 'direct', nm)
       markConflicts(nm, c.id)
       await persistContact(c)
+    }
+    if (c.request === 'in') {
+      if (msg?.t !== 'invite') return
+      if (fresh) {
+        c.notified = true
+        await persistContact(c)
+        notifier({ title: c.name, body: t('wantsToAdd') })
+      }
+      return
+    }
+    if (c.request === 'out') {
+      if (msg?.t === 'decline') { await deleteContact(f); return }
+      await becomeContact(c, 'people')
+      if (msg?.t === 'invite') buildPacket(c, { t: 'accept' }).then(transmit).catch(() => {})
     }
     await onAppMessage(f, msg)
   }
@@ -413,6 +508,8 @@ export function createCore({ mesh, dbName = 'ripplo', state = createState(), not
       if (!chatId) return
       await receive({ id: `${f}.${msg.id}`, chatId, from: f, text: msg.text }, msg.text)
     } else if (msg.t === 'att') {
+      const sender = state.contacts[f]
+      if (sender && sender.addedVia === 'incoming' && !sender.cardSent) return
       if (!WIRE_ID_RE.test(msg.id) || !/^[0-9a-f]{32}$/.test(msg.attId) || !KINDS.includes(msg.kind) || !/^[0-9a-f]{64}$/.test(msg.sha256)) return
       if (!Number.isInteger(msg.size) || msg.size < 0 || msg.size > MAX_FILE || !Number.isInteger(msg.chunks) || msg.chunks < 1 || msg.chunks > MAX_CHUNKS) return
       if (typeof msg.key !== 'string' || unb64(msg.key).length !== 32 || !routeChat(f, msg.g)) return
@@ -420,6 +517,8 @@ export function createCore({ mesh, dbName = 'ripplo', state = createState(), not
       await tryFinish(msg.attId)
     } else if (msg.t === 'group') {
       await onGroup(f, msg)
+    } else if (msg.t === 'call') {
+      if (canCall(state.contacts[f])) await calls.onSignal(f, msg)
     }
   }
 
@@ -445,14 +544,14 @@ export function createCore({ mesh, dbName = 'ripplo', state = createState(), not
     ensureChat(msg.g, 'group', name, ids.filter((i) => i !== me.id))
   }
 
-  async function addContact({ id, name, ik, card, addedVia }) {
+  async function addContact({ id, name, ik, card, addedVia, request }) {
     state.contacts[id] = {
       id, name, ik, card, verification: 'none', verifiedAt: 0, verifyState: 'idle',
-      addedVia, addedAt: Date.now(), conflict: false,
+      addedVia, addedAt: Date.now(), conflict: false, ...(request && { request }),
     }
     const c = state.contacts[id]
     markConflicts(name, id)
-    ensureChat(id, 'direct', name)
+    if (!request) ensureChat(id, 'direct', name)
     await persistContact(c)
     return c
   }
@@ -467,7 +566,7 @@ export function createCore({ mesh, dbName = 'ripplo', state = createState(), not
     if (!c.card && c.ik === ik) {
       c.card = card
       c.name = v.name
-      ensureChat(c.id, 'direct', c.name)
+      if (!c.request) ensureChat(c.id, 'direct', c.name)
       markConflicts(c.name, c.id)
       await persistContact(c)
     }
@@ -488,7 +587,10 @@ export function createCore({ mesh, dbName = 'ripplo', state = createState(), not
     if (v.id === me.id) throw new RipploError('self')
     const isNew = !state.contacts[v.id]
     const c = await learnCard(v, via)
-    if (!isNew) return c
+    if (!isNew) {
+      if (c.request === 'in') await acceptRequest(c.id)
+      return c
+    }
     const person = state.people.find((p) => p.id === v.id)
     if (person) person.isContact = true
     if (['link', 'qr', 'people'].includes(via)) verifyNearby(v.id).catch(() => {})
@@ -501,18 +603,67 @@ export function createCore({ mesh, dbName = 'ripplo', state = createState(), not
     return addCard(v.card, via)
   }
 
-  const addPerson = (person) => addCard(unb64(person.card), 'people')
+  async function becomeContact(c, via) {
+    delete c.request
+    c.addedVia = via
+    ensureChat(c.id, 'direct', c.name)
+    await persistContact(c)
+    const person = state.people.find((p) => p.id === c.id)
+    if (person) person.isContact = true
+    verifyNearby(c.id).catch(() => {})
+  }
+
+  async function invite(person) {
+    const v = checkCard(unb64(person.card))
+    if (v.id === me.id) throw new RipploError('self')
+    let c = state.contacts[v.id]
+    if (c?.request === 'in') return acceptRequest(c.id)
+    if (c && c.request !== 'out') return c
+    if (!c) {
+      try { await mesh.signalAddContact(v.bundle) } catch { throw new RipploError('bad_link', 'invalid prekey bundle') }
+      c = await addContact({ id: v.id, name: v.name, ik: b64(v.ik), card: b64(v.card), addedVia: 'people', request: 'out' })
+    }
+    c.inviteFailed = false
+    persistContact(c)
+    buildPacket(c, { t: 'invite' }).then(transmit).then((r) => {
+      if (!r.ok && state.contacts[c.id]?.request === 'out') { c.inviteFailed = true; persistContact(c) }
+    }).catch(() => { c.inviteFailed = true; persistContact(c) })
+    return c
+  }
+
+  async function acceptRequest(id) {
+    const c = state.contacts[id]
+    if (!c || c.request !== 'in') return
+    await becomeContact(c, 'people')
+    buildPacket(c, { t: 'accept' }).then(transmit).catch(() => {})
+    return c
+  }
+
+  async function declineRequest(id) {
+    const c = state.contacts[id]
+    if (!c || c.request !== 'in') return
+    const pkt = await buildPacket(c, { t: 'decline' }, true)
+    await deleteContact(id)
+    transmit(pkt).catch(() => {})
+  }
 
   async function onApp(p, from) {
+    if (p.payload[0] === FRAME_TAG) return calls.onMedia(p.payload)
     const msg = JSON.parse(unutf8(p.payload))
     const nb = state.neighbors.find((n) => n.node === from)
-    if (!nb || !msg || typeof msg !== 'object') return
+    if (!msg || typeof msg !== 'object') return
     if (msg.t === 'hello') {
       const v = checkCard(unb64(msg.card))
       if (v.id === me.id) return
-      nb.card = { id: v.id, name: v.name, ik: b64(v.ik), card: b64(v.card) }
+      const card = { id: v.id, name: v.name, ik: b64(v.ik), card: b64(v.card) }
+      if (helloCards.size >= MAX_HELLOS && !helloCards.has(from)) helloCards.delete(helloCards.keys().next().value)
+      helloCards.set(from, card)
+      if (nb) nb.card = card
       markConflicts(v.name, v.id)
       if (state.contacts[v.id]) await learnCard(v, 'link')
+      if (msg.r || (state.settings.hidden && !greeted.has(from))) sendHello(from, false)
+    } else if (!nb) {
+      return
     } else if (msg.t === 'challenge') {
       const n = unb64(msg.n)
       const ik = nb.card && nb.card.id === msg.from ? unb64(nb.card.ik) : state.contacts[msg.from] && unb64(state.contacts[msg.from].ik)
@@ -627,7 +778,7 @@ export function createCore({ mesh, dbName = 'ripplo', state = createState(), not
     const ids = [...new Set(memberIds)]
     if (!clean || !ids.length) throw new RipploError('bad_group')
     if (ids.length > MAX_GROUP) throw new RipploError('too_many')
-    if (ids.some((i) => !state.contacts[i] || !state.contacts[i].card)) throw new RipploError('no_contact')
+    if (ids.some((i) => !state.contacts[i] || !state.contacts[i].card || state.contacts[i].request)) throw new RipploError('no_contact')
     const g = b64(random(9)).replace(/\+/g, '-').replace(/\//g, '_')
     const chat = ensureChat(g, 'group', clean, ids)
     const body = { t: 'group', g, name: clean, members: [b64(me.card), ...ids.map((i) => state.contacts[i].card)] }
@@ -684,7 +835,8 @@ export function createCore({ mesh, dbName = 'ripplo', state = createState(), not
       const mime = safeMime(msg.mime)
       await db.putBin('blobs', aid, plain)
       const att = { kind: msg.kind, mime, size: plain.length, attId: aid, url: URL.createObjectURL(new Blob([plain], { type: mime })) }
-      if (Number.isFinite(msg.duration)) att.duration = msg.duration
+      if (Number.isFinite(msg.duration) && msg.duration > 0) att.duration = Math.min(msg.duration, 3600)
+      if (typeof msg.wave === 'string' && msg.wave.length <= 96 && /^[A-Za-z0-9+/]*={0,2}$/.test(msg.wave)) att.wave = Array.from(unb64(msg.wave))
       await receive({ id: `${f}.${msg.id}`, chatId: msg.g || f, from: f, att }, '', msg.kind)
     } catch {
       return discard(aid)
@@ -692,23 +844,79 @@ export function createCore({ mesh, dbName = 'ripplo', state = createState(), not
     await discard(aid)
   }
 
-  async function refreshPeople() {
-    if (discover) return
-    state.peopleRefreshing = true
-    state.people = []
-    const id = newId()
-    await new Promise((resolve) => {
+  const normName = (s) => String(s).normalize('NFKC').toLowerCase().replace(/\s+/g, ' ').trim()
+  const normId = (s) => String(s).toUpperCase().replace(/[^0-9A-Z]/g, '')
+  const idLike = (s) => ID_RE.test(normId(s))
+  const findHash = (norm) => b64url(sha256(utf8('ripplo-find-v1\0' + norm)).subarray(0, 8))
+  const findKey = (text) => findHash(idLike(text) ? normId(text) : normName(text))
+  const matchesQuery = (text, name, id) => (idLike(text) ? normId(id) === normId(text) : normName(name) === normName(text))
+
+  function discoverRound({ payload, timeout, quiet }) {
+    return new Promise((resolve) => {
+      const id = newId()
+      let quietTimer
       const finish = () => {
         clearTimeout(timer)
+        clearTimeout(quietTimer)
         discover = null
-        state.peopleRefreshing = false
-        state.peopleRefreshedAt = Date.now()
         resolve()
       }
-      const timer = setTimeout(finish, T.discover)
-      discover = { id: hex(id), finish }
-      mesh.send(encodePacket({ type: TYPE.DISCOVER, id, payload: utf8('{"t":"who"}') })).catch(finish)
+      const timer = setTimeout(finish, timeout)
+      const d = {
+        id: hex(id), finish, dead: false,
+        bump() { if (d.dead) { clearTimeout(quietTimer); quietTimer = setTimeout(finish, quiet) } },
+        settle() { d.dead = true; d.bump() },
+      }
+      discover = d
+      mesh.send(encodePacket({ type: TYPE.DISCOVER, id, payload: utf8(JSON.stringify(payload)) }))
+        .then((r) => { if (r && r.neighbors === 0) finish() })
+        .catch(finish)
     })
+  }
+
+  async function refreshPeople() {
+    if (state.peopleRefreshing) return
+    state.peopleRefreshing = true
+    state.peopleQuery = ''
+    searchText = ''
+    peopleBase = null
+    state.people = []
+    try {
+      let lo = 0
+      for (const h of RINGS) {
+        const last = h === RINGS[RINGS.length - 1]
+        await discoverRound({
+          payload: { t: 'who', ...(!last && { h }), ...(lo && { lo }) },
+          timeout: last ? T.discover : T.ring,
+          quiet: last ? T.quiet : T.quietRing,
+        })
+        if (state.people.length >= MAX_SCAN) break
+        lo = h
+      }
+    } finally {
+      state.peopleRefreshing = false
+      state.peopleRefreshedAt = Date.now()
+    }
+  }
+
+  async function searchPeople(raw) {
+    const text = String(raw ?? '').trim().slice(0, 40)
+    if (state.peopleRefreshing) return
+    if (!text) {
+      if (peopleBase) { state.people = peopleBase; peopleBase = null }
+      state.peopleQuery = ''
+      searchText = ''
+      return
+    }
+    if (!state.peopleQuery) peopleBase = state.people
+    state.peopleQuery = searchText = text
+    state.people = []
+    state.peopleRefreshing = true
+    try {
+      await discoverRound({ payload: { t: 'who', q: findKey(text) }, timeout: T.discover, quiet: T.quiet })
+    } finally {
+      state.peopleRefreshing = false
+    }
   }
 
   function onReply(p) {
@@ -716,16 +924,34 @@ export function createCore({ mesh, dbName = 'ripplo', state = createState(), not
     let v
     try { v = checkCard(p.payload) } catch { return }
     if (v.id === me.id) return
+    if (searchText && !matchesQuery(searchText, v.name, v.id)) return
     markConflicts(v.name, v.id)
     const person = { id: v.id, name: v.name, card: b64(v.card), hops: p.hops, seenAt: Date.now(), isContact: !!state.contacts[v.id] }
+    const limit = searchText ? MAX_SEARCH : MAX_SCAN
     const i = state.people.findIndex((x) => x.id === v.id)
-    if (i < 0) state.people.push(person)
-    else if (person.hops < state.people[i].hops) state.people[i] = person
+    if (i >= 0) {
+      if (person.hops < state.people[i].hops) state.people[i] = person
+    } else if (state.people.length < limit) {
+      state.people.push(person)
+    } else {
+      let far = 0
+      for (let k = 1; k < state.people.length; k++) if (state.people[k].hops > state.people[far].hops) far = k
+      if (person.hops < state.people[far].hops) state.people[far] = person
+    }
+    state.people.sort((a, b) => a.hops - b.hops)
+    discover.bump()
   }
 
   function onDiscover(p) {
+    if (state.settings.hidden) return
     if (discover && hex(p.id) === discover.id) return
-    try { if (JSON.parse(unutf8(p.payload)).t !== 'who') return } catch { return }
+    let q
+    try { q = JSON.parse(unutf8(p.payload)) } catch { return }
+    if (!q || q.t !== 'who') return
+    const d = (p.hops || 0) + 1
+    if (Number.isFinite(q.h) && d > q.h) return
+    if (Number.isFinite(q.lo) && d <= q.lo) return
+    if (q.q !== undefined && ![findHash(normName(me.name)), findHash(normId(me.id))].includes(q.q)) return
     mesh.send(encodePacket({ type: TYPE.REPLY, dest: p.id, payload: me.card })).catch(() => {})
   }
 
@@ -749,12 +975,13 @@ export function createCore({ mesh, dbName = 'ripplo', state = createState(), not
   }
 
   async function saveSettings(patch) {
-    for (const k of ['autoUpdate', 'backgroundRelay', 'appLock']) if (typeof patch[k] === 'boolean') state.settings[k] = patch[k]
+    for (const k of ['autoUpdate', 'backgroundRelay', 'appLock', 'hidden']) if (typeof patch[k] === 'boolean') state.settings[k] = patch[k]
+    if (patch.hidden === false) for (const n of state.neighbors) sendHello(n.node, !n.card)
     await db.put('kv', 'settings', { ...state.settings })
   }
 
   return {
-    state, init, close, createProfile, setAvatar, setName, myInviteLink: () => encodeLink(me.card), addContactFromLink, addPerson,
+    state, init, close, createProfile, setAvatar, setName, searchPeople, startCall: async (id) => { if (!canCall(state.contacts[id])) throw new RipploError('call_no_contact'); return calls.start(id) }, acceptCall: calls.accept, hangUp: calls.hangup, setMuted: calls.setMuted, myInviteLink: () => encodeLink(me.card), addContactFromLink, invite, acceptRequest, declineRequest,
     verifyNearby, verifyByQr, markVerified, safetyNumber, sendText, sendAttachment, retry, loadMessages,
     markRead, createGroup, refreshPeople, deleteChat, deleteContact, saveSettings, restoreBackup,
   }

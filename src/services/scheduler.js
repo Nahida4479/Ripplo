@@ -1,17 +1,15 @@
 import { App } from '@capacitor/app'
 import { state } from '../core/state.js'
 import { refreshPeople } from '../core/api.js'
-
-const STALE = 20 * 3600e3
+import { isDue, SLOT_MS } from '../lib/schedule.js'
 
 function tick() {
-  const h = new Date().getHours()
-  if (!state.profile || h < 2 || h >= 5 || state.peopleRefreshing) return
-  if (Date.now() - (state.peopleRefreshedAt || 0) > STALE) refreshPeople().catch(() => {})
+  if (!state.profile || state.peopleRefreshing) return
+  if (isDue(state.profile.tag, state.peopleRefreshedAt || 0)) refreshPeople().catch(() => {})
 }
 
 export function startScheduler() {
-  setInterval(tick, 30 * 60e3)
+  setInterval(tick, SLOT_MS)
   App.addListener('resume', tick)
   tick()
 }

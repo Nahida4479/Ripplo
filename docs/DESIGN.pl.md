@@ -53,6 +53,8 @@ Ikony w nagłówku: QR (skanuj/dodaj), ołówek (nowy czat / nowa grupa). Piguł
 Opcjonalna sekcja „Przypięte”. Wiersz 68 px: awatar 48 (inicjały na kolorze z hasha, ikona grupy dla grup),
 nazwa 16/600, podgląd 14 `--text-2` (głosowa: ikona mikrofonu + „Wiadomość głosowa”), czas 12 po prawej, znaczek nieprzeczytanych
 (akcent, `--on-accent`). Niezweryfikowane kontakty mają mały bursztynowy znaczek tarczy na awatarze.
+Pod pigułką wyszukiwania, gdy ktoś cię zaprosił, sekcja **Zaproszenia · n**: awatar z bursztynową tarczą, nazwa,
+„chce cię dodać”, **Odrzuć** (ghost) i **Akceptuj**.
 Stan pusty: ilustracja fal + „Dodaj znajomego kodem QR lub linkiem zaproszenia”.
 
 ## Widok czatu
@@ -69,29 +71,49 @@ Stan pusty: ilustracja fal + „Dodaj znajomego kodem QR lub linkiem zaproszenia
 - Multimedia: miniatury obrazów/wideo maks. 240, zaokrąglone 14; wiadomość głosowa = przycisk odtwarzania + słupki fali +
   czas trwania. Przychodzące multimedia pojawiają się dopiero po otrzymaniu w całości.
 - Pole pisania w kształcie pigułki: `+` (zdjęcie/wideo, maks. 20 MB), pole tekstowe z automatycznym powiększaniem (licznik `n/1000` pojawia się od
-  900, czerwony przy 1000), przycisk mikrofonu przy pustym polu (przytrzymaj lub stuknij, by nagrywać, z anulowaniem), przycisk wysyłania przy tekście.
+  900, czerwony przy 1000), przycisk mikrofonu przy pustym polu (stuknij, by nagrywać; podczas nagrywania: anuluj, czerwona kropka z czasem, kreski poziomu na żywo, wyślij), przycisk wysyłania przy tekście.
 - Każdy czat pokazuje na górze linię z kłódką: „Wiadomości są szyfrowane end-to-end protokołem Signal.”
 
 ## Zakładka Ludzie
 
 Nagłówek: ikona odświeżania (kręci się podczas DISCOVER), „Ostatnio odświeżono 03:12 · następne dziś w nocy”.
 Sekcje: **W pobliżu** (bezpośredni sąsiedzi, na żywo, z plakietkami medium `BLE`, `LAN`, `Wi-Fi Direct` i
-prędkością), **W zasięgu sieci** (odpowiedzi DISCOVER, z liczbą przeskoków). Akcja w wierszu: **Dodaj** → arkusz potwierdzenia
-z ostrzeżeniem o niezweryfikowanym kluczu. Kontakty już dodane pokazują ptaszek.
+prędkością), **W zasięgu sieci** (odpowiedzi DISCOVER, z liczbą przeskoków). Nad sekcjami jest pole szukania (pełna nazwa lub ID, w sieci tylko skrót); wyniki zastępują listę z meshu, a X ją przywraca.
+Akcja w wierszu: **Zaproś** → arkusz potwierdzenia
+(„Osoba dostanie prośbę i może ją przyjąć lub odrzucić”). Po wysłaniu wiersz pokazuje plakietkę **Zaproszono** (**Ponów**, gdy
+doręczenie się nie udało); osoba, która cię zaprosiła, ma **Akceptuj**. Kontakty już dodane pokazują ptaszek.
+
+## Ekran połączenia
+
+Przycisk słuchawki w nagłówku czatu (ukryty dla grup i oczekujących próśb, zablokowany podczas rozmowy) zaczyna
+połączenie; wymaga łącza bezpośredniego. Arkusz na cały ekran nad wszystkim: awatar 112, nazwa, stan (Dzwonię… /
+Połączenie przychodzące / Łączenie… / licznik / powód zakończenia), potem okrągłe przyciski 68 px: przychodzące = czerwony
+Odrzuć i zielony Odbierz (dzwonek i wibracja), w innym razie przełącznik Wycisz i czerwony Zakończ. Stan zakończenia
+zostaje 2,5 s.
+
+## Arkusz udostępniania („Wyślij do…”)
+
+Pojawia się, gdy inna aplikacja udostępni Ripplo tekst, zdjęcie, wideo lub dźwięk (menu udostępniania systemu → Ripplo).
+Linia podglądu (fragment tekstu lub rodzaj multimediów), przewijana lista czatów i grup z awatarami, Anuluj. Stuknięcie
+czatu wysyła od razu i otwiera ten czat.
 
 ## Arkusz dodawania kontaktu
 
 Zakładki: **Mój kod** (duży QR linku zaproszenia + ripploId + przycisk Udostępnij link przez Web Share API /
-kopiowanie), **Skanuj** (wizjer kamery z zaokrągloną maską, jsQR), **Wklej link**.
+kopiowanie), **Skanuj** (wizjer kamery z zaokrągloną maską; ciągłe automatyczne wykrywanie, natywny `BarcodeDetector` gdy jest, w przeciwnym razie jsQR; bez przycisku), **Wklej link**.
 
 ## Strona kontaktu
+
+Gdy klucz jest zweryfikowany (i nie ma konfliktu), numer bezpieczeństwa, jego QR oraz przyciski Zweryfikuj / Ponów są ukryte;
+wracają, gdy weryfikacja zniknie lub oznaczony zostanie konflikt. Sekcja **Multimedia** wypisuje wszystkie zdjęcia i filmy
+z czatu (siatka 3 kolumny, najnowsze pierwsze, kafelki wideo z ikoną odtwarzania); stuknięcie otwiera podgląd na cały ekran.
 
 Awatar, nazwa, ripploId, karta weryfikacji (stan + metoda + data), numer bezpieczeństwa (12×5 cyfr
 czcionką monospace) + jego QR, akcje: Zweryfikuj kodem QR, Ponów sprawdzenie w pobliżu, Jestem pewien, że to ta osoba, Usuń kontakt.
 
 ## Ustawienia (lista zgrupowanych kart, jak w referencyjnej aplikacji muzycznej)
 
-- **Profil**: Zmień nazwę (pole w wierszu, Zapisz / Anuluj), awatar do kliknięcia (wybór zdjęcia, kadr do kwadratu; przycisk Usuń gdy ustawione), imię, ripploId, Mój QR. Zdjęcia widać na liście czatów, w nagłówku czatu, na stronie kontaktu, w Szukaj osób i Nowy czat; inaczej inicjały.
+- **Profil**: przełącznik „Widoczność w Znajdź osoby”, Zmień nazwę (pole w wierszu, Zapisz / Anuluj), awatar do kliknięcia (wybór zdjęcia, kadr do kwadratu; przycisk Usuń gdy ustawione), imię, ripploId, Mój QR. Zdjęcia widać na liście czatów, w nagłówku czatu, na stronie kontaktu, w Szukaj osób i Nowy czat; inaczej inicjały.
 - **Wygląd**: kontrolka segmentowa trybu, próbki Koloru akcentu, próbki Tła (gradient),
   Język.
 - **Sieć**: lista transportów na żywo ze stanem + zmierzoną prędkością; przełącznik Przekazywania w tle

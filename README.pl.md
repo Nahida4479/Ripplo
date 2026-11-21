@@ -190,6 +190,11 @@ Używaj tego samego keystore przy każdym wydaniu: Android instaluje tylko aktua
 - APK zawiera tylko biblioteki `arm64-v8a` i `armeabi-v7a` (bez x86 / x86_64).
 - Wersja webowa do developmentu nie ma warstwy natywnej ani prawdziwego szyfrowania.
 
+# Współpraca
+
+- Bez komentarzy w kodzie (JS, Vue, CSS, Java, Swift, Gradle, shell, XML), także bez zakomentowanego kodu. Wyjaśnienia trafiają do `docs/` (po angielsku, z polskim bliźniakiem `*.pl.md`). Jedyny wyjątek to pliki generowane przez narzędzia.
+- Nie commituj sekretów: keystore'ów, haseł, `.env`, tokenów ani kluczy prywatnych.
+
 # Współtwórcy
 
 - [Nahida4479](https://github.com/Nahida4479)

@@ -10,12 +10,15 @@ import { startUpdater } from './services/updater.js'
 import { startScheduler } from './services/scheduler.js'
 import { startLock, lock } from './services/lock.js'
 import { startBackup } from './services/backup.js'
+import { startShare } from './services/share.js'
 import LockOverlay from './components/LockOverlay.vue'
 import GateView from './views/GateView.vue'
 import OnboardingView from './views/OnboardingView.vue'
 import AddContactSheet from './components/AddContactSheet.vue'
 import NewChatSheet from './components/NewChatSheet.vue'
 import ConfirmSheet from './components/ConfirmSheet.vue'
+import ShareSheet from './components/ShareSheet.vue'
+import CallOverlay from './components/CallOverlay.vue'
 
 const route = useRoute()
 const granted = ref(false)
@@ -29,6 +32,7 @@ async function onGranted() {
   startScheduler()
   startLock()
   startBackup()
+  startShare()
 }
 </script>
 <template>
@@ -46,8 +50,10 @@ async function onGranted() {
     </nav>
     <AddContactSheet />
     <NewChatSheet />
+    <ShareSheet v-if="!lock.locked" />
   </template>
   <ConfirmSheet />
+  <CallOverlay v-if="state.ready" />
   <LockOverlay v-if="lock.locked" />
   <div v-if="ui.toastText" class="toast" role="status">{{ ui.toastText }}</div>
 </template>

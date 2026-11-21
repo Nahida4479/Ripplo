@@ -1,6 +1,6 @@
 import { reactive } from 'vue'
 
-export const ui = reactive({ add: null, newChat: null, confirm: null, toastText: '' })
+export const ui = reactive({ add: null, newChat: null, confirm: null, share: null, toastText: '' })
 
 let timer
 export function toast(text) {

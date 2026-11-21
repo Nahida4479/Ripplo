@@ -31,6 +31,8 @@ function nativeMesh() {
     selfHash: async () => (await P.selfHash()).sha256,
     installUpdate: (url, sha256, prompt) => P.installUpdate({ url, sha256, prompt }),
     requestBatteryExemption: () => P.requestBatteryExemption(),
+    setAutoUpdate: (enabled) => P.setAutoUpdate({ enabled }),
+    takeShare: async () => { try { return (await P.takeShare()).share || null } catch { return null } },
     checkPermissions: () => P.checkPermissions(),
     requestPermissions: () => P.requestPermissions(),
     dbPut: ({ store, key, idx, value }) => P.dbPut({ store, key, idx, value: b64(value) }),
@@ -138,6 +140,8 @@ function webMesh() {
     backupRestore: unsupported,
     installUpdate: async () => { throw new Error('unsupported') },
     requestBatteryExemption: async () => {},
+    setAutoUpdate: async () => {},
+    takeShare: async () => null,
     checkPermissions: async () => GRANTED,
     requestPermissions: async () => GRANTED,
     on(event, cb) {

@@ -1,7 +1,7 @@
 <script setup>
 import { ref, watch, onBeforeUnmount, computed, nextTick } from 'vue'
 import QRCode from 'qrcode'
-import jsQR from 'jsqr'
+import { startScanner } from '../lib/scanner.js'
 import { useRouter } from 'vue-router'
 import { state } from '../core/state.js'
 import { myInviteLink, addContactFromLink, verifyByQr } from '../core/api.js'
@@ -15,13 +15,12 @@ const link = ref('')
 const pasted = ref('')
 const video = ref(null)
 const canvas = ref(null)
-let stream, raf, busy = false
+let stopper, busy = false
 const verify = computed(() => ui.add?.mode === 'verify')
 
 function stopScan() {
-  cancelAnimationFrame(raf)
-  stream?.getTracks().forEach(x => x.stop())
-  stream = null
+  stopper?.()
+  stopper = null
 }
 function close() { stopScan(); ui.add = null }
 
@@ -32,7 +31,7 @@ async function handle(text, via) {
     if (verify.value) {
       const ok = await verifyByQr(ui.add.id, text)
       toast(ok ? t('verifiedOk') : t('verifyMismatch'))
-      if (!ok) { busy = false; return }
+      if (!ok) { setTimeout(() => { busy = false }, 1500); return }
       close()
     } else {
       const c = await addContactFromLink(text, via)
@@ -40,32 +39,16 @@ async function handle(text, via) {
     }
   } catch (e) {
     toast(t('err_' + (e.code || 'bad_link')))
-    busy = false
+    setTimeout(() => { busy = false }, 1500)
   }
 }
 
 async function startScan() {
-  try {
-    stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } })
-  } catch { toast(t('cameraDenied')); return }
   await nextTick()
-  const v = video.value
-  if (!v) return stopScan()
-  v.srcObject = stream
-  await v.play().catch(() => {})
-  const ctx = canvas.value.getContext('2d', { willReadFrequently: true })
-  const loop = () => {
-    if (!stream) return
-    if (v.readyState >= 2 && v.videoWidth) {
-      canvas.value.width = v.videoWidth; canvas.value.height = v.videoHeight
-      ctx.drawImage(v, 0, 0)
-      const img = ctx.getImageData(0, 0, v.videoWidth, v.videoHeight)
-      const hit = jsQR(img.data, img.width, img.height)
-      if (hit?.data) handle(hit.data, 'qr')
-    }
-    raf = requestAnimationFrame(loop)
-  }
-  loop()
+  if (!video.value || !canvas.value) return
+  try {
+    stopper = await startScanner(video.value, canvas.value, text => handle(text, 'qr'))
+  } catch { toast(t('cameraDenied')) }
 }
 
 watch(() => ui.add, a => {
