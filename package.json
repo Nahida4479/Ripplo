@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "description": "Offline end-to-end encrypted mesh messenger",
-  "license": "GPL-3.0-only",
+  "license": "AGPL-3.0-only",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
