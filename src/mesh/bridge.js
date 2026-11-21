@@ -30,14 +30,13 @@ function nativeMesh() {
   }
 }
 
-// Dev fallback: every browser tab is a node; tabs see each other over BroadcastChannel.
 function webMesh() {
   const solo = new URLSearchParams(location.search).has('solo')
   const nodeTag = hex(crypto.getRandomValues(new Uint8Array(16)))
   const ch = new BroadcastChannel('ripplo-mesh')
   const listeners = {}
   const emit = (ev, d) => (listeners[ev] || []).forEach((cb) => cb(d))
-  const peers = new Map() // node -> last seen ms
+  const peers = new Map()
   let router
 
   const hello = () => ch.postMessage({ t: 'hello', node: nodeTag })
@@ -46,7 +45,7 @@ function webMesh() {
     if (!peers.has(node)) {
       router.linkUp(node)
       emit('neighbor', { node, up: true, medium: 'lan', kbps: 20000 })
-      hello() // let the newcomer learn about us immediately
+      hello()
     }
     peers.set(node, Date.now())
   }

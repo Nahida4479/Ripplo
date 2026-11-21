@@ -1,4 +1,3 @@
-// Reference router: mirrors docs/ARCHITECTURE.md §3.1 (Kotlin and Swift ports follow this file).
 import { TYPE, TTL_DEFAULT, decodePacket, encodePacket, newId } from './packet.js'
 
 const SELF = 'self'
@@ -13,9 +12,9 @@ export class Router {
     this.sendTo = sendTo
     this.deliver = deliver
     this.now = now
-    this.seen = new Map()     // `${type}:${idHex}` -> time (insertion order == time order)
-    this.reverse = new Map()  // idHex -> { prev, dest, pending, done, t }
-    this.routes = new Map()   // destTagHex -> { n: neighbor, t }
+    this.seen = new Map()
+    this.reverse = new Map()
+    this.routes = new Map()
     this.links = new Set()
   }
 
@@ -51,7 +50,7 @@ export class Router {
         }
         if (p.type === TYPE.DISCOVER && from !== SELF) this.deliver(bytes, from)
         if (from !== SELF && p.ttl <= 1) { this.sendDeadEnd(from, id); return }
-        const q = from === SELF ? bytes : encodePacket({ ...p, ttl: Math.min(p.ttl, TTL_DEFAULT) - 1, hops: Math.min(p.hops + 1, 255) }) // clamp: a hostile neighbor can't widen the flood
+        const q = from === SELF ? bytes : encodePacket({ ...p, ttl: Math.min(p.ttl, TTL_DEFAULT) - 1, hops: Math.min(p.hops + 1, 255) })
         const route = p.type === TYPE.DATA ? this.routes.get(dest) : null
         const targets = route && this.links.has(route.n) && route.n !== from
           ? [route.n]
@@ -71,7 +70,6 @@ export class Router {
           if (from !== SELF) this.routes.set(r.dest, { n: from, t: this.now() })
           r.done = true
         }
-        // hops counts links traversed, so a direct neighbour is 1 (ARCHITECTURE leaves this open)
         if (r.prev === SELF) this.deliver(encodePacket({ ...p, hops: Math.min(p.hops + 1, 255) }), SELF)
         else this.sendTo(r.prev, encodePacket({ ...p, hops: Math.min(p.hops + 1, 255) }))
         break

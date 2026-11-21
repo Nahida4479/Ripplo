@@ -1,5 +1,4 @@
 #!/usr/bin/env bash
-# Renders app icons from public/*.svg. Needs rsvg-convert + magick.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 RES=android/app/src/main/res
@@ -26,6 +25,5 @@ for f in ic_launcher ic_launcher_round; do
 XML
 done
 
-# iOS: 1024 opaque, no alpha
 magick public/icon_ios.png -background white -alpha remove -alpha off -resize 1024x1024 \
   PNG24:ios/App/App/Assets.xcassets/AppIcon.appiconset/AppIcon-512@2x.png

@@ -4,7 +4,6 @@ import { Router } from '../src/mesh/router.js'
 
 const tag = (n) => new Uint8Array(16).fill(n)
 
-// edges: [[a,b],...]; nodes are named by index+1 (tag filled with that number)
 function net(names, edges) {
   const queue = [], sends = [], inbox = {}
   const routers = {}
@@ -48,7 +47,7 @@ describe('router', () => {
     t.routers.A.onPacket(data(tag(99)), 'self'); t.run()
     expect(t.ofType('A', TYPE.DEAD_END)).toHaveLength(1)
     expect(t.ofType('A', TYPE.ACK)).toHaveLength(0)
-    expect(t.sends.length).toBe(10) // 5 forwards + 5 dead ends
+    expect(t.sends.length).toBe(10)
   })
 
   it('(c) diamond: duplicate gets DEAD_END, A still gets ACK and no DEAD_END', () => {
