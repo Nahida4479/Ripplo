@@ -8,3 +8,4 @@ dist/
 *.mobileprovision
 .env*
 keystore.properties
+.claude/
