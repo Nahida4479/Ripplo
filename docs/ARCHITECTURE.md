@@ -111,7 +111,7 @@ onPacket(p, from):                       # from = neighbor nodeTag, or SELF for 
     if DATA and p.dest == self: persist to inbox; send ACK(dest=p.id, hops=0) to from; deliver; return
     if DISCOVER and from != SELF: deliver to JS          # JS may answer with REPLY
     if from != SELF and p.ttl <= 1: send DEAD_END to from; return
-    q = copy(p); if from != SELF: q.ttl -= 1; q.hops += 1
+    q = copy(p); if from != SELF: q.ttl = min(p.ttl, 8) - 1; q.hops = min(p.hops+1, 255)   # clamp hostile TTL
     targets = DATA and routes[p.dest] alive and != from ? [routes[p.dest]] : neighbors - from
     if targets empty: deadEnd(p.id); return
     reverse[p.id].pending = len(targets); send q to each
@@ -119,14 +119,15 @@ onPacket(p, from):                       # from = neighbor nodeTag, or SELF for 
     if seen(p): return; mark seen
     r = reverse[p.dest]; if !r: return
     if ACK: routes[r.dest] = from (unless from == SELF); r.done = true
-    if r.prev == SELF: deliver to JS (hops = p.hops)  else: send p (hops+1) to r.prev
+    q = copy(p) with hops+1          # hops = links traversed; a direct neighbor gives 1
+    if r.prev == SELF: deliver q to JS  else: send q to r.prev
   DEAD_END:
     if seen(p): return; mark seen
     r = reverse[p.dest]; if !r or r.done: return
     r.pending -= 1; if r.pending <= 0: deadEnd(p.dest)
 
 deadEnd(id):  r = reverse[id]; r.done = true
-              if r.prev == SELF: deliver DEAD_END(dest=id) to JS
+              if r.prev == SELF: deliver DEAD_END(dest=id) to JS   # JS deliveries for own traffic use from = 'self'
               else send DEAD_END(new id, dest=id) to r.prev
 ```
 
