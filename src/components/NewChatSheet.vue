@@ -37,7 +37,7 @@ async function create() {
       <input v-if="group" v-model="name" class="field" maxlength="40" :placeholder="t('groupName')" :aria-label="t('groupName')" style="margin-bottom: 8px" />
       <div v-if="!contacts.length" class="empty">{{ t('noContacts') }}</div>
       <button v-for="c in contacts" :key="c.id" class="list-row" @click="pick(c)">
-        <Avatar :name="c.name" :size="40" :shield="c.verification === 'none'" />
+        <Avatar :name="c.name" :photo="c.avatar" :size="40" :shield="c.verification === 'none'" />
         <span class="grow name">{{ c.name }}</span>
         <Check v-if="picked.includes(c.id)" :size="22" color="var(--accent)" />
       </button>

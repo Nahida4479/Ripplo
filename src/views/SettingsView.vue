@@ -2,9 +2,10 @@
 import { ref, computed } from 'vue'
 import { QrCode, ExternalLink, ShieldCheck, ShieldAlert, ShieldQuestion, TriangleAlert } from 'lucide-vue-next'
 import { state } from '../core/state.js'
-import { saveSettings } from '../core/api.js'
+import { saveSettings, setAvatar } from '../core/api.js'
 import { mesh } from '../mesh/bridge.js'
-import { ui } from '../components/ui.js'
+import { ui, toast } from '../components/ui.js'
+import { makeAvatar } from '../lib/avatar.js'
 import { t, locale, setLocale } from '../i18n.js'
 import { theme, ACCENTS, GRADIENTS } from '../services/theme.js'
 import { checkUpdate, install } from '../services/updater.js'
@@ -22,6 +23,13 @@ const integ = computed(() => ({
   ok: [ShieldCheck, 'ok', 'integrityOk'], mismatch: [ShieldAlert, 'bad', 'integrityBad']
 }[state.integrity.status] || [ShieldQuestion, '', 'integrityUnknown']))
 const kbps = n => n.kbps >= 1000 ? (n.kbps / 1000).toFixed(1) + ' Mbps' : n.kbps + ' kbps'
+const photoInput = ref(null)
+async function pickPhoto(e) {
+  const file = e.target.files[0]
+  e.target.value = ''
+  if (!file) return
+  try { await setAvatar(await makeAvatar(file)) } catch { toast(t('err_bad_avatar')) }
+}
 const initials = l => l.slice(0, 2).toUpperCase()
 </script>
 <template>
@@ -30,8 +38,13 @@ const initials = l => l.slice(0, 2).toUpperCase()
 
     <h2 class="section">{{ t('profile') }}</h2>
     <div class="card">
-      <div class="row"><Avatar :name="state.profile?.name" :size="44" />
-        <span class="grow"><span class="label">{{ state.profile?.name }}</span><br /><span class="hint mono">{{ state.profile?.ripploId }}</span></span></div>
+      <div class="row">
+        <button class="icon-btn" style="width: auto; height: auto" :aria-label="t('changePhoto')" @click="photoInput.click()"><Avatar :name="state.profile?.name" :photo="state.profile?.avatar" :size="44" /></button>
+        <span class="grow"><span class="label">{{ state.profile?.name }}</span><br /><span class="hint mono">{{ state.profile?.ripploId }}</span></span>
+        <button v-if="state.profile?.avatar" class="btn sm ghost" @click="setAvatar('')">{{ t('removePhoto') }}</button>
+        <input ref="photoInput" type="file" accept="image/*" hidden @change="pickPhoto" />
+      </div>
+      <div class="row hint">{{ t('photoHint') }}</div>
       <button class="row" @click="ui.add = { mode: 'add' }"><QrCode :size="22" :stroke-width="1.75" /><span class="grow label">{{ t('myCode') }}</span></button>
     </div>
 
@@ -89,7 +102,7 @@ const initials = l => l.slice(0, 2).toUpperCase()
 
     <h2 class="section">{{ t('updates') }}</h2>
     <div class="card">
-      <div class="row"><span class="grow label">{{ t('currentVersion') }}</span><span class="val">{{ __APP_VERSION__ }}</span></div>
+      <div class="row"><span class="grow label">{{ t('currentVersion') }}</span><span class="val">{{ state.update.current || '–' }}</span></div>
       <div class="row"><span class="grow label">{{ t('latestVersion') }}</span><span class="val">{{ state.update.latest || '–' }}</span></div>
       <div v-if="state.update.error" class="row hint">{{ state.update.error }}</div>
       <div v-if="state.update.progress != null" class="row"><progress class="grow" max="1" :value="state.update.progress" /></div>
@@ -107,7 +120,7 @@ const initials = l => l.slice(0, 2).toUpperCase()
 
     <h2 class="section">{{ t('about') }}</h2>
     <div class="card">
-      <div class="row"><span class="grow"><span class="label">Ripplo</span><br /><span class="hint">{{ t('tagline') }}</span></span><span class="val">{{ __APP_VERSION__ }}</span></div>
+      <div class="row"><span class="grow"><span class="label">Ripplo</span><br /><span class="hint">{{ t('tagline') }}</span></span><span class="val">{{ state.update.current || '–' }}</span></div>
       <a class="row" :href="REPO" target="_blank" rel="noopener"><span class="grow label">GitHub</span><ExternalLink :size="18" /></a>
       <div class="row"><span class="grow label">{{ t('license') }}</span><span class="val">AGPL-3.0</span></div>
     </div>

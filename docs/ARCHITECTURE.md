@@ -229,6 +229,19 @@ comparison with the real person is the strong check.
 Safety number: Signal-style, 60 digits from both identity keys (SHA-512 iterated 5200×,
 `fingerprint version 0 | key | ripploId`), shown in 12 groups of 5 and as a QR.
 
+### Profile picture
+
+Optional, set in Settings → Profile: cropped to a 160×160 JPEG, ≤ 16 KiB, stored in `kv/profile.avatar`
+(base64). It never goes into the card, QR, link, `hello` or `REPLY` (they must stay small and reach
+strangers). It travels only as the field `av` of a Signal-encrypted message, so a relay never sees it:
+- `av` is attached to a message to a contact whenever `contact.avSent != myAvatarVersion`
+  (`SHA-256(avatar)[0..4]`, empty when none). The first message to a new contact therefore carries it,
+  and the receiver shows it for whoever added them or wants to add them.
+- Changing or removing the picture sends `{ "t": "avatar" }` (carrier only) to every contact; a failed
+  send resets `avSent`, so the next message retries. `av: ""` removes it on the receiver.
+- The receiver accepts `av` only if it is base64, ≤ 16 KiB and starts with the JPEG magic `FF D8 FF`,
+  then stores `contact.avatar`; anything else is ignored.
+
 ## 6. Link-local APP messages (JSON)
 
 - `{ "t": "hello", "card": "<b64 card bytes>" }` — sent on every new neighbor; fills the People tab "nearby"
@@ -290,8 +303,13 @@ and shows a content-free notification *"New message"* for `0x01` payloads.
   `Ripplo-vX.Y.Z-unsigned.ipa` and `SHA256SUMS` in the GitHub release.
 - The app (when online) reads `api.github.com/repos/Nahida4479/Ripplo/releases/latest`; a newer
   semver shows an update badge. Android with auto-update on: native downloads the APK, checks its
-  SHA-256 against `SHA256SUMS` and its signing certificate against the installed one, then installs
+  SHA-256 against the release hash and its signing certificate against the installed one, then installs
   via `PackageInstaller` (silent from the second self-update on, Android 12+).
+- Release hashes come from the `digest` field of the release asset in the API response (fallback: the
+  `SHA256SUMS` block in the release notes); `SHA256SUMS` is never fetched from the WebView because
+  github.com download redirects carry no CORS headers. The current version is the native
+  `versionName` (`App.getInfo()`), not the bundled `package.json` version.
+- Native install errors carry the `PackageInstaller` status message, shown in Settings → Updates.
 - Self-check: on Android the app hashes its own installed APK and compares it with `SHA256SUMS` of
   the release matching its version — so copies shared with Nearby Share / Quick Share are verified
   too. Result shown in Settings → Security.
