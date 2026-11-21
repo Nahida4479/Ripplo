@@ -42,7 +42,7 @@ async function onGranted() {
   <GateView v-if="!granted" @granted="onGranted" />
   <div v-else-if="!state.ready" class="center" role="status">Ripplo…</div>
   <OnboardingView v-else-if="state.needsOnboarding" />
-  <template v-else>
+  <template v-else-if="!state.lockedCall">
     <router-view v-slot="{ Component }"><component :is="Component" :key="route.fullPath" /></router-view>
     <nav v-if="!route.meta.full" class="tabbar" :aria-label="t('navigation')">
       <router-link v-for="[to, icon, label] in tabs" :key="to" :to="to" :class="{ on: route.path === to }" :aria-label="t(label)">
@@ -55,8 +55,9 @@ async function onGranted() {
     <NewChatSheet />
     <ShareSheet v-if="!lock.locked" />
   </template>
-  <ConfirmSheet />
+  <div v-else class="center" role="status">Ripplo…</div>
+  <ConfirmSheet v-if="!state.lockedCall" />
   <CallOverlay v-if="state.ready" />
-  <LockOverlay v-if="lock.locked" />
-  <div v-if="ui.toastText" class="toast" role="status">{{ ui.toastText }}</div>
+  <LockOverlay v-if="lock.locked && !state.lockedCall" />
+  <div v-if="ui.toastText && !state.lockedCall" class="toast" role="status">{{ ui.toastText }}</div>
 </template>

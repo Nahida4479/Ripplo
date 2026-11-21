@@ -514,7 +514,9 @@ liczby ramek wysłanych / odebranych / odtworzonych / błędów do diagnozy. Je�
 wzmocnienia), częstej przyczyny cichego nagrywania na niektórych telefonach, i dopiero potem pokazuje ostrzeżenie. Wiersz statystyk pokazuje też stan ścieżki,
 stan kontekstu audio i liczbę przechwyconych ramek. Wyciszenie wyłącza ścieżkę, więc cisza jest nadal wysyłana i podtrzymuje łącze.
 Rozmowa kończy się `lost` po 6 s bez uwierzytelnionej ramki (30 s przed pierwszą, gdy u rozmówcy może być otwarte pytanie o
-mikrofon) albo gdy sąsiad zniknie.
+mikrofon) albo gdy przez 8 s nie ma żadnego sąsiada dla połączenia. Sąsiad jest znajdowany po karcie z hello, po węźle, z którego przyszły
+uwierzytelnione ramki połączenia (wiązanym przy pierwszej ramce), albo po węźle zapamiętanym przy kontakcie (`contact.node`, zapisywanym, gdy dochodzi karta hello),
+więc połączenie odebrane tuż po ponownym otwarciu aplikacji, zanim wymieniono jakiekolwiek hello, nie jest przerywane.
 
 Dzwonienie (Android, `Ringer`) idzie za ustawieniami samego telefonu, a nie za głośnością aplikacji: tryb dzwonka normalny = domyślny
 dzwonek na strumieniu dzwonka (`USAGE_NOTIFICATION_RINGTONE`, w pętli) plus wibracja; tryb wibracji = tylko wibracja; tryb cichy albo Nie
@@ -545,8 +547,13 @@ Połączenia: oferta od kontaktu, którego dodałeś/aś, zaakceptowałeś/aś l
 inne natywne połączenie (stan dzwonienia wygasa po 45 s, nawet jeśli `end` dzwoniącego nigdy nie dojdzie), wywołuje pełnoekranowe powiadomienie na kanale
 `calls` i dzwoni przez `Ringer` przez 45 s zgodnie z systemowymi trybami dźwięku; wersja powiadomienia na ekranie blokady jest ogólna („Połączenie
 przychodzące”), a przy włączonej blokadzie aplikacji nazwa jest wszędzie zastąpiona przez „Ripplo”. Celem pełnego ekranu jest `CallActivity`, mały natywny
-ekran (dzwoniący, Odbierz, Odrzuć), który może pokazać się nad blokadą; `MainActivity` nigdy, więc czaty zostają za blokadą. Odbierz najpierw prosi system o
-zdjęcie blokady, a potem uruchamia `MainActivity` z `ripplo.chat` i losowym jednorazowym tokenem utworzonym natywnie dla tego dzwonka (`ripplo.answer`).
+ekran (dzwoniący, Odbierz, Odrzuć), który może pokazać się nad blokadą; `MainActivity` nigdy, więc czaty zostają za blokadą. Odbierz nie prosi o odblokowanie: uruchamia
+`MainActivity` z `ripplo.chat` i losowym jednorazowym tokenem utworzonym natywnie dla tego dzwonka (`ripplo.answer`), a `MainActivity` pokazuje się nad blokadą tylko
+wtedy, gdy ten token jest w tej chwili ważny (`Opener.peek`; akcja Odbierz w powiadomieniu ma `setAuthenticationRequired(false)`). Aplikacja wchodzi wtedy w tryb
+rozmowy na blokadzie (`state.lockedCall`, włączany, gdy w tym momencie `isLocked()` jest prawdą): renderowany jest tylko ekran rozmowy, bez czatów, zakładek,
+okien, komunikatów i nakładki blokady aplikacji, ekran zostaje włączony na czas rozmowy (`keepAwake`), a po jej końcu aktywność jest zamykana i usuwana
+(`endLockedCall`, także `setShowWhenLocked(false)`), co wraca do ekranu blokady. Jeśli użytkownik odblokuje telefon w trakcie rozmowy, aplikacja po prostu działa
+dalej normalnie; połączenie, które się nie pojawi, zamyka ten tryb po 25 s.
 Wtyczka zamienia token na id połączenia tylko wtedy, gdy zgadza się z bieżącym dzwonkiem (`Opener.redeem`); aplikacja odbiera automatycznie tylko wtedy, gdy id
 połączenia równa się tej wartości, a połączenie dzwoni w ciągu 20 s, więc inna aplikacja, która wywoła wyeksportowaną aktywność, nie wymusi odebrania.
 `ripplo.chat` jest przyjmowane tylko, gdy wygląda jak ripploId lub id grupy. Odrzuć wycisza dzwonek i usuwa ofertę ze skrzynki, więc dzwoniący po prostu nie

@@ -27,6 +27,9 @@ function nativeMesh() {
     sendApp: (node, payload) => P.sendApp({ node, payload: b64(payload) }),
     getNeighbors: async () => (await P.getNeighbors()).neighbors,
     drainInbox: async () => (await P.drainInbox()).packets.map((e) => (e.opened ? { opened: e.opened } : inbound(e))),
+    isLocked: async () => { try { return !!(await P.isLocked()).locked } catch { return false } },
+    keepAwake: (on) => P.keepAwake({ on }).catch(() => {}),
+    endLockedCall: () => P.endLockedCall().catch(() => {}),
     takeOpen: async () => { try { return (await P.takeOpen()).open || null } catch { return null } },
     getDbKey: async () => ({ key: unb64((await P.getDbKey()).key), insecure: false }),
     selfHash: async () => (await P.selfHash()).sha256,
@@ -126,6 +129,9 @@ function webMesh() {
       return router.neighbors().map((node) => ({ node, medium: 'lan', kbps: 20000, rttMs: 1, links: [{ medium: 'lan', kbps: 20000 }] }))
     },
     drainInbox: async () => [],
+    isLocked: async () => false,
+    keepAwake: async () => {},
+    endLockedCall: async () => {},
     takeOpen: async () => null,
     async getDbKey() {
       let k = localStorage.getItem('ripplo-dbkey')

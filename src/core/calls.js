@@ -2,7 +2,7 @@ import { b64, unb64, random } from '../lib/bytes.js'
 import { importCallKey, sealFrame, openFrame, packFrames, unpackFrames, createReplay } from '../crypto/callFrame.js'
 import { RipploError } from '../crypto/identity.js'
 
-const DEFAULT_TIMING = { ring: 45000, silence: 6000, first: 30000, hold: 2500, stale: 120000, warn: 4 }
+const DEFAULT_TIMING = { ring: 45000, silence: 6000, first: 30000, hold: 2500, stale: 120000, warn: 4, gone: 8000 }
 const QUIET = 0.003
 const ID_LEN = 8
 const KEY_LEN = 32
@@ -22,7 +22,7 @@ export function createCalls({ state, signal, sendMedia, hasNeighbor, supported, 
 
   const open = (peer, role, id) => ({
     peer, role, id, idB64: b64(id), key: null, audio: null, seq: 0, live: false, done: false, heard: false,
-    replay: createReplay(), lastRx: 0, liveAt: 0, ringTimer: null, watch: null, micQuiet: 0, outQuiet: 0, lastRecv: 0, fellBack: false,
+    replay: createReplay(), lastRx: 0, liveAt: 0, ringTimer: null, watch: null, micQuiet: 0, outQuiet: 0, lastRecv: 0, fellBack: false, node: null, goneAt: 0,
   })
 
   function finish(c, reason, tell) {
@@ -54,7 +54,7 @@ export function createCalls({ state, signal, sendMedia, hasNeighbor, supported, 
       await c.audio.start(async (frames) => {
         if (cur !== c || c.done || !c.live) return
         const packet = await sealFrame(c.key, c.id, c.role, c.seq++, packFrames(frames))
-        sendMedia(c.peer, packet)
+        sendMedia(c.peer, packet, c.node)
       })
     } catch {
       try { c.audio?.stop() } catch {}
@@ -83,7 +83,9 @@ export function createCalls({ state, signal, sendMedia, hasNeighbor, supported, 
         const warn = c.micQuiet >= T.warn ? 'mic' : c.outQuiet >= T.warn ? 'out' : !c.heard && Date.now() - c.liveAt > T.warn * 1000 ? 'none' : ''
         state.call = { ...state.call, stats: st, warn }
       }
-      if (Date.now() - c.lastRx > (c.heard ? T.silence : T.first) || !hasNeighbor(c.peer)) finish(c, 'lost', 'end')
+      if (hasNeighbor(c.peer, c.node)) c.goneAt = 0
+      else if (!c.goneAt) c.goneAt = Date.now()
+      if (Date.now() - c.lastRx > (c.heard ? T.silence : T.first) || (c.goneAt && Date.now() - c.goneAt > T.gone)) finish(c, 'lost', 'end')
     }, 1000)
   }
 
@@ -91,7 +93,7 @@ export function createCalls({ state, signal, sendMedia, hasNeighbor, supported, 
     if (cur) throw new RipploError('call_busy')
     if (!supported()) throw new RipploError('call_unsupported')
     try { await ensureMic() } catch { throw new RipploError('call_mic') }
-    if (!hasNeighbor(peer)) throw new RipploError('call_no_link')
+    if (!hasNeighbor(peer, null)) throw new RipploError('call_no_link')
     const raw = random(KEY_LEN)
     const c = open(peer, 0, random(ID_LEN))
     cur = c
@@ -147,7 +149,7 @@ export function createCalls({ state, signal, sendMedia, hasNeighbor, supported, 
     else finish(c, ringing ? 'cancelled' : 'ended', 'end')
   }
 
-  async function onMedia(bytes) {
+  async function onMedia(bytes, node) {
     const c = cur
     if (!c || !c.live) return
     let opened
@@ -165,6 +167,7 @@ export function createCalls({ state, signal, sendMedia, hasNeighbor, supported, 
     }
     c.lastRx = Date.now()
     c.heard = true
+    if (node) c.node = node
     c.audio.play(frames)
   }
 

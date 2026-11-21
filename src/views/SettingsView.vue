@@ -44,19 +44,16 @@ const initials = l => l.slice(0, 2).toUpperCase()
     <div class="card">
       <div class="row">
         <button class="icon-btn" style="width: auto; height: auto" :aria-label="t('changePhoto')" @click="photoInput.click()"><Avatar :name="state.profile?.name" :photo="state.profile?.avatar" :size="44" /></button>
-        <span v-if="draft === null" class="grow wrap"><span class="label">{{ state.profile?.name }}</span><br /><span class="hint mono">{{ state.profile?.ripploId }}</span></span>
+        <button v-if="draft === null" class="grow wrap namebtn" :aria-label="t('changeName')" @click="draft = state.profile?.name"><span class="label">{{ state.profile?.name }}</span><br /><span class="hint mono">{{ state.profile?.ripploId }}</span></button>
         <input v-else v-model="draft" class="field grow" maxlength="40" :aria-label="t('yourName')" @keyup.enter="saveName" />
         <input ref="photoInput" type="file" accept="image/*" hidden @change="pickPhoto" />
       </div>
-      <div class="row profile-acts">
+      <div v-if="draft !== null || state.profile?.avatar" class="row profile-acts">
         <template v-if="draft !== null">
           <button class="btn sm ghost" @click="draft = null">{{ t('cancel') }}</button>
           <button class="btn sm" @click="saveName">{{ t('save') }}</button>
         </template>
-        <template v-else>
-          <button class="btn sm ghost" @click="draft = state.profile?.name">{{ t('changeName') }}</button>
-          <button v-if="state.profile?.avatar" class="btn sm ghost" @click="setAvatar('')">{{ t('removePhoto') }}</button>
-        </template>
+        <button v-else class="btn sm ghost" @click="setAvatar('')">{{ t('removePhoto') }}</button>
       </div>
       <div class="row hint">{{ t('photoHint') }}</div>
       <div class="row">
@@ -152,6 +149,7 @@ const initials = l => l.slice(0, 2).toUpperCase()
 </template>
 <style scoped>
 .wrap { overflow-wrap: anywhere; }
+.namebtn { text-align: left; min-width: 0; padding: 0; }
 .profile-acts { flex-wrap: wrap; justify-content: flex-end; }
 .contrib { display: flex; align-items: center; gap: 12px; }
 .contrib img, .ini { width: 44px; height: 44px; border-radius: 50%; flex: none; }

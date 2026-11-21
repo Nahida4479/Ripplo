@@ -2,6 +2,7 @@ package io.github.nahida4479.ripplo.mesh;
 
 import android.Manifest;
 import android.app.Activity;
+import android.app.KeyguardManager;
 import android.app.NotificationManager;
 import android.app.PendingIntent;
 import android.content.Context;
@@ -249,6 +250,43 @@ public class RipploMeshPlugin extends Plugin implements MeshEngine.Listener {
             JSObject o = openedJson(it, key);
             if (o != null) notifyListeners("opened", o);
         }
+    }
+
+    public static boolean callTokenValid(String token) {
+        return Opener.peek(token);
+    }
+
+    @PluginMethod
+    public void isLocked(PluginCall call) {
+        KeyguardManager km = (KeyguardManager) getContext().getSystemService(Context.KEYGUARD_SERVICE);
+        JSObject r = new JSObject();
+        r.put("locked", km != null && km.isKeyguardLocked());
+        call.resolve(r);
+    }
+
+    @PluginMethod
+    public void keepAwake(PluginCall call) {
+        final boolean on = call.getBoolean("on", false);
+        Activity a = getActivity();
+        if (a != null) {
+            a.runOnUiThread(() -> {
+                if (on) a.getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+                else a.getWindow().clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+            });
+        }
+        call.resolve();
+    }
+
+    @PluginMethod
+    public void endLockedCall(PluginCall call) {
+        Activity a = getActivity();
+        if (a != null) {
+            a.runOnUiThread(() -> {
+                if (Build.VERSION.SDK_INT >= 27) a.setShowWhenLocked(false);
+                a.finishAndRemoveTask();
+            });
+        }
+        call.resolve();
     }
 
     @PluginMethod

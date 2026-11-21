@@ -125,7 +125,11 @@ export function createCore({ mesh, dbName = 'ripplo', state = createState(), not
   }
 
   const canCall = (c) => consented(c)
-  const callTiming = Object.fromEntries(Object.entries({ ring: timing.callRing, silence: timing.callSilence, hold: timing.callHold, warn: timing.callWarn }).filter(([, v]) => v !== undefined))
+  const neighborOf = (id, node) =>
+    (node && state.neighbors.find((n) => n.node === node)) ||
+    state.neighbors.find((n) => n.card?.id === id) ||
+    state.neighbors.find((n) => n.node && n.node === state.contacts[id]?.node)
+  const callTiming = Object.fromEntries(Object.entries({ ring: timing.callRing, silence: timing.callSilence, hold: timing.callHold, warn: timing.callWarn, gone: timing.callGone }).filter(([, v]) => v !== undefined))
   const calls = createCalls({
     state,
     timing: callTiming,
@@ -139,9 +143,9 @@ export function createCore({ mesh, dbName = 'ripplo', state = createState(), not
         if (r.microphone !== 'granted') throw new Error('mic')
       }
     }),
-    hasNeighbor: (id) => state.neighbors.some((n) => n.card?.id === id),
-    sendMedia: (id, bytes) => {
-      const nb = state.neighbors.find((n) => n.card?.id === id)
+    hasNeighbor: (id, node) => !!neighborOf(id, node),
+    sendMedia: (id, bytes, node) => {
+      const nb = neighborOf(id, node)
       if (!nb) return false
       mesh.sendApp(nb.node, bytes).catch(() => {})
       return true
@@ -800,7 +804,7 @@ export function createCore({ mesh, dbName = 'ripplo', state = createState(), not
   }
 
   async function onApp(p, from) {
-    if (p.payload[0] === FRAME_TAG) return calls.onMedia(p.payload)
+    if (p.payload[0] === FRAME_TAG) return calls.onMedia(p.payload, from)
     const msg = JSON.parse(unutf8(p.payload))
     const nb = state.neighbors.find((n) => n.node === from)
     if (!msg || typeof msg !== 'object') return
@@ -815,6 +819,10 @@ export function createCore({ mesh, dbName = 'ripplo', state = createState(), not
       markConflicts(v.name, v.id)
       if (state.contacts[v.id]) await learnCard(v, 'link')
       const known = state.contacts[v.id]
+      if (known && known.node !== from) {
+        known.node = from
+        persistContact(known)
+      }
       if (known && !known.request && known.verification === 'none' && known.verifyState !== 'checking' && Date.now() - (known.verifyTried || 0) > 30000) {
         known.verifyTried = Date.now()
         verifyNearby(v.id).catch(() => {})

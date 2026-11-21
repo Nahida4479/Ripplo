@@ -595,7 +595,9 @@ sent / received / played / error frame counts for diagnosis. If the microphone s
 or automatic gain), a common cause of silent capture on some phones, and only then shows the warning. The stats line also shows the
 track state, the audio context state and the number of captured frames. Muting disables the track, so silence is still sent and keeps the link alive. The call
 ends with `lost` after 6 s without an authenticated frame (30 s before the first one, while the peer's microphone permission
-prompt may be open) or when the neighbor disappears.
+prompt may be open) or when no neighbor for the call has been present for 8 s. The neighbor is found by its hello card, by the node the call's
+authenticated frames came from (bound on the first frame), or by the node remembered on the contact (`contact.node`, saved when a hello card arrives)
+so a call answered right after the app was reopened, before any hello was exchanged, is not cut off.
 
 Ringing (Android, `Ringer`) follows the phone's own settings instead of the app volume: ringer mode normal = the default ringtone
 on the ring stream (`USAGE_NOTIFICATION_RINGTONE`, looping) plus vibration; vibrate mode = vibration only; silent mode, or Do Not Disturb /
@@ -625,8 +627,12 @@ Calls: an offer from a contact you added, accepted or wrote to, not older than 1
 ringing (a ring state expires after 45 s even if the caller's `end` never arrives), raises a full-screen notification on the `calls` channel and
 rings with `Ringer` for 45 s following the system sound modes; the lock-screen version of the notification is generic ("Incoming call"), and
 with app lock on the name is replaced by "Ripplo" everywhere. The full-screen target is `CallActivity`, a small native screen (caller, Answer,
-Decline) that may show over the lock screen; `MainActivity` never does, so chats stay behind the lock. Answer asks the system to dismiss the
-keyguard first and then starts `MainActivity` with `ripplo.chat` and a random one-time token created natively for this ring (`ripplo.answer`).
+Decline) that may show over the lock screen; `MainActivity` never does, so chats stay behind the lock. Answer does not ask for the unlock: it starts `MainActivity` with `ripplo.chat` and a random one-time token created natively for this
+ring (`ripplo.answer`), and `MainActivity` shows over the lock screen only when that token is valid right now (`Opener.peek`; the notification's
+Answer action sets `setAuthenticationRequired(false)`). The app then enters locked-call mode (`state.lockedCall`, entered when `isLocked()` is true at
+that moment): only the call screen is rendered, no chats, tabs, dialogs, toasts or app-lock overlay, the screen is kept on for the call
+(`keepAwake`), and when the call ends the activity is finished and removed (`endLockedCall`, also `setShowWhenLocked(false)`), returning to the lock
+screen. If the user unlocks the phone during the call the app simply continues normally; a call that never appears closes the mode after 25 s.
 The plugin turns the token into the call id only if it matches the current ring (`Opener.redeem`); the app accepts a call automatically only
 when its call id equals that value and the call is ringing within 20 s, so another app that fires the exported activity cannot trigger an
 answer. `ripplo.chat` is accepted only when it looks like a ripploId or a group id. Decline silences the ring and removes the offer from the

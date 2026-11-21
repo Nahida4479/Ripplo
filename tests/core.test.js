@@ -1198,3 +1198,59 @@ describe('messages already opened by the native layer', () => {
     expect(Object.keys(b.core.state.contacts)).toHaveLength(0)
   })
 })
+
+describe('calls survive a reopened app', () => {
+  async function live(timing = {}) {
+    const ea = fakeAudio(), eb = fakeAudio()
+    const t = { ...TIMING, callHold: 100, ...timing }
+    const a = await user('Alice', t, ea.api), b = await user('Bob', t, eb.api)
+    await a.core.addContactFromLink(b.link)
+    await b.core.addContactFromLink(a.link)
+    connect(a.mesh, b.mesh)
+    await waitFor(() => a.state.neighbors[0]?.card && b.state.neighbors[0]?.card)
+    await a.core.startCall(b.id)
+    await waitFor(() => b.state.call?.status === 'ringing')
+    await b.core.acceptCall()
+    await waitFor(() => a.state.call?.status === 'active' && b.state.call?.status === 'active')
+    await ea.handler([new Uint8Array([1])])
+    await waitFor(() => eb.frames.length === 1)
+    await eb.handler([new Uint8Array([2])])
+    await waitFor(() => ea.frames.length === 1)
+    return { a, b, ea, eb }
+  }
+
+  it('keeps the call and the audio when the neighbor cards are forgotten', async () => {
+    const { a, b, ea, eb } = await live()
+    a.state.neighbors[0].card = undefined
+    b.state.neighbors[0].card = undefined
+    await new Promise((r) => setTimeout(r, 1800))
+    expect(a.state.call.status).toBe('active')
+    expect(b.state.call.status).toBe('active')
+    await ea.handler([new Uint8Array([3])])
+    await waitFor(() => eb.frames.length === 2)
+    await eb.handler([new Uint8Array([4])])
+    await waitFor(() => ea.frames.length === 2)
+  })
+
+  it('tolerates a short loss of the neighbor and ends the call only when it stays gone', { timeout: 20000 }, async () => {
+    const { a } = await live({ callGone: 2500 })
+    const saved = a.state.neighbors.splice(0)
+    await new Promise((r) => setTimeout(r, 1600))
+    expect(a.state.call.status).toBe('active')
+    a.state.neighbors.push(...saved)
+    await new Promise((r) => setTimeout(r, 1500))
+    expect(a.state.call.status).toBe('active')
+    a.state.neighbors.splice(0)
+    await waitFor(() => a.state.call?.reason === 'lost', 6000)
+  })
+
+  it('shows a contact as in range through the remembered node before the card arrives', async () => {
+    const a = await user('Alice'), b = await user('Bob')
+    await a.core.addContactFromLink(b.link)
+    connect(a.mesh, b.mesh)
+    await waitFor(() => a.state.neighbors[0]?.card && b.state.neighbors[0]?.card)
+    await waitFor(() => a.state.contacts[b.id].node === a.state.neighbors[0].node)
+    a.state.neighbors[0].card = undefined
+    expect(a.state.neighbors.find((n) => n.node === a.state.contacts[b.id].node)).toBeTruthy()
+  })
+})

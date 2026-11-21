@@ -45,6 +45,11 @@ final class Opener {
         ringingAt = 0;
     }
 
+    static synchronized boolean peek(String token) {
+        return token != null && !token.isEmpty() && token.equals(ringingToken)
+                && System.currentTimeMillis() - ringingAt <= Notifier.RING_MS + 5000;
+    }
+
     static synchronized String redeem(String token) {
         if (token == null || token.isEmpty() || !token.equals(ringingToken)) return null;
         if (System.currentTimeMillis() - ringingAt > Notifier.RING_MS + 5000) return null;

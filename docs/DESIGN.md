@@ -117,7 +117,7 @@ monospace) + QR of it, actions: Verify with QR, Retry nearby, I'm sure it's them
 
 ## Settings (list of grouped cards, like the music app reference)
 
-- **Profile**: "Visible in Find people" switch, Change name (inline field, Save / Cancel), tappable avatar (pick a photo, cropped square; Remove button when set), name, ripploId, My QR. Photos show in chat list, chat header, contact page, People and New chat; initials otherwise.
+- **Profile**: "Visible in Find people" switch, tapping the name edits it in place (Save / Cancel; there is no separate button), tappable avatar (pick a photo, cropped square; Remove button when set), name, ripploId, My QR. Photos show in chat list, chat header, contact page, People and New chat; initials otherwise.
 - **Appearance**: mode segmented control, Accent color swatches, Background gradient swatches,
   Language.
 - **Network**: live list of transports with state + measured speed; Background relay toggle
@@ -135,4 +135,4 @@ Android: the status-bar glyph is the monochrome `ic_stat_ripplo` tinted with the
 rendered from `public/icon.svg` by `scripts/icons.sh`) is the large icon of every notification, native and local. iOS always shows the app icon
 (`AppIcon`, the same artwork as `public/icon_ios.png`), which cannot be changed per notification.
 Titles are the sender's name (groups: "group: name"), the body is the message text, "Sent a photo" or "Sent an attachment"; invitations read
-"Contact invitation"; incoming calls use a small native full-screen call screen (name, Answer, Decline) that can appear over the lock screen without exposing the chats; Answer first asks for the unlock. On the lock screen messages show only "New message".
+"Contact invitation"; incoming calls use a small native full-screen call screen (name, Answer, Decline) that can appear over the lock screen without exposing the chats; Answer connects at once without unlocking: only the call screen is shown over the lock screen (the screen stays on) and the chats stay hidden until the phone is unlocked. On the lock screen messages show only "New message".

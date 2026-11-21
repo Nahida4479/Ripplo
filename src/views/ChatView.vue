@@ -24,7 +24,7 @@ const scroller = ref(null)
 const fileIn = ref(null)
 
 const route = computed(() => {
-  const n = state.neighbors.find(x => x.card?.id === id)
+  const n = state.neighbors.find(x => x.card?.id === id || (x.node && x.node === state.contacts[id]?.node))
   return n ? String(n.medium).toUpperCase() : null
 })
 const sub = computed(() => {

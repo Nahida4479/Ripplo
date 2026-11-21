@@ -4,6 +4,7 @@ import { Phone, PhoneOff, Mic, MicOff } from 'lucide-vue-next'
 import { state } from '../core/state.js'
 import { acceptCall, hangUp, setMuted } from '../core/api.js'
 import { startRing, stopRing } from '../services/ringtone.js'
+import { mesh } from '../mesh/bridge.js'
 import { t } from '../i18n.js'
 import Avatar from './Avatar.vue'
 
@@ -25,7 +26,8 @@ const status = computed(() => {
 })
 
 watch(incoming, (on) => (on ? startRing() : stopRing()), { immediate: true })
-onBeforeUnmount(() => { clearInterval(tick); stopRing() })
+watch(() => !!call.value && call.value.status !== 'ended', (on) => mesh.keepAwake(on), { immediate: true })
+onBeforeUnmount(() => { clearInterval(tick); stopRing(); mesh.keepAwake(false) })
 </script>
 <template>
   <div v-if="call" class="call" role="dialog" aria-modal="true" :aria-label="peer?.name">

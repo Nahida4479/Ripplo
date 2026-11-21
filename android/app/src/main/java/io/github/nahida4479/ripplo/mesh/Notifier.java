@@ -157,7 +157,7 @@ final class Notifier {
                 .setTimeoutAfter(RING_MS)
                 .setFullScreenIntent(show, true)
                 .setContentIntent(show)
-                .addAction(0, ctx.getString(R.string.call_answer), answer)
+                .addAction(new NotificationCompat.Action.Builder(0, ctx.getString(R.string.call_answer), answer).setAuthenticationRequired(false).build())
                 .addAction(0, ctx.getString(R.string.call_decline), decline)
                 .build();
         try {

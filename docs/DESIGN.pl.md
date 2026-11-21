@@ -118,7 +118,7 @@ czcionką monospace) + jego QR, akcje: Zweryfikuj kodem QR, Ponów sprawdzenie w
 
 ## Ustawienia (lista zgrupowanych kart, jak w referencyjnej aplikacji muzycznej)
 
-- **Profil**: przełącznik „Widoczność w Znajdź osoby”, Zmień nazwę (pole w wierszu, Zapisz / Anuluj), awatar do kliknięcia (wybór zdjęcia, kadr do kwadratu; przycisk Usuń gdy ustawione), imię, ripploId, Mój QR. Zdjęcia widać na liście czatów, w nagłówku czatu, na stronie kontaktu, w Szukaj osób i Nowy czat; inaczej inicjały.
+- **Profil**: przełącznik „Widoczność w Znajdź osoby”, stuknięcie w nazwę edytuje ją w miejscu (Zapisz / Anuluj; nie ma osobnego przycisku), awatar do kliknięcia (wybór zdjęcia, kadr do kwadratu; przycisk Usuń gdy ustawione), imię, ripploId, Mój QR. Zdjęcia widać na liście czatów, w nagłówku czatu, na stronie kontaktu, w Szukaj osób i Nowy czat; inaczej inicjały.
 - **Wygląd**: kontrolka segmentowa trybu, próbki Koloru akcentu, próbki Tła (gradient),
   Język.
 - **Sieć**: lista transportów na żywo ze stanem + zmierzoną prędkością; przełącznik Przekazywania w tle
@@ -136,4 +136,4 @@ Android: glif na pasku stanu to jednobarwne `ic_stat_ripplo` w kolorze akcentu, 
 `public/icon.svg` przez `scripts/icons.sh`) jest dużą ikoną każdego powiadomienia, natywnego i lokalnego. iOS zawsze pokazuje ikonę aplikacji (`AppIcon`,
 ta sama grafika co `public/icon_ios.png`), której nie można zmienić dla pojedynczego powiadomienia.
 Tytuł to nazwa nadawcy (grupy: „grupa: nazwa”), treść to tekst wiadomości, „Wysłano zdjęcie” lub „Wysłano załącznik”; zaproszenia mają
-„Zaproszenie do kontaktów”; połączenia przychodzące używają małego natywnego pełnoekranowego ekranu połączenia (nazwa, Odbierz, Odrzuć), który może pojawić się nad ekranem blokady bez odsłaniania czatów; Odbierz najpierw prosi o odblokowanie. Na ekranie blokady wiadomości pokazują tylko „Nowa wiadomość”.
+„Zaproszenie do kontaktów”; połączenia przychodzące używają małego natywnego pełnoekranowego ekranu połączenia (nazwa, Odbierz, Odrzuć), który może pojawić się nad ekranem blokady bez odsłaniania czatów; Odbierz łączy od razu bez odblokowywania: nad blokadą widać tylko ekran rozmowy (ekran zostaje włączony), a czaty zostają ukryte do odblokowania telefonu. Na ekranie blokady wiadomości pokazują tylko „Nowa wiadomość”.

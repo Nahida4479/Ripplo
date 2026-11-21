@@ -12,12 +12,50 @@ const go = (router, id) => { if (CHAT_ID.test(String(id))) router.push('/chat/' 
 export function startOpen(router) {
   let want = null
 
+  let sawCall = false
+  let poll = null
+  let guard = null
+
+  function endLocked() {
+    clearInterval(poll)
+    clearTimeout(guard)
+    poll = guard = null
+    sawCall = false
+    if (!state.lockedCall) return
+    state.lockedCall = false
+    mesh.endLockedCall()
+  }
+
+  async function enterLocked() {
+    if (state.lockedCall || !(await mesh.isLocked())) return
+    state.lockedCall = true
+    sawCall = !!state.call
+    guard = setTimeout(() => { if (!state.call) endLocked() }, ANSWER_WINDOW + 5000)
+    poll = setInterval(async () => {
+      if (!(await mesh.isLocked())) {
+        clearInterval(poll)
+        clearTimeout(guard)
+        poll = guard = null
+        state.lockedCall = false
+      }
+    }, 1000)
+  }
+
   async function take() {
     const o = await mesh.takeOpen()
     if (!o) return
+    if (o.answer) {
+      want = { peer: o.chatId, id: o.answer, until: Date.now() + ANSWER_WINDOW }
+      await enterLocked()
+    }
     go(router, o.chatId)
-    if (o.answer) want = { peer: o.chatId, id: o.answer, until: Date.now() + ANSWER_WINDOW }
   }
+
+  watch(() => !!state.call, (has) => {
+    if (!state.lockedCall) return
+    if (has) sawCall = true
+    else if (sawCall) endLocked()
+  })
 
   watch(
     () => [state.call?.status, state.call?.peer, state.call?.dir, state.call?.id],

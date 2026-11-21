@@ -1,7 +1,6 @@
 package io.github.nahida4479.ripplo.mesh;
 
 import android.app.Activity;
-import android.app.KeyguardManager;
 import android.content.Intent;
 import android.graphics.Color;
 import android.graphics.drawable.GradientDrawable;
@@ -117,17 +116,7 @@ public class CallActivity extends Activity {
     }
 
     private void answerCall() {
-        KeyguardManager km = (KeyguardManager) getSystemService(KEYGUARD_SERVICE);
-        if (Build.VERSION.SDK_INT >= 26 && km != null && km.isKeyguardLocked()) {
-            km.requestDismissKeyguard(this, new KeyguardManager.KeyguardDismissCallback() {
-                @Override
-                public void onDismissSucceeded() {
-                    launchMain();
-                }
-            });
-        } else {
-            launchMain();
-        }
+        launchMain();
     }
 
     @Override
