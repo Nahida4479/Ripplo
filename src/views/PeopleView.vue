@@ -38,7 +38,7 @@ const nearbyPerson = n => ({ id: n.card.id, name: n.card.name, card: n.card.card
     <div class="card">
       <div v-if="!nearby.length" class="empty">{{ t('nobodyNearby') }}</div>
       <div v-for="n in nearby" :key="n.node" class="row">
-        <Avatar :name="n.card.name" :size="40" />
+        <Avatar :name="n.card.name" :photo="state.contacts[n.card.id]?.avatar" :size="40" />
         <span class="grow"><span class="label">{{ n.card.name }}</span><br />
           <span class="chip">{{ medium(n.medium) }}</span> <span class="hint">{{ n.kbps }} kbps</span></span>
         <Check v-if="isContact(n.card.id)" :size="22" color="var(--ok)" :aria-label="t('inContacts')" />
@@ -50,7 +50,7 @@ const nearbyPerson = n => ({ id: n.card.id, name: n.card.name, card: n.card.card
     <div class="card">
       <div v-if="!state.people.length" class="empty">{{ t('nobodyInMesh') }}</div>
       <div v-for="p in state.people" :key="p.id" class="row">
-        <Avatar :name="p.name" :size="40" />
+        <Avatar :name="p.name" :photo="state.contacts[p.id]?.avatar" :size="40" />
         <span class="grow"><span class="label">{{ p.name }}</span><br /><span class="hint">{{ t('hops', { n: p.hops }) }}</span></span>
         <Check v-if="p.isContact || isContact(p.id)" :size="22" color="var(--ok)" :aria-label="t('inContacts')" />
         <button v-else class="btn sm" @click="add(p)">{{ t('add') }}</button>

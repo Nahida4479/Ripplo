@@ -5,6 +5,7 @@ import { createVault } from '../crypto/vault.js'
 import { openDb } from '../crypto/db.js'
 import { RipploError, encodeCard, checkCard, encodeLink, parseLink, deriveIds, cleanName } from '../crypto/identity.js'
 import { CHUNK, encryptFile, decryptFile, chunkCount, chunkPayload, parseChunk } from '../crypto/attachment.js'
+import { isAvatar } from '../lib/avatar.js'
 import { createState } from './state.js'
 import { notify } from '../services/notifications.js'
 import { t } from '../i18n.js'
@@ -54,10 +55,10 @@ export function createCore({ mesh, dbName = 'ripplo', state = createState(), not
   const persistMsg = (m) => db.putMsg({ ...m, att: m.att && { ...m.att, url: undefined } })
   const tagOf = (c) => deriveIds(unb64(c.ik)).tag
 
-  function loadMe(name) {
+  function loadMe(name, avatar = '') {
     const { tag, ripploId } = deriveIds(own.ik)
-    me = { ik: own.ik, tag, id: ripploId, name, card: encodeCard(name, own.bundle) }
-    state.profile = { name, ripploId, tag: hex(tag) }
+    me = { ik: own.ik, tag, id: ripploId, name, avatar, avVer: avatar ? hex(sha256(utf8(avatar))).slice(0, 8) : '', card: encodeCard(name, own.bundle) }
+    state.profile = { name, ripploId, tag: hex(tag), avatar }
   }
 
   async function init() {
@@ -73,7 +74,7 @@ export function createCore({ mesh, dbName = 'ripplo', state = createState(), not
     const profile = await db.get('kv', 'profile')
     state.needsOnboarding = !profile
     if (profile) {
-      loadMe(profile.name)
+      loadMe(profile.name, profile.avatar)
       await dropExpired()
       await start()
       if (await db.get('kv', 'needsSessionReset')) {
@@ -91,6 +92,15 @@ export function createCore({ mesh, dbName = 'ripplo', state = createState(), not
     loadMe(clean)
     state.needsOnboarding = false
     await start()
+  }
+
+  async function setAvatar(avatar) {
+    if (avatar && !isAvatar(avatar)) throw new RipploError('bad_avatar')
+    await db.put('kv', 'profile', { name: me.name, avatar: avatar || '' })
+    loadMe(me.name, avatar || '')
+    for (const c of Object.values(state.contacts)) {
+      buildPacket(c, { t: 'avatar' }).then(transmit).then((r) => { if (!r.ok) c.avSent = '?' }).catch(() => { c.avSent = '?' })
+    }
   }
 
   async function start() {
@@ -184,6 +194,11 @@ export function createCore({ mesh, dbName = 'ripplo', state = createState(), not
       obj = { ...extra, c: b64(me.card) }
       if (!c.cardSent) { c.cardSent = Date.now(); persistContact(c) }
     }
+    if ((me.avatar || c.avSent) && c.avSent !== me.avVer) {
+      obj = { ...obj, av: me.avatar }
+      c.avSent = me.avVer
+      persistContact(c)
+    }
     const payload = await mesh.signalSeal(hex(tagOf(c)), utf8(JSON.stringify(obj)))
     return encodePacket({ type: TYPE.DATA, dest: tagOf(c), payload })
   }
@@ -236,6 +251,7 @@ export function createCore({ mesh, dbName = 'ripplo', state = createState(), not
         m.delivered = m.total - m.undelivered.length
         m.hops = r.hops
       } else if (r.error) m.errored = true
+      if (!r.ok) state.contacts[rid].avSent = '?'
     })).then(() => {
       m.status = m.undelivered.length === 0 ? 'delivered' : m.errored ? 'failed' : 'out_of_range'
       persistMsg(m)
@@ -331,6 +347,10 @@ export function createCore({ mesh, dbName = 'ripplo', state = createState(), not
     const msg = JSON.parse(unutf8(plaintext))
     const c = state.contacts[f]
     if (c.cardSent && !c.cardAck) { c.cardAck = true; persistContact(c) }
+    if (typeof msg?.av === 'string' && (msg.av === '' || isAvatar(msg.av)) && (c.avatar || '') !== msg.av) {
+      c.avatar = msg.av
+      await persistContact(c)
+    }
     if (msg && typeof msg.c === 'string' && !c.card) {
       try {
         const v = checkCard(unb64(msg.c))
@@ -707,7 +727,7 @@ export function createCore({ mesh, dbName = 'ripplo', state = createState(), not
   }
 
   return {
-    state, init, close, createProfile, myInviteLink: () => encodeLink(me.card), addContactFromLink, addPerson,
+    state, init, close, createProfile, setAvatar, myInviteLink: () => encodeLink(me.card), addContactFromLink, addPerson,
     verifyNearby, verifyByQr, markVerified, safetyNumber, sendText, sendAttachment, retry, loadMessages,
     markRead, createGroup, refreshPeople, deleteChat, deleteContact, saveSettings, restoreBackup,
   }

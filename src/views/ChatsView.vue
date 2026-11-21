@@ -23,7 +23,7 @@ const fmt = ts => {
   <main class="page">
     <header class="hdr">
       <button class="icon-btn" :aria-label="t('profile')" @click="router.push('/settings')">
-        <Avatar :name="state.profile?.name" :size="36" />
+        <Avatar :name="state.profile?.name" :photo="state.profile?.avatar" :size="36" />
       </button>
       <h1>{{ t('chats') }}</h1>
       <button class="icon-btn" :aria-label="t('addContact')" @click="ui.add = { mode: 'add' }"><QrCode :size="22" :stroke-width="1.75" /></button>
@@ -36,7 +36,7 @@ const fmt = ts => {
       <button class="btn" @click="ui.add = { mode: 'add' }">{{ t('addContact') }}</button>
     </div>
     <button v-for="c in list" :key="c.id" class="list-row" @click="router.push('/chat/' + c.id)">
-      <Avatar :name="c.name" :group="c.type === 'group'" :shield="shield(c)" />
+      <Avatar :name="c.name" :photo="state.contacts[c.id]?.avatar" :group="c.type === 'group'" :shield="shield(c)" />
       <span class="grow">
         <span class="name" style="display: block">{{ c.name }}</span>
         <span class="prev"><template v-if="c.lastKind === 'voice'"><Mic :size="14" />{{ t('voiceMessage') }}</template><template v-else-if="c.lastKind">{{ t(c.lastKind === 'video' ? 'videoMessage' : 'photoMessage') }}</template><template v-else>{{ c.lastText }}</template></span>

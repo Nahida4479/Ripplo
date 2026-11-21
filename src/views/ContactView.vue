@@ -35,7 +35,7 @@ function del() {
   <main v-if="c" class="page" style="padding-bottom: calc(var(--sab) + 24px)">
     <header class="hdr"><button class="icon-btn" :aria-label="t('back')" @click="router.back()"><ChevronLeft :size="24" /></button></header>
     <div class="center" style="min-height: 0; padding: 8px 0 20px; gap: 6px">
-      <Avatar :name="c.name" :size="88" />
+      <Avatar :name="c.name" :photo="c.avatar" :size="88" />
       <h1 style="margin: 8px 0 0; font-size: 24px">{{ c.name }}</h1>
       <div class="mono hint" style="color: var(--text-2); font-size: 13px">{{ c.id }}</div>
     </div>

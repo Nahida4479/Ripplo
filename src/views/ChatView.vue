@@ -103,7 +103,7 @@ function sure() { ui.confirm = { title: t('imSure'), text: t('imSureConfirm'), o
     <header class="hdr top">
       <button class="icon-btn" :aria-label="t('back')" @click="router.back()"><ChevronLeft :size="24" /></button>
       <button class="who" :aria-label="t('contactInfo')" :disabled="isGroup" @click="router.push('/contact/' + id)">
-        <Avatar :name="name" :size="38" :group="isGroup" />
+        <Avatar :name="name" :photo="contact?.avatar" :size="38" :group="isGroup" />
         <span><b>{{ name }}</b><br /><small>{{ sub }}</small></span>
       </button>
     </header>

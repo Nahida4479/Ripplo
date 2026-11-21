@@ -91,7 +91,7 @@ czcionką monospace) + jego QR, akcje: Zweryfikuj kodem QR, Ponów sprawdzenie w
 
 ## Ustawienia (lista zgrupowanych kart, jak w referencyjnej aplikacji muzycznej)
 
-- **Profil**: imię, ripploId, Mój QR.
+- **Profil**: awatar do kliknięcia (wybór zdjęcia, kadr do kwadratu; przycisk Usuń gdy ustawione), imię, ripploId, Mój QR. Zdjęcia widać na liście czatów, w nagłówku czatu, na stronie kontaktu, w Szukaj osób i Nowy czat; inaczej inicjały.
 - **Wygląd**: kontrolka segmentowa trybu, próbki Koloru akcentu, próbki Tła (gradient),
   Język.
 - **Sieć**: lista transportów na żywo ze stanem + zmierzoną prędkością; przełącznik Przekazywania w tle

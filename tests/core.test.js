@@ -5,6 +5,7 @@ import { createCore } from '../src/core/messenger.js'
 import { TYPE, encodePacket, decodePacket, newId } from '../src/mesh/packet.js'
 import { createDevSignal } from '../src/mesh/devSignal.js'
 import { parseLink } from '../src/crypto/identity.js'
+import { isAvatar } from '../src/lib/avatar.js'
 import { createVault } from '../src/crypto/vault.js'
 import { openDb } from '../src/crypto/db.js'
 import { b64, b64url, hex, utf8, unutf8, random, concat } from '../src/lib/bytes.js'
@@ -307,5 +308,40 @@ describe('card piggyback and session reset', () => {
     await second.init()
     expect(calls.sort()).toEqual([hex(parseLink(a.link).tag), hex(parseLink(b.link).tag)].sort())
     expect(await (await openDb(dbName, await createVault(mesh), mesh)).get('kv', 'needsSessionReset')).toBeUndefined()
+  })
+})
+
+describe('profile picture', () => {
+  const jpeg = (n) => b64(concat(new Uint8Array([0xff, 0xd8, 0xff, 0xe0]), new Uint8Array(n).fill(7)))
+  it('validates avatars', () => {
+    expect(isAvatar(jpeg(100))).toBe(true)
+    expect(isAvatar(b64(utf8('<svg onload=alert(1)>')))).toBe(false)
+    expect(isAvatar(jpeg(20000))).toBe(false)
+    expect(isAvatar('')).toBe(false)
+  })
+
+  it('reaches the contact with the first message and follows changes and removal', async () => {
+    const a = await user('Alice'), b = await user('Bob')
+    expect(await codeOf(a.core.setAvatar('not-a-jpeg'))).toBe('bad_avatar')
+    await a.core.setAvatar(jpeg(100))
+    await a.core.addContactFromLink(b.link)
+    await a.core.sendText(b.id, 'hi')
+    await waitFor(() => b.state.contacts[a.id]?.avatar === jpeg(100))
+    await a.core.setAvatar(jpeg(200))
+    await waitFor(() => b.state.contacts[a.id].avatar === jpeg(200))
+    await a.core.setAvatar('')
+    await waitFor(() => b.state.contacts[a.id].avatar === '')
+    expect(a.state.profile.avatar).toBe('')
+  })
+
+  it('ignores an invalid avatar from a peer', async () => {
+    const a = await user('Alice'), b = await user('Bob')
+    const seal = a.mesh.signalSeal
+    a.mesh.signalSeal = (tag, pt) => seal(tag, utf8(JSON.stringify({ ...JSON.parse(unutf8(pt)), av: b64(utf8('<svg/>')) })))
+    await a.core.addContactFromLink(b.link)
+    await a.core.sendText(b.id, 'hi')
+    await waitFor(() => b.state.contacts[a.id])
+    await waitFor(() => b.state.messages[a.id]?.length)
+    expect(b.state.contacts[a.id].avatar).toBeUndefined()
   })
 })

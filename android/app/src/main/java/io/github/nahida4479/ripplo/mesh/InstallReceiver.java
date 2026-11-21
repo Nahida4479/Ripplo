@@ -17,10 +17,16 @@ public class InstallReceiver extends BroadcastReceiver {
                     : (Intent) intent.getParcelableExtra(Intent.EXTRA_INTENT);
             if (confirm != null) {
                 confirm.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-                try { ctx.startActivity(confirm); } catch (RuntimeException ignored) { }
+                try {
+                    ctx.startActivity(confirm);
+                    return;
+                } catch (RuntimeException e) {
+                    RipploMeshPlugin.installResult(false, -1, "cannot open installer");
+                    return;
+                }
             }
             return;
         }
-        RipploMeshPlugin.installResult(status == PackageInstaller.STATUS_SUCCESS, status);
+        RipploMeshPlugin.installResult(status == PackageInstaller.STATUS_SUCCESS, status, intent.getStringExtra(PackageInstaller.EXTRA_STATUS_MESSAGE));
     }
 }

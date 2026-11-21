@@ -1018,7 +1018,7 @@ public class RipploMeshPlugin extends Plugin implements MeshEngine.Listener {
         }
     }
 
-    static void installResult(boolean ok, int status) {
+    static void installResult(boolean ok, int status, String message) {
         PluginCall c = installCall;
         installCall = null;
         if (c == null) return;
@@ -1027,7 +1027,7 @@ public class RipploMeshPlugin extends Plugin implements MeshEngine.Listener {
             r.put("status", "success");
             c.resolve(r);
         } else {
-            c.reject("install failed " + status);
+            c.reject("install failed " + status + (message == null ? "" : ": " + message));
         }
     }
 }

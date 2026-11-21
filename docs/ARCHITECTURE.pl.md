@@ -228,6 +228,19 @@ z prawdziwą osobą to mocna weryfikacja.
 Numer bezpieczeństwa (safety number): w stylu Signal, 60 cyfr z obu kluczy tożsamości (SHA-512 iterowany 5200×,
 `fingerprint version 0 | key | ripploId`), wyświetlany w 12 grupach po 5 oraz jako QR.
 
+### Zdjęcie profilowe
+
+Opcjonalne, ustawiane w Ustawienia → Profil: kadrowane do JPEG 160×160, ≤ 16 KiB, zapisane w `kv/profile.avatar`
+(base64). Nigdy nie trafia do karty, QR, linku, `hello` ani `REPLY` (muszą być małe i docierają do obcych).
+Podróżuje tylko jako pole `av` w wiadomości szyfrowanej Signalem, więc przekaźnik go nie widzi:
+- `av` jest dołączane do wiadomości do kontaktu, gdy `contact.avSent != wersjaMojegoZdjęcia`
+  (`SHA-256(avatar)[0..4]`, puste gdy brak). Pierwsza wiadomość do nowego kontaktu zawsze je niesie, więc odbiorca
+  widzi zdjęcie osoby, która go dodała lub chce dodać.
+- Zmiana lub usunięcie zdjęcia wysyła `{ "t": "avatar" }` (sam nośnik) do każdego kontaktu; nieudane wysłanie
+  zeruje `avSent`, więc następna wiadomość ponawia. `av: ""` usuwa zdjęcie u odbiorcy.
+- Odbiorca przyjmuje `av` tylko jeśli to base64, ≤ 16 KiB i zaczyna się od magicznych bajtów JPEG `FF D8 FF`,
+  po czym zapisuje `contact.avatar`; w przeciwnym razie ignoruje.
+
 ## 6. Wiadomości APP link-local (JSON)
 
 - `{ "t": "hello", "card": "<b64 card bytes>" }` — wysyłana do każdego nowego sąsiada; wypełnia sekcję „W pobliżu” w zakładce Ludzie
@@ -289,8 +302,12 @@ i pokazuje pozbawione treści powiadomienie *„Nowa wiadomość”* dla payload
   `Ripplo-vX.Y.Z-unsigned.ipa` oraz `SHA256SUMS` w wydaniu na GitHubie.
 - Aplikacja (gdy jest internet) odczytuje `api.github.com/repos/Nahida4479/Ripplo/releases/latest`; nowszy
   semver pokazuje plakietkę aktualizacji. Android z włączoną automatyczną aktualizacją: warstwa natywna pobiera APK, sprawdza jego
-  SHA-256 względem `SHA256SUMS` oraz jego certyfikat podpisu względem zainstalowanego, a następnie instaluje
+  SHA-256 względem skrótu wydania oraz jego certyfikat podpisu względem zainstalowanego, a następnie instaluje
   przez `PackageInstaller` (po cichu od drugiej samoaktualizacji, Android 12+).
+- Skróty wydania pochodzą z pola `digest` zasobu w odpowiedzi API (zapasowo: blok `SHA256SUMS` w opisie wydania);
+  `SHA256SUMS` nie jest pobierany z WebView, bo przekierowania pobierania z github.com nie mają nagłówków CORS.
+  Obecna wersja to natywne `versionName` (`App.getInfo()`), a nie wersja z `package.json`.
+- Błędy natywnej instalacji niosą komunikat statusu `PackageInstaller`, widoczny w Ustawienia → Aktualizacje.
 - Autokontrola: na Androidzie aplikacja liczy skrót własnego zainstalowanego APK i porównuje go z `SHA256SUMS`
   wydania odpowiadającego jej wersji — więc kopie udostępnione przez Nearby Share / Quick Share są również weryfikowane.
   Wynik widoczny w Ustawienia → Bezpieczeństwo.

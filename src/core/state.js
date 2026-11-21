@@ -14,7 +14,7 @@ export function createState() {
     people: [],
     peopleRefreshedAt: 0,
     peopleRefreshing: false,
-    update: { checking: false, latest: null, available: false, url: null, apkUrl: null, sha256: null, progress: 0, error: null },
+    update: { current: '', checking: false, latest: null, available: false, url: null, apkUrl: null, sha256: null, progress: null, error: null },
     integrity: { status: 'unknown', checkedAt: 0 },
     settings: { autoUpdate: true, backgroundRelay: true },
   })
