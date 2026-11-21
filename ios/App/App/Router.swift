@@ -45,12 +45,8 @@ final class Router {
                 return
             }
             if p.type == PacketType.discover && from != Router.SELF { deliver(p, from) }
-            if from != Router.SELF && p.ttl <= 1 {
-                _ = send(from, make(PacketType.deadEnd, dest: p.id))
-                return
-            }
             var q = p
-            if from != Router.SELF { q.ttl = min(p.ttl, MeshConst.ttlDefault) - 1; q.hops = UInt8(min(Int(p.hops) + 1, 255)) }
+            if from != Router.SELF { q.hops = UInt8(min(Int(p.hops) + 1, 255)) }
             let targets: [String]
             if p.type == PacketType.data, let r = routes[p.dest], t - r.ts < MeshConst.entryLifetime,
                r.node != from, neighbors().contains(r.node) {

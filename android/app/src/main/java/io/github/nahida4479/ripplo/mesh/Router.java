@@ -69,12 +69,8 @@ final class Router {
                     return 0;
                 }
                 if (p.type == Packet.DISCOVER && !fromSelf) host.deliver(p, from);
-                if (!fromSelf && p.ttl <= 1) { sendDeadEnd(from, id); return 0; }
                 Packet q = p.copy();
-                if (!fromSelf) {
-                    q.ttl = Math.min(p.ttl, Packet.TTL_DEFAULT) - 1;
-                    q.hops = Math.min(p.hops + 1, 255);
-                }
+                if (!fromSelf) q.hops = Math.min(p.hops + 1, 255);
                 Route route = p.type == Packet.DATA ? routes.get(dest) : null;
                 List<String> nb = host.neighbors();
                 List<String> targets = new ArrayList<>();

@@ -96,9 +96,9 @@ Po dodaniu kontaktu aplikacja przez 60 sekund szuka go jako bezpośredniego sąs
 ## Jak podróżują wiadomości
 
 - Wiadomości podróżują przeskok po przeskoku: każdy telefon przekazuje pakiet swoim sąsiadom, a gdy trasa zostanie poznana, kolejne pakiety idą już nią.
-- Każdy pakiet ma TTL równy 8 przeskokom.
+- Nie ma limitu przeskoków: wiadomość przejdzie przez dowolnie długi łańcuch telefonów.
 - Wiadomości nie mogą krążyć w pętli: każdy telefon przekazuje dany pakiet najwyżej raz, a duplikaty są odrzucane odpowiedzią „ślepy zaułek” (dead end) zamiast być przekazywane dalej.
-- Jeśli wszystkie ścieżki zawiodą, nadawca widzi „Kontakt jest poza zasięgiem sieci mesh” i może spróbować ponownie. Aplikacja rezygnuje też po 90 sekundach bez odpowiedzi.
+- Jeśli wszystkie ścieżki zawiodą, nadawca widzi „Kontakt jest poza zasięgiem sieci mesh” i może spróbować ponownie. Aplikacja rezygnuje też po 5 minutach bez odpowiedzi.
 - Etapy dostarczenia: `encrypting`, `sending`, `delivered` (z liczbą telefonów, przez które przeszła), `out of range`.
 - Przychodzące wiadomości są potwierdzane od razu po zapisaniu, więc dostarczanie działa przy wyłączonym ekranie i zamkniętej aplikacji.
 - Przekazywanie odbywa się natywnie, więc telefony przekazują wiadomości także w tle.

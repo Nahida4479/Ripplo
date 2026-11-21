@@ -1,4 +1,4 @@
-import { TYPE, TTL_DEFAULT, decodePacket, encodePacket, newId } from './packet.js'
+import { TYPE, decodePacket, encodePacket, newId } from './packet.js'
 
 const SELF = 'self'
 const EXPIRY_MS = 10 * 60 * 1000
@@ -49,8 +49,7 @@ export class Router {
           return
         }
         if (p.type === TYPE.DISCOVER && from !== SELF) this.deliver(bytes, from)
-        if (from !== SELF && p.ttl <= 1) { this.sendDeadEnd(from, id); return }
-        const q = from === SELF ? bytes : encodePacket({ ...p, ttl: Math.min(p.ttl, TTL_DEFAULT) - 1, hops: Math.min(p.hops + 1, 255) })
+        const q = from === SELF ? bytes : encodePacket({ ...p, hops: Math.min(p.hops + 1, 255) })
         const route = p.type === TYPE.DATA ? this.routes.get(dest) : null
         const targets = route && this.links.has(route.n) && route.n !== from
           ? [route.n]

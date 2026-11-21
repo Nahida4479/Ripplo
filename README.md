@@ -96,9 +96,9 @@ After adding a contact, the app looks for them as a direct neighbor for 60 secon
 ## How messages travel
 
 - Messages travel hop by hop: every phone forwards a packet to its neighbors, and once a route is learned the following packets go along it.
-- Each packet has a TTL of 8 hops.
+- There is no hop limit: a message crosses any chain of phones, however long.
 - Messages cannot loop: every phone forwards a given packet at most once, and duplicates are answered with a "dead end" instead of being forwarded.
-- If every path dies, the sender sees "Contact is out of mesh range" and can retry. The app also gives up after 90 seconds without an answer.
+- If every path dies, the sender sees "Contact is out of mesh range" and can retry. The app also gives up after 5 minutes without an answer.
 - Delivery stages: `encrypting`, `sending`, `delivered` (with the number of phones it passed through), `out of range`.
 - Incoming messages are acknowledged as soon as they are stored, so delivery works with the screen off and the app closed.
 - Relaying happens natively, so phones keep relaying in the background.

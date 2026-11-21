@@ -9,7 +9,7 @@ Vue 3 (JS) UI + crypto in a Capacitor 8 WebView; transports and the relay router
 ```
 ┌──────────────── WebView (JS) ────────────────┐      ┌──────── native (Kotlin / Swift) ────────┐
 │ Vue UI ── core/api.js ── crypto/* (Signal)   │      │ MeshEngine (foreground service on Android)│
-│                  │                           │ base64│  Router  (dedupe, TTL, reverse paths)    │
+│                  │                           │ base64│  Router  (dedupe, reverse paths)        │
 │            mesh/bridge.js ───────────────────┼──────►│  Links   (best link per neighbor)        │
 │  (web dev fallback: mesh/router.js +         │◄──────┤  Transports: BLE GATT, BLE L2CAP, LAN,   │
 │   BroadcastChannel between browser tabs)     │events │  Wi-Fi Direct*, Wi-Fi Aware*, Multipeer** │
@@ -74,7 +74,7 @@ Limits: text ≤ 1000 characters, attachment ≤ 20 MiB (before encryption).
 |-----|------|-------|
 | 0   | 1    | version = `1` |
 | 1   | 1    | type |
-| 2   | 1    | ttl  (hops still allowed) |
+| 2   | 1    | ttl  (reserved, ignored; send 8) |
 | 3   | 1    | hops (hops taken so far) |
 | 4   | 16   | id   (random per packet) |
 | 20  | 16   | dest |
@@ -97,7 +97,7 @@ Max packet 65 536 bytes. Types:
 DATA payload first byte: `0x01` sealed message, `0x02` attachment chunk
 (`0x02 | attId(16) | index u32 | total u32 | bytes`).
 
-Defaults: `TTL = 8`, seen/reverse/route entries expire after 10 min, seen-cache cap 20 000.
+No hop limit. Defaults: seen/reverse/route entries expire after 10 min, seen-cache cap 20 000.
 
 ### 3.1 Router (identical in `src/mesh/router.js`, Kotlin and Swift)
 
@@ -112,8 +112,7 @@ onPacket(p, from):                       # from = neighbor nodeTag, or SELF for 
     mark seen; reverse[p.id] = {prev: from, dest: p.dest, pending: 0, done: false}
     if DATA and p.dest == self: persist to inbox; send ACK(dest=p.id, hops=0) to from; deliver; return
     if DISCOVER and from != SELF: deliver to JS          # JS may answer with REPLY
-    if from != SELF and p.ttl <= 1: send DEAD_END to from; return
-    q = copy(p); if from != SELF: q.ttl = min(p.ttl, 8) - 1; q.hops = min(p.hops+1, 255)   # clamp hostile TTL
+    q = copy(p); if from != SELF: q.hops = min(p.hops+1, 255)
     targets = DATA and routes[p.dest] alive and != from ? [routes[p.dest]] : neighbors - from
     if targets empty: deadEnd(p.id); return
     reverse[p.id].pending = len(targets); send q to each
@@ -133,10 +132,11 @@ deadEnd(id):  r = reverse[id]; r.done = true
               else send DEAD_END(new id, dest=id) to r.prev
 ```
 
-Why messages cannot loop: every node forwards a given `id` at most once (seen-set), TTL drops
-by one per hop, and duplicates are answered with DEAD_END instead of being forwarded. When every
+Why messages cannot loop: every node forwards a given `id` at most once (seen-set), so a
+packet can never pass the same phone twice, and duplicates are answered with DEAD_END instead of being forwarded. When every
 branch dies the DEAD_ENDs aggregate back to the sender, which shows *"Contact is out of mesh range"*.
-JS also gives up after 90 s without ACK/DEAD_END (links can vanish mid-flight).
+There is no hop limit, so a message crosses any chain of phones, however long. JS also gives up
+after 5 min without ACK/DEAD_END (links can vanish mid-flight).
 
 The ACK on the way back teaches every relay `routes[dest] = neighbor`, so later packets (e.g. media
 chunks) go unicast along the learned path instead of flooding.
@@ -220,7 +220,7 @@ unverified (a relay could have swapped the card) and gets the same warning as an
 ## 8. Message lifecycle (what the sender sees)
 
 `encrypting` → `sending` (handed to N neighbors; attachments show chunk progress %) →
-`delivered` (ACK, "via k phones") or `out_of_range` (all branches dead-ended or 90 s timeout,
+`delivered` (ACK, "via k phones") or `out_of_range` (all branches dead-ended or 5 min timeout,
 with **Retry**). `failed` = local error. Incoming: shown and notified only once complete
 (for attachments the pointer arrives after all chunks). Native ACKs DATA as soon as it is
 persisted to the inbox, so delivery works with the screen off and the app closed.

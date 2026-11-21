@@ -9,7 +9,7 @@ są natywne (Kotlin / Swift), dzięki czemu telefony przekazują wiadomości tak
 ```
 ┌──────────────── WebView (JS) ────────────────┐      ┌──────── native (Kotlin / Swift) ────────┐
 │ Vue UI ── core/api.js ── crypto/* (Signal)   │      │ MeshEngine (foreground service on Android)│
-│                  │                           │ base64│  Router  (dedupe, TTL, reverse paths)    │
+│                  │                           │ base64│  Router  (dedupe, reverse paths)        │
 │            mesh/bridge.js ───────────────────┼──────►│  Links   (best link per neighbor)        │
 │  (web dev fallback: mesh/router.js +         │◄──────┤  Transports: BLE GATT, BLE L2CAP, LAN,   │
 │   BroadcastChannel between browser tabs)     │events │  Wi-Fi Direct*, Wi-Fi Aware*, Multipeer** │
@@ -74,7 +74,7 @@ Limity: tekst ≤ 1000 znaków, załącznik ≤ 20 MiB (przed szyfrowaniem).
 |-----|------|-------|
 | 0   | 1    | version = `1` |
 | 1   | 1    | type |
-| 2   | 1    | ttl  (hops still allowed) |
+| 2   | 1    | ttl  (reserved, ignored; send 8) |
 | 3   | 1    | hops (hops taken so far) |
 | 4   | 16   | id   (random per packet) |
 | 20  | 16   | dest |
@@ -97,7 +97,7 @@ Maksymalny pakiet to 65 536 bajtów. Typy:
 Pierwszy bajt payloadu DATA: `0x01` wiadomość sealed, `0x02` fragment załącznika
 (`0x02 | attId(16) | index u32 | total u32 | bytes`).
 
-Wartości domyślne: `TTL = 8`, wpisy seen/reverse/route wygasają po 10 min, limit pamięci podręcznej seen to 20 000.
+Brak limitu przeskoków. Wartości domyślne: wpisy seen/reverse/route wygasają po 10 min, limit pamięci podręcznej seen to 20 000.
 
 ### 3.1 Router (identyczny w `src/mesh/router.js`, Kotlin i Swift)
 
@@ -112,8 +112,7 @@ onPacket(p, from):                       # from = neighbor nodeTag, or SELF for 
     mark seen; reverse[p.id] = {prev: from, dest: p.dest, pending: 0, done: false}
     if DATA and p.dest == self: persist to inbox; send ACK(dest=p.id, hops=0) to from; deliver; return
     if DISCOVER and from != SELF: deliver to JS          # JS may answer with REPLY
-    if from != SELF and p.ttl <= 1: send DEAD_END to from; return
-    q = copy(p); if from != SELF: q.ttl = min(p.ttl, 8) - 1; q.hops = min(p.hops+1, 255)   # clamp hostile TTL
+    q = copy(p); if from != SELF: q.hops = min(p.hops+1, 255)
     targets = DATA and routes[p.dest] alive and != from ? [routes[p.dest]] : neighbors - from
     if targets empty: deadEnd(p.id); return
     reverse[p.id].pending = len(targets); send q to each
@@ -133,10 +132,9 @@ deadEnd(id):  r = reverse[id]; r.done = true
               else send DEAD_END(new id, dest=id) to r.prev
 ```
 
-Dlaczego wiadomości nie mogą krążyć w pętli: każdy węzeł przekazuje dany `id` najwyżej raz (zbiór seen), TTL maleje
-o jeden na każdym przeskoku, a duplikaty są odrzucane odpowiedzią DEAD_END zamiast być przekazywane dalej. Gdy wszystkie
-gałęzie wygasną, DEAD_END-y agregują się z powrotem do nadawcy, który pokazuje *„Kontakt jest poza zasięgiem sieci mesh”*.
-JS rezygnuje też po 90 s bez ACK/DEAD_END (łącza mogą zniknąć w trakcie przesyłu).
+Dlaczego wiadomości nie mogą krążyć w pętli: każdy węzeł przekazuje dany `id` najwyżej raz (zbiór seen), więc pakiet nigdy nie przejdzie dwa razy przez ten sam telefon, a duplikaty dostają w odpowiedzi DEAD_END zamiast być przekazywane dalej.
+Gdy wszystkie gałęzie wygasną, DEAD_END-y agregują się z powrotem do nadawcy, który pokazuje *„Kontakt jest poza zasięgiem sieci mesh”*.
+Nie ma limitu przeskoków, więc wiadomość przejdzie przez dowolnie długi łańcuch telefonów. JS rezygnuje też po 5 min bez ACK/DEAD_END (łącza mogą zniknąć w trakcie przesyłu).
 
 ACK wracający trasą uczy każdy przekaźnik `routes[dest] = neighbor`, więc kolejne pakiety (np. fragmenty
 multimediów) idą unicastem wyuczoną ścieżką zamiast być zalewane (flood).
@@ -221,7 +219,7 @@ niezweryfikowana (przekaźnik mógł podmienić wizytówkę) i dostaje to samo o
 
 `encrypting` → `sending` (przekazano N sąsiadom; załączniki pokazują postęp fragmentów w %) →
 `delivered` (ACK, „przez k telefonów”) lub `out_of_range` (wszystkie gałęzie zakończyły się dead-endem albo upłynął
-limit 90 s, z przyciskiem **Ponów**). `failed` = błąd lokalny. Wiadomości przychodzące: wyświetlane i zgłaszane powiadomieniem dopiero
+limit 5 min, z przyciskiem **Ponów**). `failed` = błąd lokalny. Wiadomości przychodzące: wyświetlane i zgłaszane powiadomieniem dopiero
 po otrzymaniu w całości (w przypadku załączników wskaźnik przychodzi po wszystkich fragmentach). Warstwa natywna wysyła ACK dla DATA zaraz po
 zapisaniu do skrzynki (inbox), więc dostarczanie działa przy wyłączonym ekranie i zamkniętej aplikacji.
 

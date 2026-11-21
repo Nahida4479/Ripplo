@@ -24,7 +24,7 @@ const WINDOW = 4
 const ID_RE = /^[0-9A-HJKMNP-TV-Z]{16}$/
 const WIRE_ID_RE = /^[A-Za-z0-9_-]{1,64}$/
 const KINDS = ['image', 'video', 'voice']
-const DEFAULT_TIMING = { ack: 90000, discover: 30000, verify: 60000, proof: 5000, poll: 500 }
+const DEFAULT_TIMING = { ack: 300000, discover: 30000, verify: 60000, proof: 5000, poll: 500 }
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
 const latin1 = (bytes) => Array.from(bytes, (b) => String.fromCharCode(b)).join('')

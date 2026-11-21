@@ -59,11 +59,12 @@ describe('router', () => {
     expect(t.sends.some((s) => s.p.type === TYPE.DEAD_END)).toBe(true)
   })
 
-  it('(d) TTL=2 on line of 5: DEAD_END returns to sender', () => {
-    const names = line(5), t = net(names, lineEdges(names))
-    t.routers.A.onPacket(data(t.tagOf('E'), 2), 'self'); t.run()
-    expect(t.ofType('A', TYPE.DEAD_END)).toHaveLength(1)
-    expect(t.ofType('E', TYPE.DATA)).toHaveLength(0)
+  it('(d) no hop limit: line of 40 with ttl field 1 still delivers, hops saturate safely', () => {
+    const names = Array.from({ length: 40 }, (_, i) => `n${i}`), t = net(names, lineEdges(names))
+    t.routers.n0.onPacket(data(t.tagOf('n39'), 1), 'self'); t.run()
+    expect(t.ofType('n39', TYPE.DATA)).toHaveLength(1)
+    expect(t.ofType('n0', TYPE.ACK)[0].p.hops).toBe(39)
+    expect(t.ofType('n0', TYPE.DEAD_END)).toHaveLength(0)
   })
 
   it('(e) DISCOVER floods, each other node delivers once, REPLYs reach origin', () => {
