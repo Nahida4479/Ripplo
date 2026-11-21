@@ -1,1 +1,0 @@
-{"directed":false,"multigraph":false,"graph":{"schema_version":1,"graphify_version":"0.9.102"},"nodes":[{"id":"app","label":"app.js","_origin":"ast","community":0,"file_type":"code","norm_label":"app.js","source_file":"app.js","source_location":null}],"links":[],"hyperedges":[],"built_at_commit":"ea9f9d8cdeb87d87c40ceca4da3d98844a354d3f"}
