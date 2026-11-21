@@ -52,6 +52,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Set;
 import java.util.concurrent.Callable;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import javax.crypto.Cipher;
@@ -80,6 +81,7 @@ public class RipploMeshPlugin extends Plugin implements MeshEngine.Listener {
     private static final String KEY_ALIAS = "ripplo_db_wrap";
     private static final String ACTION_INSTALL = "io.github.nahida4479.ripplo.INSTALL_RESULT";
     private static volatile PluginCall installCall;
+    private static final AtomicBoolean updating = new AtomicBoolean();
 
     private interface SignalOp {
         JSObject run(SignalCore core) throws Exception;
@@ -929,6 +931,7 @@ public class RipploMeshPlugin extends Plugin implements MeshEngine.Listener {
             call.reject("install_permission");
             return;
         }
+        if (!updating.compareAndSet(false, true)) { call.reject("busy"); return; }
         Thread t = new Thread(() -> {
             File apk = new File(getContext().getCacheDir(), "update.apk");
             try {
@@ -938,6 +941,8 @@ public class RipploMeshPlugin extends Plugin implements MeshEngine.Listener {
             } catch (Exception e) {
                 apk.delete();
                 call.reject(e.getMessage() == null ? "update failed" : e.getMessage());
+            } finally {
+                updating.set(false);
             }
         }, "ripplo-update");
         t.setDaemon(true);
@@ -1021,13 +1026,11 @@ public class RipploMeshPlugin extends Plugin implements MeshEngine.Listener {
                 session.fsync(os);
             }
             installCall = call;
-            UpdatedReceiver.arm(ctx);
             Intent i = new Intent(ctx, InstallReceiver.class).setAction(ACTION_INSTALL);
             int flags = PendingIntent.FLAG_UPDATE_CURRENT | (Build.VERSION.SDK_INT >= 31 ? PendingIntent.FLAG_MUTABLE : 0);
             PendingIntent pending = PendingIntent.getBroadcast(ctx, id, i, flags);
             session.commit(pending.getIntentSender());
         } catch (Exception e) {
-            UpdatedReceiver.disarm(ctx);
             pi.abandonSession(id);
             throw e;
         }

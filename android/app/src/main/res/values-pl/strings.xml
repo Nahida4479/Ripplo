@@ -1,0 +1,8 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="channel_relay">Przekazywanie w tle</string>
+    <string name="channel_messages">Wiadomości</string>
+    <string name="relay_text">Ripplo działa w tle</string>
+    <string name="new_message">Nowa wiadomość</string>
+    <string name="updated_text">Ripplo zostało zaktualizowane. Dotknij, aby otworzyć.</string>
+</resources>

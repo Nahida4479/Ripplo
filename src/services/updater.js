@@ -55,10 +55,12 @@ export async function checkUpdate() {
 
 export async function install(prompt = true) {
   const u = state.update
+  if (u.installing) return
+  u.installing = true
   u.error = null
   u.progress = 0
   const off = mesh.on('updateProgress', ({ progress }) => { u.progress = progress })
-  try { await mesh.installUpdate(u.apkUrl, u.sha256, prompt) } catch (e) { u.error = e.message === 'install_permission' ? t('err_install_permission') : e.message } finally { off(); u.progress = null }
+  try { await mesh.installUpdate(u.apkUrl, u.sha256, prompt) } catch (e) { u.error = e.message === 'install_permission' ? t('err_install_permission') : e.message } finally { off(); u.progress = null; u.installing = false }
 }
 
 export async function checkIntegrity() {

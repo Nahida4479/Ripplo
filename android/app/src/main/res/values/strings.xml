@@ -6,7 +6,7 @@
     <string name="custom_url_scheme">io.github.nahida4479.ripplo</string>
     <string name="channel_relay">Mesh relay</string>
     <string name="channel_messages">Messages</string>
-    <string name="relay_text">Relaying encrypted messages</string>
+    <string name="relay_text">Ripplo is running in the background</string>
     <string name="new_message">New message</string>
     <string name="updated_text">Ripplo was updated. Tap to open.</string>
 </resources>

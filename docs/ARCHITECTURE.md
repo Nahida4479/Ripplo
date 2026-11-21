@@ -310,9 +310,11 @@ and shows a content-free notification *"New message"* for `0x01` payloads.
   github.com download redirects carry no CORS headers. The current version is the native
   `versionName` (`App.getInfo()`), not the bundled `package.json` version.
 - After a self-update the system kills the app. `UpdatedReceiver` (`MY_PACKAGE_REPLACED`) relaunches
-  `MainActivity` only if Ripplo started that install in the last 30 min. Android 10+ may block starting an
+  `MainActivity` after every update of the package. Android 10+ may block starting an
   activity from the background, so it also posts a "Ripplo was updated. Tap to open." notification,
   removed on the next resume.
+- Only one install runs at a time: native rejects a second `installUpdate` with `busy`, and the UI disables
+  Install while checking or installing (two parallel downloads shared `update.apk` and made the progress jump).
 - Native install errors carry the `PackageInstaller` status message, shown in Settings → Updates.
 - Self-check: on Android the app hashes its own installed APK and compares it with `SHA256SUMS` of
   the release matching its version — so copies shared with Nearby Share / Quick Share are verified

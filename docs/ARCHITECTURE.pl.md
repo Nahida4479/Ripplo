@@ -308,9 +308,11 @@ i pokazuje pozbawione treści powiadomienie *„Nowa wiadomość”* dla payload
   `SHA256SUMS` nie jest pobierany z WebView, bo przekierowania pobierania z github.com nie mają nagłówków CORS.
   Obecna wersja to natywne `versionName` (`App.getInfo()`), a nie wersja z `package.json`.
 - Po samoaktualizacji system zamyka aplikację. `UpdatedReceiver` (`MY_PACKAGE_REPLACED`) uruchamia ponownie
-  `MainActivity` tylko wtedy, gdy Ripplo zainicjowało tę instalację w ciągu ostatnich 30 min. Android 10+ może zablokować
+  `MainActivity` po każdej aktualizacji pakietu. Android 10+ może zablokować
   start aktywności z tła, więc dodatkowo pokazuje powiadomienie „Ripplo zostało zaktualizowane. Dotknij, aby otworzyć.”,
   usuwane przy następnym wznowieniu.
+- Naraz działa tylko jedna instalacja: warstwa natywna odrzuca drugie `installUpdate` jako `busy`, a UI blokuje
+  Zainstaluj podczas sprawdzania i instalacji (dwa równoległe pobrania współdzieliły `update.apk` i skakał pasek).
 - Błędy natywnej instalacji niosą komunikat statusu `PackageInstaller`, widoczny w Ustawienia → Aktualizacje.
 - Autokontrola: na Androidzie aplikacja liczy skrót własnego zainstalowanego APK i porównuje go z `SHA256SUMS`
   wydania odpowiadającego jej wersji — więc kopie udostępnione przez Nearby Share / Quick Share są również weryfikowane.
