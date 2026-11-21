@@ -229,6 +229,16 @@ comparison with the real person is the strong check.
 Safety number: Signal-style, 60 digits from both identity keys (SHA-512 iterated 5200×,
 `fingerprint version 0 | key | ripploId`), shown in 12 groups of 5 and as a QR.
 
+### Changing the display name
+
+Settings → Profile → Change name. The card (and so the invite link, QR, `hello` and `REPLY`) is rebuilt
+with the new name and `hello` is re-sent to current neighbors. Contacts learn the name only from an
+authenticated, Signal-encrypted message: field `nm` is attached to a message whenever
+`contact.nameSent != myName`, and `{ "t": "profile" }` (carrier only) goes to every contact right away;
+a failed send resets `nameSent`. The receiver applies `nm` after `cleanName` (≤ 40 chars) and re-runs
+the same-name conflict check. Names inside cards are NOT signed, so a name from a card, `hello` or
+`REPLY` never overrides the name of an existing contact. The `ripploId` and keys do not change.
+
 ### Profile picture
 
 Optional, set in Settings → Profile: cropped to a 160×160 JPEG, ≤ 16 KiB, stored in `kv/profile.avatar`
@@ -237,7 +247,7 @@ strangers). It travels only as the field `av` of a Signal-encrypted message, so 
 - `av` is attached to a message to a contact whenever `contact.avSent != myAvatarVersion`
   (`SHA-256(avatar)[0..4]`, empty when none). The first message to a new contact therefore carries it,
   and the receiver shows it for whoever added them or wants to add them.
-- Changing or removing the picture sends `{ "t": "avatar" }` (carrier only) to every contact; a failed
+- Changing or removing the picture sends `{ "t": "profile" }` (carrier only) to every contact; a failed
   send resets `avSent`, so the next message retries. `av: ""` removes it on the receiver.
 - The receiver accepts `av` only if it is base64, ≤ 16 KiB and starts with the JPEG magic `FF D8 FF`,
   then stores `contact.avatar`; anything else is ignored.

@@ -7,7 +7,7 @@ const core = createCore({ mesh, state, dbName: devProfile ? `ripplo-${devProfile
 
 export { state, MAX_TEXT, MAX_FILE }
 export const {
-  init, createProfile, setAvatar, myInviteLink, addContactFromLink, addPerson, verifyNearby, verifyByQr, markVerified,
+  init, createProfile, setAvatar, setName, myInviteLink, addContactFromLink, addPerson, verifyNearby, verifyByQr, markVerified,
   safetyNumber, sendText, sendAttachment, retry, loadMessages, markRead, createGroup, refreshPeople,
   deleteChat, deleteContact, saveSettings, restoreBackup,
 } = core

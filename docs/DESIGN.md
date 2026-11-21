@@ -91,7 +91,7 @@ monospace) + QR of it, actions: Verify with QR, Retry nearby, I'm sure it's them
 
 ## Settings (list of grouped cards, like the music app reference)
 
-- **Profile**: tappable avatar (pick a photo, cropped square; Remove button when set), name, ripploId, My QR. Photos show in chat list, chat header, contact page, People and New chat; initials otherwise.
+- **Profile**: Change name (inline field, Save / Cancel), tappable avatar (pick a photo, cropped square; Remove button when set), name, ripploId, My QR. Photos show in chat list, chat header, contact page, People and New chat; initials otherwise.
 - **Appearance**: mode segmented control, Accent color swatches, Background gradient swatches,
   Language.
 - **Network**: live list of transports with state + measured speed; Background relay toggle

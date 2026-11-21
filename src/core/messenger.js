@@ -94,13 +94,28 @@ export function createCore({ mesh, dbName = 'ripplo', state = createState(), not
     await start()
   }
 
+  function pushProfile() {
+    for (const n of state.neighbors) mesh.sendApp(n.node, utf8(JSON.stringify({ t: 'hello', card: b64(me.card) }))).catch(() => {})
+    for (const c of Object.values(state.contacts)) {
+      const fail = () => { c.avSent = c.nameSent = '?' }
+      buildPacket(c, { t: 'profile' }).then(transmit).then((r) => { if (!r.ok) fail() }).catch(fail)
+    }
+  }
+
   async function setAvatar(avatar) {
     if (avatar && !isAvatar(avatar)) throw new RipploError('bad_avatar')
-    await db.put('kv', 'profile', { name: me.name, avatar: avatar || '' })
     loadMe(me.name, avatar || '')
-    for (const c of Object.values(state.contacts)) {
-      buildPacket(c, { t: 'avatar' }).then(transmit).then((r) => { if (!r.ok) c.avSent = '?' }).catch(() => { c.avSent = '?' })
-    }
+    await db.put('kv', 'profile', { name: me.name, avatar: me.avatar })
+    pushProfile()
+  }
+
+  async function setName(name) {
+    const clean = cleanName(name)
+    if (!clean) throw new RipploError('bad_name')
+    if (clean === me.name) return
+    loadMe(clean, me.avatar)
+    await db.put('kv', 'profile', { name: me.name, avatar: me.avatar })
+    pushProfile()
   }
 
   async function start() {
@@ -199,6 +214,11 @@ export function createCore({ mesh, dbName = 'ripplo', state = createState(), not
       c.avSent = me.avVer
       persistContact(c)
     }
+    if (c.nameSent !== me.name) {
+      obj = { ...obj, nm: me.name }
+      c.nameSent = me.name
+      persistContact(c)
+    }
     const payload = await mesh.signalSeal(hex(tagOf(c)), utf8(JSON.stringify(obj)))
     return encodePacket({ type: TYPE.DATA, dest: tagOf(c), payload })
   }
@@ -251,7 +271,7 @@ export function createCore({ mesh, dbName = 'ripplo', state = createState(), not
         m.delivered = m.total - m.undelivered.length
         m.hops = r.hops
       } else if (r.error) m.errored = true
-      if (!r.ok) state.contacts[rid].avSent = '?'
+      if (!r.ok) state.contacts[rid].avSent = state.contacts[rid].nameSent = '?'
     })).then(() => {
       m.status = m.undelivered.length === 0 ? 'delivered' : m.errored ? 'failed' : 'out_of_range'
       persistMsg(m)
@@ -356,6 +376,13 @@ export function createCore({ mesh, dbName = 'ripplo', state = createState(), not
         const v = checkCard(unb64(msg.c))
         if (v.id === f) await learnCard(v, 'incoming')
       } catch {}
+    }
+    const nm = typeof msg?.nm === 'string' ? cleanName(msg.nm) : ''
+    if (nm && nm !== c.name) {
+      c.name = nm
+      ensureChat(c.id, 'direct', nm)
+      markConflicts(nm, c.id)
+      await persistContact(c)
     }
     await onAppMessage(f, msg)
   }
@@ -727,7 +754,7 @@ export function createCore({ mesh, dbName = 'ripplo', state = createState(), not
   }
 
   return {
-    state, init, close, createProfile, setAvatar, myInviteLink: () => encodeLink(me.card), addContactFromLink, addPerson,
+    state, init, close, createProfile, setAvatar, setName, myInviteLink: () => encodeLink(me.card), addContactFromLink, addPerson,
     verifyNearby, verifyByQr, markVerified, safetyNumber, sendText, sendAttachment, retry, loadMessages,
     markRead, createGroup, refreshPeople, deleteChat, deleteContact, saveSettings, restoreBackup,
   }

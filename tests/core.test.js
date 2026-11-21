@@ -345,3 +345,19 @@ describe('profile picture', () => {
     expect(b.state.contacts[a.id].avatar).toBeUndefined()
   })
 })
+
+describe('changing the display name', () => {
+  it('rejects empty names and updates the contact, its chat, the card and the link', async () => {
+    const a = await user('Alice'), b = await user('Bob')
+    expect(await codeOf(a.core.setName('  '))).toBe('bad_name')
+    await a.core.addContactFromLink(b.link)
+    await a.core.sendText(b.id, 'hi')
+    await waitFor(() => b.state.contacts[a.id]?.card)
+    await a.core.setName('Alicja')
+    await waitFor(() => b.state.contacts[a.id].name === 'Alicja')
+    expect(b.state.chats.find((c) => c.id === a.id).name).toBe('Alicja')
+    expect(a.state.profile.name).toBe('Alicja')
+    expect(a.state.profile.ripploId).toBe(a.id)
+    expect(parseLink(a.core.myInviteLink()).name).toBe('Alicja')
+  })
+})

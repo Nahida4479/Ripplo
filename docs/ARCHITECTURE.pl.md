@@ -228,6 +228,16 @@ z prawdziwą osobą to mocna weryfikacja.
 Numer bezpieczeństwa (safety number): w stylu Signal, 60 cyfr z obu kluczy tożsamości (SHA-512 iterowany 5200×,
 `fingerprint version 0 | key | ripploId`), wyświetlany w 12 grupach po 5 oraz jako QR.
 
+### Zmiana nazwy wyświetlanej
+
+Ustawienia → Profil → Zmień nazwę. Karta (a więc link zaproszenia, QR, `hello` i `REPLY`) jest budowana od nowa
+z nową nazwą, a `hello` wysyłane ponownie do obecnych sąsiadów. Kontakty poznają nazwę tylko z uwierzytelnionej,
+zaszyfrowanej Signalem wiadomości: pole `nm` jest dołączane do wiadomości, gdy `contact.nameSent != mojaNazwa`,
+a `{ "t": "profile" }` (sam nośnik) idzie od razu do każdego kontaktu; nieudane wysłanie zeruje `nameSent`.
+Odbiorca stosuje `nm` po `cleanName` (≤ 40 znaków) i ponownie sprawdza konflikt tej samej nazwy. Nazwy w kartach
+NIE są podpisane, więc nazwa z karty, `hello` lub `REPLY` nigdy nie nadpisuje nazwy istniejącego kontaktu.
+`ripploId` i klucze się nie zmieniają.
+
 ### Zdjęcie profilowe
 
 Opcjonalne, ustawiane w Ustawienia → Profil: kadrowane do JPEG 160×160, ≤ 16 KiB, zapisane w `kv/profile.avatar`
@@ -236,7 +246,7 @@ Podróżuje tylko jako pole `av` w wiadomości szyfrowanej Signalem, więc przek
 - `av` jest dołączane do wiadomości do kontaktu, gdy `contact.avSent != wersjaMojegoZdjęcia`
   (`SHA-256(avatar)[0..4]`, puste gdy brak). Pierwsza wiadomość do nowego kontaktu zawsze je niesie, więc odbiorca
   widzi zdjęcie osoby, która go dodała lub chce dodać.
-- Zmiana lub usunięcie zdjęcia wysyła `{ "t": "avatar" }` (sam nośnik) do każdego kontaktu; nieudane wysłanie
+- Zmiana lub usunięcie zdjęcia wysyła `{ "t": "profile" }` (sam nośnik) do każdego kontaktu; nieudane wysłanie
   zeruje `avSent`, więc następna wiadomość ponawia. `av: ""` usuwa zdjęcie u odbiorcy.
 - Odbiorca przyjmuje `av` tylko jeśli to base64, ≤ 16 KiB i zaczyna się od magicznych bajtów JPEG `FF D8 FF`,
   po czym zapisuje `contact.avatar`; w przeciwnym razie ignoruje.

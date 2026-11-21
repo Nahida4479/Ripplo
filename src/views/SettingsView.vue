@@ -2,7 +2,7 @@
 import { ref, computed } from 'vue'
 import { QrCode, ExternalLink, ShieldCheck, ShieldAlert, ShieldQuestion, TriangleAlert } from 'lucide-vue-next'
 import { state } from '../core/state.js'
-import { saveSettings, setAvatar } from '../core/api.js'
+import { saveSettings, setAvatar, setName } from '../core/api.js'
 import { mesh } from '../mesh/bridge.js'
 import { ui, toast } from '../components/ui.js'
 import { makeAvatar } from '../lib/avatar.js'
@@ -24,6 +24,10 @@ const integ = computed(() => ({
 }[state.integrity.status] || [ShieldQuestion, '', 'integrityUnknown']))
 const kbps = n => n.kbps >= 1000 ? (n.kbps / 1000).toFixed(1) + ' Mbps' : n.kbps + ' kbps'
 const photoInput = ref(null)
+const draft = ref(null)
+async function saveName() {
+  try { await setName(draft.value); draft.value = null } catch (e) { toast(t('err_' + (e.code || 'bad_name'))) }
+}
 async function pickPhoto(e) {
   const file = e.target.files[0]
   e.target.value = ''
@@ -40,8 +44,14 @@ const initials = l => l.slice(0, 2).toUpperCase()
     <div class="card">
       <div class="row">
         <button class="icon-btn" style="width: auto; height: auto" :aria-label="t('changePhoto')" @click="photoInput.click()"><Avatar :name="state.profile?.name" :photo="state.profile?.avatar" :size="44" /></button>
-        <span class="grow"><span class="label">{{ state.profile?.name }}</span><br /><span class="hint mono">{{ state.profile?.ripploId }}</span></span>
-        <button v-if="state.profile?.avatar" class="btn sm ghost" @click="setAvatar('')">{{ t('removePhoto') }}</button>
+        <span v-if="draft === null" class="grow"><span class="label">{{ state.profile?.name }}</span><br /><span class="hint mono">{{ state.profile?.ripploId }}</span></span>
+        <input v-else v-model="draft" class="field grow" maxlength="40" :aria-label="t('yourName')" @keyup.enter="saveName" />
+        <template v-if="draft !== null">
+          <button class="btn sm ghost" @click="draft = null">{{ t('cancel') }}</button>
+          <button class="btn sm" @click="saveName">{{ t('save') }}</button>
+        </template>
+        <button v-else class="btn sm ghost" @click="draft = state.profile?.name">{{ t('changeName') }}</button>
+        <button v-if="draft === null && state.profile?.avatar" class="btn sm ghost" @click="setAvatar('')">{{ t('removePhoto') }}</button>
         <input ref="photoInput" type="file" accept="image/*" hidden @change="pickPhoto" />
       </div>
       <div class="row hint">{{ t('photoHint') }}</div>
