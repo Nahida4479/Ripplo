@@ -55,11 +55,7 @@ const row = r => {
   v.append(a)
   const d = document.createElement('td')
   d.textContent = new Date(r.date).toLocaleDateString(root.lang, { year: 'numeric', month: 'short', day: 'numeric' })
-  const p = document.createElement('td')
-  p.textContent = r.assets.apk ? nf.format(r.assets.apk.n) : '–'
-  const i = document.createElement('td')
-  i.textContent = r.assets.ipa ? nf.format(r.assets.ipa.n) : '–'
-  tr.append(v, d, p, i)
+  tr.append(v, d)
   return tr
 }
 
@@ -84,7 +80,9 @@ const fill = rels => {
   $('#rel-body').replaceChildren(...rels.map(row))
 }
 
-$$('[data-dl-label]').forEach(el => { el.textContent = isIOS ? L.lblIpa : L.lblApk })
+$$('a[hreflang]').forEach(a => a.addEventListener('click', () => {
+  try { localStorage.setItem('ripplo-lang', a.hreflang) } catch {}
+}))
 $(`#card-${os}`)?.classList.add('pick')
 
 loadReleases().then(fill).catch(() => {
