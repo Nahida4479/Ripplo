@@ -73,7 +73,7 @@ final class BleTransport extends Transport {
     }
 
     private boolean codedOn() {
-        return Build.VERSION.SDK_INT >= 26 && engine.bleCoded() && adapter != null
+        return Build.VERSION.SDK_INT >= 26 && adapter != null
                 && adapter.isLeCodedPhySupported() && adapter.isLeExtendedAdvertisingSupported();
     }
 

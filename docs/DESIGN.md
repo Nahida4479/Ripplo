@@ -126,7 +126,7 @@ monospace) + QR of it, actions: Verify with QR, Retry nearby, I'm sure it's them
 - **Security**: app integrity (Official build ✓ / Modified ✗ / Not checked yet), DB encryption
   status, Signal protocol info.
 - **Updates**: current version, latest version, Check now (accent-colored button so it is easy to see; the label changes to "Checking…" for at least 0.8 s and there is no "up to date" line), Auto-update toggle (Android), progress.
-- **About**: app name + tagline, version (tapping this row 5 times within 2 s toggles **developer mode**, which adds a **Developer** card with transport states, the BLE Coded PHY switch (with phone support shown), a row per neighbor to force a connection with one standard (LAN, Wi-Fi Direct, Wi-Fi Aware, BLE 1M / Coded PHY) or close it, the diagnostic log and Refresh / Copy log / Clear log), GitHub link, License, **Contributors** cards: avatar
+- **About**: app name + tagline, version (tapping this row 5 times within 2 s toggles **developer mode**, which adds a **Developer** card with transport states, the BLE Coded PHY support status (read-only, no switch), a row per neighbor to force a connection with one standard (LAN, Wi-Fi Direct, Wi-Fi Aware, BLE 1M / Coded PHY) or close it, the diagnostic log and Refresh / Copy log / Clear log), GitHub link, License, **Contributors** cards: avatar
   (GitHub avatar when online, initials offline), login bold, "GitHub profile" sub-text, external-link
   icon on the right; card = `--surface`, 1 px border, radius 14.
 

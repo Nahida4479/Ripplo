@@ -418,17 +418,6 @@ public final class MeshEngine implements Router.Host {
         }
     }
 
-    public boolean bleCoded() { return prefs.getBoolean("ble_coded", false); }
-
-    public void setBleCoded(boolean on) {
-        prefs.edit().putBoolean("ble_coded", on).apply();
-        for (final Transport t : new ArrayList<>(transports)) {
-            if (!t.name().equals("ble")) continue;
-            t.stop();
-            sched.execute(t::start);
-        }
-    }
-
     public boolean forceConnect(String node, String spec) {
         String[] p = spec.split(":", 2);
         Diag.i("force connect " + p[0] + " node=" + node.substring(0, Math.min(8, node.length())));

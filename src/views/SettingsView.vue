@@ -38,7 +38,7 @@ function aboutTap() {
   if (on) loadDev()
 }
 const devLog = ref('')
-const bleCaps = ref({ coded: false, extended: false, enabled: false })
+const bleCaps = ref({ coded: false, extended: false })
 const forceSpec = ref({})
 const SPECS = ['lan', 'wifi-direct', 'wifi-aware', 'ble:1m', 'ble:coded']
 const specOf = n => forceSpec.value[n.node] || 'lan'
@@ -51,10 +51,6 @@ async function forceConnect(n) {
 async function forceClose(n) {
   await mesh.devDisconnect(n.node, specOf(n).split(':')[0])
   setTimeout(loadDev, 500)
-}
-async function toggleCoded() {
-  await mesh.setBleCoded(!bleCaps.value.enabled)
-  await loadDev()
 }
 const devTransports = ref([])
 async function loadDev() {
@@ -213,7 +209,6 @@ const initials = l => l.slice(0, 2).toUpperCase()
         <div v-for="x in devTransports" :key="x.name" class="row"><span class="grow label">{{ x.name }}</span><span class="chip" :class="x.running ? 'ok' : x.unsupported ? 'bad' : 'warn'">{{ x.running ? 'running' : x.unsupported ? 'unsupported' : 'stopped' }}</span></div>
         <div class="row">
           <span class="grow"><span class="label">{{ t('devBleCoded') }}</span><br /><span class="hint">{{ t('devBleCodedHint', { coded: bleCaps.coded ? '✓' : '✗', ext: bleCaps.extended ? '✓' : '✗' }) }}</span></span>
-          <button class="switch" role="switch" :aria-checked="bleCaps.enabled" :aria-label="t('devBleCoded')" :disabled="!bleCaps.coded || !bleCaps.extended" @click="toggleCoded" />
         </div>
         <div class="row hint">{{ t('devForce') }}</div>
         <div v-for="n in state.neighbors" :key="n.node" class="row forcerow">

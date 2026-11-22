@@ -418,14 +418,7 @@ public class RipploMeshPlugin extends Plugin implements MeshEngine.Listener {
         JSObject r = new JSObject();
         r.put("coded", coded);
         r.put("extended", ext);
-        r.put("enabled", engine.bleCoded());
         call.resolve(r);
-    }
-
-    @PluginMethod
-    public void setBleCoded(PluginCall call) {
-        engine.setBleCoded(call.getBoolean("enabled", false));
-        call.resolve();
     }
 
     @PluginMethod

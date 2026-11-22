@@ -235,11 +235,11 @@ Duplicate links of the same medium to the same node: keep the one initiated by t
 BLE GATT is a byte stream per direction: central writes slices of `mtu-3` to RX (write with
 response, ordered); peripheral notifies slices on TX. Request MTU 517.
 
-**BLE Coded PHY (Android only, opt-in).** With the switch in developer mode on and a phone that reports
+**BLE Coded PHY (Android only, always on).** On a phone that reports
 `isLeCodedPhySupported()` and `isLeExtendedAdvertisingSupported()`, the node also starts an extended advertising set on the Coded PHY
 (connectable, same service UUID) and scans with `setLegacy(false)`. A scan hit carries its primary PHY; a coded hit is connected with
 `PHY_LE_CODED_MASK` (long range, 125 / 500 kbit/s), a 1M hit with `PHY_LE_1M_MASK`. If a 1M hit for the same address was seen in the last 20 s the coded
-hit is ignored (1M is faster). The PHY of a client link is read with `readPhy()` and shown in the developer details. The switch is stored in `ripplo_mesh` prefs (`ble_coded`, default off) and restarts the BLE transport.
+hit is ignored (1M is faster). The PHY of a client link is read with `readPhy()` and shown in the developer details. There is no switch: the developer card only shows whether the phone supports it.
 iOS has no PHY selection in CoreBluetooth, so it only ever uses 1M.
 
 Classic Bluetooth RFCOMM is not used: iOS apps cannot use it without MFi; L2CAP CoC is the
@@ -426,7 +426,7 @@ Binary values are base64 (standard) strings; node tags are lowercase hex.
 | `sendApp` | `{ node, payload }` — link-local APP packet to one neighbor |
 | `getNeighbors` | → `{ neighbors: [{ node, medium, kbps, rttMs, links: [{medium,kbps,rttMs,outbound}], seen: [medium] }] }` — `seen` = media on which the neighbor was discovered in the last 2 min (LAN, Wi-Fi Direct, Wi-Fi Aware) without an open link; the People tab shows them as dimmed chips without a check |
 | `devConnect` / `devDisconnect` | Developer mode: `{ node, spec }` → `{ started }` forces a connection attempt to a neighbor on one medium (`lan`, `wifi-direct`, `wifi-aware`, `ble:1m`, `ble:coded`), ignoring existing links and initiator rules (BLE connects to recent scan hits, since a scan hit has no node tag); `{ node, medium }` closes that medium's links |
-| `getBleCaps` / `setBleCoded` | → `{ coded, extended, enabled }`; `{ enabled }` stores the Coded PHY switch and restarts BLE |
+| `getBleCaps` | → `{ coded, extended }` (Coded PHY / extended advertising support only, no switch) |
 | `getDiag` / `clearDiag` / `getTransports` | Android developer mode: the in-memory diagnostic log (600 lines, same lines as logcat tag `ripplo`), clear it, and `{ transports: [{ name, running, unsupported }] }` |
 | `drainInbox` | → `{ packets: [{ packet, from }] }` — packets received while JS was not attached |
 | `getDbKey` | → `{ key }` 32 bytes, created once, stored with Keystore / Keychain |
