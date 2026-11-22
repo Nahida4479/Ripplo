@@ -196,6 +196,7 @@ public final class MeshEngine implements Router.Host {
     boolean addLink(Link link) {
         if (!running) { link.close(); return false; }
         synchronized (lock) { pending.add(link); }
+        android.util.Log.i("ripplo", "link add " + link.medium + " outbound=" + link.outbound);
         link.start();
         link.send(Packet.make(Packet.LINK_HELLO, new byte[16], Packet.unhex(nodeTag)).encode());
         return true;
@@ -222,6 +223,7 @@ public final class MeshEngine implements Router.Host {
                 }
             }
         }
+        android.util.Log.i("ripplo", "link down " + link.medium + " node=" + (node == null ? "none" : node.substring(0, 8)) + " last=" + down);
         if (down) {
             Router r = router;
             if (r != null) r.linkDown(node);
@@ -310,6 +312,7 @@ public final class MeshEngine implements Router.Host {
                 list.add(link);
             }
         }
+        android.util.Log.i("ripplo", "hello " + tag.substring(0, 8) + " via " + link.medium + " outbound=" + link.outbound + " loser=" + loser + " replaced=" + toClose.size());
         if (loser) { link.close(); return; }
         for (Link o : toClose) o.close();
         if (first) emitNeighbor(tag, true, link.medium, link.kbps);
@@ -408,7 +411,7 @@ public final class MeshEngine implements Router.Host {
                 o.put("kbps", links.get(0).kbps);
                 o.put("rttMs", links.get(0).rttMs);
                 JSONArray ls = new JSONArray();
-                for (Link l : links) ls.put(new JSONObject().put("medium", l.medium).put("kbps", l.kbps));
+                for (Link l : links) ls.put(new JSONObject().put("medium", l.medium).put("kbps", l.kbps).put("rttMs", l.rttMs).put("outbound", l.outbound));
                 o.put("links", ls);
                 out.put(o);
             } catch (JSONException ignored) {

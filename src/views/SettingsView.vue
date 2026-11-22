@@ -23,6 +23,22 @@ const integ = computed(() => ({
   ok: [ShieldCheck, 'ok', 'integrityOk'], mismatch: [ShieldAlert, 'bad', 'integrityBad']
 }[state.integrity.status] || [ShieldQuestion, '', 'integrityUnknown']))
 const kbps = n => n.kbps >= 1000 ? (n.kbps / 1000).toFixed(1) + ' Mbps' : n.kbps + ' kbps'
+const openNode = ref(null)
+const detail = ref([])
+async function toggleNet(n) {
+  if (openNode.value === n.node) { openNode.value = null; return }
+  openNode.value = n.node
+  let fresh = null
+  try { fresh = ((await mesh.getNeighbors()) || []).find(x => x.node === n.node) } catch {}
+  const links = fresh?.links?.length ? fresh.links : n.links?.length ? n.links : [n]
+  detail.value = [
+    'node ' + n.node,
+    'card ' + (n.card ? n.card.id + ' (' + n.card.name + ')' : 'none'),
+    'unsupported ' + !!n.unsupported,
+    ...links.map(l => String(l.medium) + ' ' + l.kbps + ' kbps' + (l.rttMs ? ' rtt ' + l.rttMs + ' ms' : '') + (l.outbound === undefined ? '' : l.outbound ? ' out' : ' in'))
+  ]
+  console.info('ripplo net ' + JSON.stringify(detail.value))
+}
 const photoInput = ref(null)
 const draft = ref(null)
 async function saveName() {
@@ -47,7 +63,7 @@ const initials = l => l.slice(0, 2).toUpperCase()
           <button class="icon-btn" style="width: auto; height: auto" :aria-label="t('changePhoto')" @click="photoInput.click()"><Avatar :name="state.profile?.name" :photo="state.profile?.avatar" :size="44" /></button>
           <button v-if="state.profile?.avatar && draft === null" class="btn sm ghost" @click="setAvatar('')">{{ t('removePhoto') }}</button>
         </div>
-        <button v-if="draft === null" class="grow wrap namebtn" :aria-label="t('changeName')" @click="draft = state.profile?.name"><span class="label">{{ state.profile?.name }}</span><br /><span class="hint mono">{{ state.profile?.ripploId }}</span></button>
+        <button v-if="draft === null" class="grow wrap namebtn" :aria-label="t('changeName')" @click="draft = state.profile?.name"><span class="label">{{ state.profile?.name }}</span><span class="hint mono">{{ state.profile?.ripploId }}</span></button>
         <input v-else v-model="draft" class="field grow" maxlength="40" :aria-label="t('yourName')" @keyup.enter="saveName" />
         <input ref="photoInput" type="file" accept="image/*" hidden @change="pickPhoto" />
       </div>
@@ -87,12 +103,15 @@ const initials = l => l.slice(0, 2).toUpperCase()
     <h2 class="section">{{ t('network') }}</h2>
     <div class="card">
       <div v-if="!state.neighbors.length" class="row hint">{{ t('noNeighbors') }}</div>
-      <div v-for="n in state.neighbors" :key="n.node" class="row">
+      <template v-for="n in state.neighbors" :key="n.node">
+      <div class="row" role="button" tabindex="0" @click="toggleNet(n)" @keyup.enter="toggleNet(n)">
         <span class="grow"><span class="label">{{ n.card?.name || n.node.slice(0, 8) }}</span><br />
           <span class="hint">{{ [...new Set((n.links?.length ? n.links : [n]).map(l => String(l.medium).toUpperCase()))].join(' + ') }} · {{ kbps(n) }}</span></span>
         <span v-if="n.unsupported" class="chip">{{ t('updateNeeded') }}</span>
         <span v-else class="chip ok">{{ t('connected') }}</span>
       </div>
+      <div v-if="openNode === n.node" class="row netinfo"><span class="hint mono">{{ detail.join('\n') }}</span></div>
+      </template>
       <div class="row">
         <span class="grow"><span class="label">{{ t('backgroundRelay') }}</span><br /><span class="hint">{{ t('relayHint') }}</span></span>
         <button class="switch" role="switch" :aria-checked="state.settings.backgroundRelay" :aria-label="t('backgroundRelay')" @click="saveSettings({ backgroundRelay: !state.settings.backgroundRelay })" />
@@ -154,8 +173,10 @@ const initials = l => l.slice(0, 2).toUpperCase()
 .profile-acts { flex-wrap: wrap; justify-content: flex-end; }
 .avcol { display: flex; flex-direction: column; align-items: center; gap: 6px; }
 .card .profrow { align-items: flex-start; }
-.profrow .namebtn { min-height: 44px; display: flex; flex-direction: column; justify-content: center; align-items: flex-start; }
+.profrow .namebtn { height: 44px; display: flex; flex-direction: column; justify-content: center; align-items: flex-start; gap: 2px; }
+.profrow .namebtn .label, .profrow .namebtn .hint { line-height: 1.2; }
 .profrow .field { min-height: 44px; }
+.netinfo .hint { white-space: pre-wrap; overflow-wrap: anywhere; user-select: text; }
 .contrib { display: flex; align-items: center; gap: 12px; }
 .contrib img, .ini { width: 44px; height: 44px; border-radius: 50%; flex: none; }
 .ini { display: grid; place-items: center; background: var(--surface-2); font-weight: 600; }

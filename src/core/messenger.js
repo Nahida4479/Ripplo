@@ -258,6 +258,7 @@ export function createCore({ mesh, dbName = 'ripplo', state = createState(), not
       if (!id || !state.contacts[id] || state.contacts[id].request) return
     }
     greeted.add(node)
+    console.info('ripplo hello out ' + node.slice(0, 8) + (ask ? ' ask' : ''))
     mesh.sendApp(node, utf8(JSON.stringify({ t: 'hello', card: b64(me.card), ...(ask && { r: 1 }) }))).catch(() => {})
   }
 
@@ -875,9 +876,11 @@ export function createCore({ mesh, dbName = 'ripplo', state = createState(), not
     if (msg.t === 'hello') {
       let v
       try { v = checkCard(unb64(msg.card)) } catch {
+        console.info('ripplo hello rejected ' + from.slice(0, 8))
         if (nb) nb.unsupported = true
         return
       }
+      console.info('ripplo hello in ' + from.slice(0, 8) + ' ' + v.name + (nb ? '' : ' (no neighbor)'))
       if (nb) nb.unsupported = false
       if (v.id === me.id) return
       const card = { id: v.id, name: v.name, ik: b64(v.ik), card: b64(v.card) }
