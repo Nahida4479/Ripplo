@@ -81,6 +81,7 @@ Każdy transport przenosi ten sam strumień bajtów, więc jedna osoba może by�
 | QR | Zeskanowanie osobiście kodu QR. |
 | Ręcznie | Ręczne zaznaczenia że dany kontakt jest tym za kogo się podaje. |
 
+<img src="/public/Screen/Ripplo_QR.png">
 
 ## Jak podróżują wiadomości
 
