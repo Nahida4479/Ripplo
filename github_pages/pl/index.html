@@ -6,8 +6,8 @@
 <script>(function(){var s=null;try{s=localStorage.getItem('ripplo-lang')}catch(e){}var l=((navigator.languages&&navigator.languages[0])||navigator.language||'').toLowerCase();if((s||(l.indexOf('pl')===0?'pl':'en'))!=='pl')location.replace('../'+location.hash)})()</script>
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Ripplo: komunikator siatkowy bez internetu, czat bez sieci (Android i iPhone)</title>
-<meta name="description" content="Ripplo to darmowy, otwartoźródłowy komunikator działający offline. Czatuj bez internetu, karty SIM i konta. Wiadomości przeskakują między pobliskimi telefonami przez Bluetooth i Wi-Fi, w pełni szyfrowane od końca do końca.">
-<meta name="keywords" content="komunikator offline, komunikator siatkowy, czat bez internetu, komunikator Bluetooth, aplikacja do czatu offline, aplikacja sieci mesh, komunikacja poza zasięgiem, szyfrowany komunikator, wiadomości bez internetu, Android, iPhone">
+<meta name="description" content="Ripplo to darmowy, otwartoźródłowy komunikator niewymagający dostępu do internetu. Komunikuj się w sytuacji kryzysowej ze znajomymi bez dostępu do internetu, karty SIM i konta. Pakiety przeskakują między pobliskimi telefonami, zaszyfrowane z użyciem protokołu Signal.">
+<meta name="keywords" content="komunikator offline, komunikator siatkowy, czat bez internetu, komunikator Bluetooth, aplikacja do czatu offline, aplikacja sieci mesh, komunikacja poza zasięgiem, szyfrowany komunikator, wiadomości bez internetu, Android, iPhone, Ripplo">
 <meta name="author" content="Ripplo">
 <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1">
 <meta name="theme-color" content="#0b0b0c">
@@ -20,18 +20,18 @@
 <link rel="stylesheet" href="../style.css">
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="Ripplo">
-<meta property="og:title" content="Ripplo: czat bez internetu">
-<meta property="og:description" content="Darmowy, otwartoźródłowy komunikator, który działa bez internetu. Wiadomości przeskakują między pobliskimi telefonami przez Bluetooth i Wi-Fi, szyfrowane end-to-end.">
+<meta property="og:title" content="Ripplo - wysyłaj wiadomości bez dostępu do internetu">
+<meta property="og:description" content="Darmowy, otwartoźródłowy komunikator, który działa bez internetu. Pakiety przeskakują między pobliskimi telefonami, zaszyfrowane z użyciem protokołu Signal.">
 <meta property="og:url" content="https://nahida4479.github.io/Ripplo/pl/">
 <meta property="og:image" content="https://nahida4479.github.io/Ripplo/og-image.png">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
-<meta property="og:image:alt" content="Ripplo, komunikator siatkowy bez internetu">
+<meta property="og:image:alt" content="Ripplo, komunikator mesh niewymagający dostępu do internetu">
 <meta property="og:locale" content="pl_PL">
 <meta property="og:locale:alternate" content="en_US">
 <meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="Ripplo: czat bez internetu">
-<meta name="twitter:description" content="Darmowy, otwartoźródłowy komunikator działający bez internetu. Sieć mesh przez Bluetooth i Wi-Fi, szyfrowanie end-to-end.">
+<meta name="twitter:title" content="Ripplo - wysyłaj wiadomości bez dostępu do internetu">
+<meta name="twitter:description" content="Darmowy, otwartoźródłowy komunikator mesh działający bez dostępu do internetu. Pakiety przeskakują między pobliskimi telefonami, zaszyfrowane z użyciem protokołu Signal.">
 <meta name="twitter:image" content="https://nahida4479.github.io/Ripplo/og-image.png">
 <script type="application/ld+json">
 {
@@ -48,10 +48,10 @@
       "@type": "SoftwareApplication",
       "@id": "https://nahida4479.github.io/Ripplo/#app",
       "name": "Ripplo",
-      "alternateName": "Ripplo, komunikator siatkowy offline",
-      "description": "Darmowy, otwartoźródłowy komunikator offline. Działa bez internetu, karty SIM i konta: wiadomości przeskakują między pobliskimi telefonami przez Bluetooth, Wi-Fi Direct, Wi-Fi Aware, LAN i Apple Multipeer, chronione szyfrowaniem end-to-end (protokół Signal z postkwantową ochroną PQXDH).",
+      "alternateName": "Ripplo, komunikator mesh",
+      "description": "Darmowy, otwartoźródłowy komunikator offline. Działa bez internetu, karty SIM i konta. Wiadomości przeskakują między pobliskimi telefonami przez Bluetooth, Wi-Fi Direct, Wi-Fi Aware, LAN i Apple Multipeer, chronione szyfrowaniem end-to-end (protokołem Signal z postkwantową ochroną PQXDH).",
       "applicationCategory": "CommunicationApplication",
-      "applicationSubCategory": "Komunikator siatkowy offline",
+      "applicationSubCategory": "Komunikator mesh",
       "operatingSystem": "Android, iOS",
       "url": "https://nahida4479.github.io/Ripplo/pl/",
       "image": "https://nahida4479.github.io/Ripplo/og-image.png",
@@ -63,10 +63,10 @@
       "codeRepository": "https://github.com/Nahida4479/Ripplo",
       "featureList": [
         "Działa bez internetu, karty SIM i konta",
-        "Przekazywanie w sieci mesh: wiadomości przeskakują od telefonu do telefonu",
+        "Dane są przekazywane w sieci mesh, wiadomości przeskakują od telefonu do telefonu",
         "Szyfrowanie end-to-end protokołem Signal z postkwantową wymianą kluczy",
         "Transport przez Bluetooth Low Energy (BLE), LAN, Wi-Fi Direct, Wi-Fi Aware i Apple Multipeer",
-        "Czaty grupowe, wiadomości głosowe, zdjęcia i filmy",
+        "Czaty grupowe, wiadomości głosowe, połączenia głosowe, zdjęcia i filmy",
         "Otwarte oprogramowanie na licencji AGPL-3.0"
       ],
       "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" }
@@ -77,27 +77,27 @@
         {
           "@type": "Question",
           "name": "Czy istnieje komunikator, który działa bez internetu?",
-          "acceptedAnswer": { "@type": "Answer", "text": "Tak. Ripplo to darmowy, otwartoźródłowy komunikator, który nie potrzebuje internetu, zasięgu komórkowego, karty SIM ani konta. Telefony łączą się ze sobą bezpośrednio przez Bluetooth i Wi-Fi, a każdy telefon z Ripplo może przekazywać wiadomości dalej." }
+          "acceptedAnswer": { "@type": "Answer", "text": "Tak. Ripplo to darmowy, otwartoźródłowy komunikator, który nie potrzebuje internetu, zasięgu komórkowego, karty SIM ani konta. Telefony łączą się ze sobą bezpośrednio, a każdy telefon z Ripplo może przekazywać zaszyfrowaną wiadomość dalej." }
         },
         {
           "@type": "Question",
           "name": "Jak działa komunikacja w sieci mesh?",
-          "acceptedAnswer": { "@type": "Answer", "text": "W sieci mesh każdy telefon jest jednocześnie nadawcą i pomocnikiem. Jeśli znajomy jest za daleko, by połączyć się bezpośrednio, Twoja wiadomość przeskakuje przez inne telefony z Ripplo, aż dotrze do celu. Telefony pośredniczące tylko przekazują zaszyfrowane dane i nie mogą ich odczytać." }
+          "acceptedAnswer": { "@type": "Answer", "text": "W sieci mesh każdy telefon jest jednocześnie nadawcą i pomocnikiem. Jeśli znajomy jest za daleko, by połączyć się bezpośrednio, Twoje wiadomości, załączniki itd. przeskakują przez inne telefony z Ripplo, aż dotrą do celu. Telefony pośredniczące przekazują zaszyfrowane dane i nie mogą ich odczytać." }
         },
         {
           "@type": "Question",
           "name": "Czy Ripplo jest prywatny i bezpieczny?",
-          "acceptedAnswer": { "@type": "Answer", "text": "Tak. Wiadomości, wiadomości głosowe, zdjęcia i filmy są szyfrowane end-to-end oficjalną biblioteką Signal libsignal, z ochroną postkwantową (PQXDH i potrójny mechanizm SPQR). Telefony przekaźnikowe nie mogą odczytać wiadomości ani zobaczyć, kto je napisał (sealed sender). Klucze prywatne zostają na Twoim telefonie." }
+          "acceptedAnswer": { "@type": "Answer", "text": "Tak. Wiadomości, wiadomości głosowe, zdjęcia i filmy są szyfrowane end-to-end oficjalną biblioteką Signal libsignal, z ochroną postkwantową (PQXDH i potrójnym mechanizmem SPQR). Telefony przekazujące pakiety nie mogą odczytać wiadomości ani zobaczyć, kto je napisał. Klucze prywatne zostają tylko i wyłącznie na Twoim telefonie." }
         },
         {
           "@type": "Question",
-          "name": "Czy potrzebuję numeru telefonu lub konta?",
-          "acceptedAnswer": { "@type": "Answer", "text": "Nie. Wybierasz tylko nazwę. Nie ma serwerów, rejestracji ani numerów telefonów. Znajomych dodajesz osobiście, przez kod QR lub wysyłając link z zaproszeniem." }
+          "name": "Czy Ripplo potrzebuje numeru telefonu lub konta?",
+          "acceptedAnswer": { "@type": "Answer", "text": "Nie. Podajesz tylko własną nazwę. Nie ma serwerów, rejestracji ani numerów telefonów. Znajomych dodajesz osobiście, przez kod QR lub wysyłając im link z zaproszeniem." }
         },
         {
           "@type": "Question",
           "name": "Jakich technologii Ripplo używa do łączenia telefonów?",
-          "acceptedAnswer": { "@type": "Answer", "text": "Bluetooth Low Energy (BLE, z szybkim kanałem L2CAP), LAN przez tę samą sieć Wi-Fi lub hotspot, Wi-Fi Direct i Wi-Fi Aware na Androidzie oraz Apple Multipeer Connectivity na iPhone'ie. Kilka może działać jednocześnie, a aplikacja zawsze korzysta z najszybszego działającego połączenia." }
+          "acceptedAnswer": { "@type": "Answer", "text": "Bluetooth Low Energy (BLE, z szybkim kanałem L2CAP), LAN przez tę samą sieć Wi-Fi lub hotspot, Wi-Fi Direct i Wi-Fi Aware na Androidzie oraz Apple Multipeer Connectivity na iPhone'ie. Aplikacja zawsze wykorzystuje najszybciej działające połączenie." }
         },
         {
           "@type": "Question",
@@ -107,12 +107,12 @@
         {
           "@type": "Question",
           "name": "Jakie telefony obsługuje Ripplo?",
-          "acceptedAnswer": { "@type": "Answer", "text": "Androida i iPhone'a. Mogą ze sobą rozmawiać przez Bluetooth i LAN. Aplikacja na Androida to podpisany plik APK. Wersja na iPhone'a to obecnie niepodpisany plik IPA, który instalujesz za pomocą narzędzia do instalacji spoza App Store (sideloading)." }
+          "acceptedAnswer": { "@type": "Answer", "text": "Androida i iPhone'a. Telefony te mogą ze sobą rozmawiać przez Bluetooth i LAN. Aplikacja na Androida zawiera podpisany plik APK. Wersja na iPhone'a to obecnie niepodpisany plik IPA, który instalujesz za pomocą narzędzia do instalacji spoza App Store." }
         },
         {
           "@type": "Question",
           "name": "Kiedy komunikator offline jest przydatny?",
-          "acceptedAnswer": { "@type": "Answer", "text": "Na festiwalach i koncertach, gdzie sieci są przeciążone, podczas wędrówek lub podróży bez zasięgu, w czasie blackoutów i klęsk żywiołowych, w miejscach ze słabym lub ograniczonym internetem, albo gdy chcesz porozmawiać z osobami w pobliżu bez pośrednictwa serwera firmy." }
+          "acceptedAnswer": { "@type": "Answer", "text": "Na festiwalach i koncertach, gdzie sieci są przeciążone, podczas wędrówek lub podróży bez zasięgu, w czasie blackoutów i klęsk żywiołowych, w miejscach ze słabym lub ograniczonym internetem, albo gdy chcesz porozmawiać z osobami w pobliżu bez pośrednictwa serwera firm trzecich." }
         }
       ]
     }
@@ -167,9 +167,9 @@
   <div class="wrap">
     <h1>
       <span class="mark"><img src="../icon.svg" alt="" width="120" height="120"><span aria-label="Ripplo"><b style="--i:0">R</b><b style="--i:1">I</b><b style="--i:2">P</b><b style="--i:3">P</b><b style="--i:4">L</b><b style="--i:5">O</b></span></span>
-      <span class="tagline">Komunikator, który działa <em>bez internetu.</em></span>
+      <span class="tagline">Komunikator, który działa <em>bez dostępu do internetu.</em></span>
     </h1>
-    <p class="lead">Ripplo to darmowy, otwartoźródłowy komunikator. Bez internetu, karty SIM i konta. Twój telefon łączy się z pobliskimi telefonami przez Bluetooth i Wi-Fi, a wiadomości przeskakują od telefonu do telefonu, aż dotrą. Wszystko jest prywatne.</p>
+    <p class="lead">Ripplo to darmowy, otwartoźródłowy komunikator, który nie wymaga dostępu do internetu, karty SIM ani konta. Twój telefon łączy się z pobliskimi telefonami, a zaszyfrowane wiadomości przeskakują od telefonu do telefonu, aż dotrą do odbiorcy.</p>
     <div class="cta">
       <a class="pill grad" href="#download"><svg class="ico"><use href="../icons.svg#i-download"/></svg>Pobierz aplikację</a>
       <a class="pill line" href="#how">Jak to działa?</a>
@@ -183,8 +183,8 @@
 <section class="sec" id="stats">
   <div class="wrap">
     <p class="eyebrow mono rv">Na żywo z GitHuba</p>
-    <h2 class="rv">Ludzie już z tego korzystają.</h2>
-    <p class="sub rv">Te liczby pochodzą prosto z publicznych danych wydań na GitHubie i aktualizują się za każdym razem, gdy otwierasz tę stronę.</p>
+    <h2 class="rv">Wiele osób już z tego korzysta.</h2>
+    <p class="sub rv">Te liczby pochodzą prosto z publicznych danych wydań na GitHubie i aktualizują się za każdym razem, gdy otwierasz tę stronę. Im więcej osób pobierze Ripplo, tym lepsze połączenie i większy zasięg sieci mesh.</p>
     <div class="stats">
       <div class="stat big rv"><b data-count="total">·</b><span>pobrań łącznie, wszystkie wersje</span></div>
       <div class="stat rv" style="--rd:.08s"><b data-count="latest">·</b><span>pobrań najnowszej wersji<small id="stat-ver"></small></span></div>
@@ -198,8 +198,8 @@
 <section class="sec" id="how">
   <div class="wrap">
     <p class="eyebrow mono rv">Jak to działa</p>
-    <h2 class="rv">Telefony rozmawiają z telefonami. Bez pośrednika.</h2>
-    <p class="sub rv">Zwykłe komunikatory wysyłają wszystko przez serwery firm w internecie. Ripplo to omija. Twój telefon łączy się bezpośrednio z telefonami wokół.</p>
+    <h2 class="rv">Telefony rozmawiają z telefonami. Bez żadnego pośredniczącego serwera.</h2>
+    <p class="sub rv">Zwykłe komunikatory wysyłają wszystko przez serwery firm, a Ripplo to omija. Twój telefon łączy się bezpośrednio z telefonami wokół, które zawierają aplikację Ripplo.</p>
     <div class="flow rv" role="img" aria-label="Animacja: wiadomość przeskakuje z Twojego telefonu przez telefon nieznajomego do telefonu Twojego znajomego">
       <svg viewBox="0 0 640 190">
         <defs><linearGradient id="fg" x1="0" x2="1"><stop offset="0" stop-color="#5b8cff"/><stop offset="1" stop-color="#14b8a6"/></linearGradient></defs>
@@ -226,7 +226,7 @@
     <div class="steps">
       <div class="step rv"><div><h3>Dodaj znajomego osobiście</h3><p>Zeskanuj jego kod QR albo wyślij link z zaproszeniem. Twoje tajne klucze powstają na Twoim telefonie i nigdy go nie opuszczają.</p></div></div>
       <div class="step rv" style="--rd:.08s"><div><h3>Napisz wiadomość</h3><p>Jeśli znajomy jest blisko, wiadomość trafi prosto do niego. Jeśli nie, przekażą ją dalej inne telefony z Ripplo po drodze.</p></div></div>
-      <div class="step rv" style="--rd:.16s"><div><h3>Tylko znajomy może ją przeczytać</h3><p>Wiadomości są zamknięte na Twoim telefonie i odblokowują się tylko na jego. Telefony pośredniczące widzą jedynie zaszyfrowane, nieczytelne dane.</p></div></div>
+      <div class="step rv" style="--rd:.16s"><div><h3>Tylko znajomy może ją przeczytać</h3><p>Wiadomości są szyfrowane na Twoim telefonie, a odszyfrowują się tylko u Twojego znajomego. Telefony pośredniczące widzą jedynie zaszyfrowane, nieczytelne dane.</p></div></div>
     </div>
     <p class="note rv"><b>Warto wiedzieć:</b> im więcej osób używa Ripplo w pobliżu, tym dalej mogą dotrzeć Twoje wiadomości. Ripplo to wczesna wersja, więc spodziewaj się drobnych niedoskonałości.</p>
   </div>
@@ -238,9 +238,9 @@
     <h2 class="rv">Prywatny czat na wypadek, gdy zabraknie sieci.</h2>
     <div class="grid c2 c3">
       <article class="card rv" style="--c:#5b8cff"><span class="badge"><svg class="ico"><use href="../icons.svg#i-signal"/></svg></span><h3>Działa bez internetu</h3><p>Nie potrzeba zasięgu komórkowego, routera Wi-Fi ani karty SIM. Idealne w górach, na festiwalach, podczas blackoutów i w podróży.</p></article>
-      <article class="card rv" style="--c:#14b8a6;--rd:.06s"><span class="badge"><svg class="ico"><use href="../icons.svg#i-users"/></svg></span><h3>Bez konta i numeru telefonu</h3><p>Wybierasz tylko nazwę. Nie ma rejestracji ani firmy, która wiedziałaby, kim są Twoi znajomi.</p></article>
-      <article class="card rv" style="--c:#a855f7;--rd:.12s"><span class="badge"><svg class="ico"><use href="../icons.svg#i-lock"/></svg></span><h3>Zamknięte od końca do końca</h3><p>Stosuje protokół Signal, ten sam rodzaj szyfrowania, któremu ufają najlepsze bezpieczne komunikatory, z dodatkową ochroną przed przyszłymi komputerami kwantowymi.</p></article>
-      <article class="card rv" style="--c:#f59e0b"><span class="badge"><svg class="ico"><use href="../icons.svg#i-eye-off"/></svg></span><h3>Pomocnicy nic nie widzą</h3><p>Telefony, które przekazują Twoją wiadomość dalej, nie mogą jej odczytać, nie wiedzą, kto ją napisał, i nigdy nie pokazują z niej powiadomienia.</p></article>
+      <article class="card rv" style="--c:#14b8a6;--rd:.06s"><span class="badge"><svg class="ico"><use href="../icons.svg#i-users"/></svg></span><h3>Bez konta i numeru telefonu</h3><p>Wybierasz tylko nazwę. Nie ma rejestracji ani firmy pośredniczącej.</p></article>
+      <article class="card rv" style="--c:#a855f7;--rd:.12s"><span class="badge"><svg class="ico"><use href="../icons.svg#i-lock"/></svg></span><h3>Zaszyfrowane od początku do końca</h3><p>Ripplo stosuje protokół Signal, ten sam rodzaj szyfrowania, któremu ufają najbardziej bezpieczne komunikatory, z dodatkową ochroną przed przyszłymi komputerami kwantowymi.</p></article>
+      <article class="card rv" style="--c:#f59e0b"><span class="badge"><svg class="ico"><use href="../icons.svg#i-eye-off"/></svg></span><h3>Pośrednicy przekazujący wiadomości nic nie widzą</h3><p>Telefony, które przekazują Twoją wiadomość dalej, nie mogą jej odczytać oraz nie wiedzą, kto ją napisał.</p></article>
       <article class="card rv" style="--c:#fb7185;--rd:.06s"><span class="badge"><svg class="ico"><use href="../icons.svg#i-mic"/></svg></span><h3>Więcej niż tekst</h3><p>Czaty grupowe, wiadomości głosowe, zdjęcia i filmy do 20 MB. Na Androidzie działa też przy wyłączonym ekranie.</p></article>
       <article class="card rv" style="--c:#38bdf8;--rd:.12s"><span class="badge"><svg class="ico"><use href="../icons.svg#i-gift"/></svg></span><h3>Darmowe i otwarte</h3><p>Bez reklam, subskrypcji i śledzenia. Każdy może przeczytać kod i sprawdzić, czy robi to, co obiecujemy.</p></article>
     </div>
@@ -251,23 +251,23 @@
   <div class="wrap">
     <p class="eyebrow mono rv">Obsługiwane połączenia</p>
     <h2 class="rv">Pięć sposobów na dotarcie do telefonu obok Ciebie.</h2>
-    <p class="sub rv">Ripplo może korzystać z kilku połączeń naraz. Co minutę sprawdza, jak szybkie jest każde z nich, i używa najszybszego działającego, więc nigdy nie musisz wybierać.</p>
+    <p class="sub rv">Ripplo może korzystać z kilku połączeń naraz. Co chwilę sprawdza, jak szybkie jest każde z nich i wybiera najszybsze i najbardziej stabilne, więc nic nie musisz ręcznie wybierać.</p>
     <div class="grid c2 c3">
-      <article class="card rv" style="--c:#5b8cff"><span class="badge"><svg class="ico"><use href="../icons.svg#i-bt"/></svg></span><h3>Bluetooth Low Energy (BLE)</h3><p>Bluetooth o niskim poborze mocy. Znajduje pobliskie telefony i oszczędza baterię. Do większych rzeczy, jak zdjęcia i wiadomości głosowe, przełącza się na szybszy kanał Bluetooth (L2CAP, Android 10 i nowszy). Działa między Androidem a iOS.</p><div class="chips"><span class="chip ok">Android</span><span class="chip ok">iOS</span></div></article>
-      <article class="card rv" style="--c:#14b8a6;--rd:.06s"><span class="badge"><svg class="ico"><use href="../icons.svg#i-wifi"/></svg></span><h3>Sieć Wi-Fi (LAN)</h3><p>Gdy telefony są w tej samej sieci Wi-Fi lub w hotspocie jednego z nich, znajdują się nawzajem i szybko rozmawiają. Internet nie jest potrzebny.</p><div class="chips"><span class="chip ok">Android</span><span class="chip ok">iOS</span></div></article>
+      <article class="card rv" style="--c:#5b8cff"><span class="badge"><svg class="ico"><use href="../icons.svg#i-bt"/></svg></span><h3>Bluetooth Low Energy (BLE)</h3><p>Bluetooth o niskim poborze mocy. Znajduje pobliskie telefony i oszczędza baterię. Nadaje się do większych rzeczy, jak zdjęcia i wiadomości głosowe; przełącza się na szybszy kanał Bluetooth (L2CAP). Działa między Androidem a iOS.</p><div class="chips"><span class="chip ok">Android</span><span class="chip ok">iOS</span></div></article>
+      <article class="card rv" style="--c:#14b8a6;--rd:.06s"><span class="badge"><svg class="ico"><use href="../icons.svg#i-wifi"/></svg></span><h3>Sieć Wi-Fi (LAN)</h3><p>Gdy telefony są w tej samej sieci Wi-Fi lub w hotspocie jednego z nich, znajdują się nawzajem, co pozwala na wymianę zaszyfrowanych pakietów.</p><div class="chips"><span class="chip ok">Android</span><span class="chip ok">iOS</span></div></article>
       <article class="card rv" style="--c:#a855f7;--rd:.12s"><span class="badge"><svg class="ico"><use href="../icons.svg#i-wifi"/></svg></span><h3>Wi-Fi Direct</h3><p>Dwa telefony z Androidem tworzą własne prywatne połączenie Wi-Fi, szybkie i bez routera.</p><div class="chips"><span class="chip ok">Android</span><span class="chip no">iOS</span></div></article>
       <article class="card rv" style="--c:#f59e0b"><span class="badge"><svg class="ico"><use href="../icons.svg#i-signal"/></svg></span><h3>Wi-Fi Aware</h3><p>Nowszy, szybszy sposób, w jaki telefony z Androidem znajdują się nawzajem i rozmawiają. Wymaga telefonu, który to obsługuje.</p><div class="chips"><span class="chip ok">Android 8+</span><span class="chip no">iOS</span></div></article>
       <article class="card rv" style="--c:#fb7185;--rd:.06s"><span class="badge"><svg class="ico"><use href="../icons.svg#i-phone"/></svg></span><h3>Apple Multipeer</h3><p>Własna technologia Apple do komunikacji między urządzeniami w pobliżu, używana między iPhone'ami i iPadami.</p><div class="chips"><span class="chip no">Android</span><span class="chip ok">iOS</span></div></article>
-      <article class="card rv" style="--c:#38bdf8;--rd:.12s"><span class="badge"><svg class="ico"><use href="../icons.svg#i-lock"/></svg></span><h3>Zabezpieczenia, które za tym stoją</h3><p>Protokół Signal (libsignal) z PQXDH i potrójnym mechanizmem SPQR dla ochrony postkwantowej. Sealed sender ukrywa, kto napisał wiadomość. Twoje tajne klucze nigdy nie opuszczają telefonu.</p></article>
+      <article class="card rv" style="--c:#38bdf8;--rd:.12s"><span class="badge"><svg class="ico"><use href="../icons.svg#i-lock"/></svg></span><h3>Zabezpieczenia, które za tym stoją</h3><p>Protokół Signal (libsignal) z PQXDH i potrójnym mechanizmem SPQR dla ochrony postkwantowej. Sealed sender ukrywa, kto napisał wiadomość. Twoje prywatne klucze nigdy nie opuszczają telefonu.</p></article>
     </div>
-    <p class="note rv"><b>Sprawdzone pliki do pobrania:</b> każde wydanie zawiera plik SHA256SUMS, a aplikacja na Androida sprawdza własny podpis, zanim zaktualizuje się sama.</p>
+    <p class="note rv"><b>Zabezpieczenie przed podmianą:</b> każde wydanie zawiera plik SHA256SUMS, a aplikacja na Androida sprawdza własny podpis, zanim zaktualizuje się sama.</p>
   </div>
 </section>
 
 <section class="sec" id="uses">
   <div class="wrap">
     <p class="eyebrow mono rv">Kiedy się przydaje</p>
-    <h2 class="rv">Stworzone na chwile, gdy zwykłe aplikacje zawodzą.</h2>
+    <h2 class="rv">Gdy zwykłe aplikacje zawodzą.</h2>
     <div class="grid c2">
       <article class="card rv" style="--c:#f59e0b"><h3>Festiwale, koncerty, stadiony</h3><p>Tysiące telefonów przeciążają sieć. Ripplo jej nie potrzebuje.</p></article>
       <article class="card rv" style="--c:#14b8a6;--rd:.06s"><h3>Wędrówki, kemping, żeglarstwo, narty</h3><p>Bądź w kontakcie z grupą tam, gdzie w ogóle nie ma zasięgu.</p></article>
@@ -281,21 +281,21 @@
   <div class="wrap">
     <p class="eyebrow mono rv">Pobieranie</p>
     <h2 class="rv">Pobierz Ripplo. Jest za darmo.</h2>
-    <p class="sub rv">Zainstaluj na co najmniej dwóch telefonach. Pliki są pobierane prosto z GitHuba.</p>
+    <p class="sub rv">Wesprzyj projekt i zainstaluj na jak największej liczbie urządzeń. Pliki są pobierane prosto z GitHuba.</p>
     <div class="dl">
       <article class="dlcard rv" id="card-apk">
         <h3><svg class="ico"><use href="../icons.svg#i-phone"/></svg>Android</h3>
         <p>Podpisany plik APK. Android 7 lub nowszy. Aplikacja potrafi się sama aktualizować i sprawdza swój podpis.</p>
         <a class="pill grad" href="https://github.com/Nahida4479/Ripplo/releases/latest" data-dl="apk" rel="noopener"><svg class="ico"><use href="../icons.svg#i-download"/></svg>Pobierz APK</a>
         <p class="meta" data-meta="apk">Najnowsze wydanie na GitHubie</p>
-        <ol><li>Otwórz pobrany plik.</li><li>Zezwól na instalację z przeglądarki, gdy Android o to zapyta.</li><li>Otwórz Ripplo i wybierz nazwę.</li></ol>
+        <ol><li>Otwórz pobrany plik.</li><li>Zezwól na instalację z przeglądarki, gdy Android o to zapyta.</li><li>Otwórz Ripplo i podaj swoją nazwę.</li></ol>
       </article>
       <article class="dlcard rv" id="card-ipa" style="--rd:.08s">
         <h3><svg class="ico"><use href="../icons.svg#i-phone"/></svg>iOS</h3>
-        <p>Niepodpisany plik IPA. Nie ma go jeszcze w App Store, więc zainstaluj go narzędziem do sideloadingu, na przykład SideStore. <a href="#ios" style="text-decoration:underline">Instrukcja krok po kroku</a>.</p>
+        <p>Niepodpisany plik IPA. Nie ma go jeszcze w App Store, więc zainstaluj go za pomocą SideStore. <a href="#ios" style="text-decoration:underline">Instrukcja krok po kroku</a>.</p>
         <a class="pill line" href="https://github.com/Nahida4479/Ripplo/releases/latest" data-dl="ipa" rel="noopener"><svg class="ico"><use href="../icons.svg#i-download"/></svg>Pobierz IPA</a>
         <p class="meta" data-meta="ipa">Najnowsze wydanie na GitHubie</p>
-        <ol><li>Pobierz plik IPA.</li><li>Otwórz go w swoim narzędziu do sideloadingu.</li><li>Podpisz i zainstaluj własnym Apple ID.</li></ol>
+        <ol><li>Pobierz plik IPA.</li><li>Otwórz go w swoim narzędziu, aby podpisać plik.</li><li>Podpisz i zainstaluj własnym Apple ID.</li></ol>
       </article>
     </div>
     <div class="tablewrap rv">
@@ -313,19 +313,19 @@
   <div class="wrap">
     <p class="eyebrow mono rv">iPhone</p>
     <h2 class="rv">Zainstaluj Ripplo na iPhonie przez SideStore.</h2>
-    <p class="sub rv">Apple uruchamia tylko podpisane aplikacje. Plik Ripplo na iPhone'a nie jest jeszcze podpisany, więc SideStore podpisuje go na telefonie Twoim własnym Apple ID. To darmowe i aplikacja nie jest zmieniana.</p>
+    <p class="sub rv">Apple uruchamia tylko podpisane aplikacje. Plik Ripplo na iPhone'a nie jest jeszcze podpisany (ze względu na wymagane aktywne konto developera), więc SideStore podpisuje go na telefonie Twoim własnym Apple ID.</p>
     <div class="steps">
-      <div class="step rv"><div><h3>Przygotuj się</h3><p>Potrzebujesz iPhone'a z iOS 15 lub nowszym, darmowego Apple ID (warto mieć osobne, zapasowe) i komputera do jednorazowej konfiguracji SideStore. Włącz tryb dewelopera: Ustawienia, Prywatność i ochrona, Tryb dewelopera (iOS 16 i nowszy), potem uruchom telefon ponownie.</p></div></div>
-      <div class="step rv" style="--rd:.08s"><div><h3>Zainstaluj SideStore (raz)</h3><p>Postępuj według oficjalnej instrukcji na <a href="https://docs.sidestore.io/" rel="noopener" style="text-decoration:underline">docs.sidestore.io</a>. Instaluje ona SideStore na telefonie i tworzy plik parowania, dzięki któremu później SideStore podpisuje aplikacje bez komputera.</p></div></div>
+      <div class="step rv"><div><h3>Przygotuj się</h3><p>Potrzebujesz iPhone'a z iOS 15 lub nowszym, darmowego Apple ID i komputera do jednorazowej konfiguracji SideStore.</p></div></div>
+      <div class="step rv" style="--rd:.08s"><div><h3>Zainstaluj SideStore</h3><p>Postępuj według oficjalnej instrukcji na <a href="https://docs.sidestore.io/" rel="noopener" style="text-decoration:underline">docs.sidestore.io</a>. Instaluje ona SideStore na telefonie i tworzy plik parowania, dzięki któremu później SideStore podpisuje aplikacje bez użycia komputera.</p></div></div>
       <div class="step rv" style="--rd:.16s"><div><h3>Pobierz IPA Ripplo</h3><p>Na iPhonie przejdź do <a href="#download" style="text-decoration:underline">sekcji pobierania</a> i pobierz plik IPA. Zapisz go w aplikacji Pliki.</p></div></div>
-      <div class="step rv"><div><h3>Dodaj go w SideStore</h3><p>Otwórz SideStore, wejdź w My Apps, dotknij przycisku + i wybierz plik IPA Ripplo. Jeśli poprosi, wpisz Apple ID i poczekaj, aż pokaże, że Ripplo jest zainstalowane.</p></div></div>
+      <div class="step rv"><div><h3>Dodaj go w SideStore</h3><p>Otwórz SideStore, wejdź w My Apps, dotknij przycisku + i wybierz plik IPA Ripplo. Poczekaj na informację, że Ripplo zostało zainstalowane.</p></div></div>
       <div class="step rv" style="--rd:.08s"><div><h3>Zaufaj aplikacji</h3><p>Jeśli iOS napisze, że deweloper nie jest zaufany: Ustawienia, Ogólne, VPN i zarządzanie urządzeniem, dotknij swojego Apple ID, potem Zaufaj. Otwórz Ripplo, zezwól na Bluetooth i sieć lokalną i wybierz nazwę.</p></div></div>
-      <div class="step rv" style="--rd:.16s"><div><h3>Odnawiaj aplikację</h3><p>Z darmowym Apple ID aplikacja przestaje się otwierać po 7 dniach. SideStore może ją odnowić w tle, jeśli ma włączone VPN i odświeżanie w tle jest dozwolone, ale iOS nie zawsze to uruchamia. Nie licz na to: co kilka dni otwórz SideStore i dotknij Refresh All.</p></div></div>
+      <div class="step rv" style="--rd:.16s"><div><h3>Odnawiaj aplikację</h3><p>Z darmowym Apple ID aplikacja przestaje się otwierać po 7 dniach. SideStore może ją odnowić w tle, jeśli ma włączone VPN i odświeżanie w tle jest dozwolone, ale iOS nie zawsze to uruchamia. Najlepiej co kilka dni otwórz SideStore i dotknij Refresh All.</p></div></div>
     </div>
     <div class="grid" style="gap:10px;margin-top:28px">
       <details class="faq rv"><summary>Czy SideStore zmienia lub widzi moje wiadomości?</summary><p>Nie. SideStore tylko podpisuje plik i go instaluje. Ripplo trzyma klucze w pęku kluczy iOS na Twoim telefonie, a wiadomości nigdy nie przechodzą przez SideStore ani Apple.</p></details>
-      <details class="faq rv"><summary>Aplikacja przestała się otwierać</summary><p>Minęło 7 dni. Otwórz SideStore, wejdź w My Apps i dotknij Refresh przy Ripplo. Rozmowy zostają. Nie usuwaj aplikacji, bo to usuwa też klucze i rozmowy.</p></details>
-      <details class="faq rv"><summary>Jak zaktualizować Ripplo?</summary><p>Pobierz nowy plik IPA i dodaj go w SideStore tak samo, tym samym Apple ID. Rozmowy i klucze zostają. Inne Apple ID może zainstalować osobną kopię z nową tożsamością, więc trzymaj się jednego.</p></details>
+      <details class="faq rv"><summary>Aplikacja przestała się otwierać</summary><p>Minęło 7 dni. Otwórz SideStore, wejdź w My Apps i dotknij Refresh przy Ripplo.</p></details>
+      <details class="faq rv"><summary>Jak zaktualizować Ripplo?</summary><p>Pobierz nowy plik IPA i dodaj go w SideStore dokładnie tak samo jak za pierwszym razem. Inne Apple ID może zainstalować osobną kopię z nową tożsamością, więc trzymaj się jednego Apple ID.</p></details>
       <details class="faq rv"><summary>Limity darmowego Apple ID</summary><p>Darmowe Apple ID pozwala mieć naraz 3 aplikacje z sideloadingu i 10 nowych identyfikatorów aplikacji na tydzień. Jeśli instalacja kończy się błędem limitu, usuń z SideStore aplikację, której nie używasz, albo poczekaj kilka dni.</p></details>
       <details class="faq rv"><summary>Czy ten plik jest prawdziwy?</summary><p>Każde wydanie ma plik <code>SHA256SUMS</code>. Przed instalacją porównaj sumę kontrolną pliku IPA z linijką w tym pliku. Kod jest otwarty, więc każdy może zbudować taki sam IPA.</p></details>
     </div>
@@ -339,12 +339,12 @@
     <div class="grid" style="gap:10px">
       <details class="faq rv"><summary>Czy istnieje komunikator, który działa bez internetu?</summary><p>Tak. Ripplo to darmowy, otwartoźródłowy komunikator, który nie potrzebuje internetu, zasięgu komórkowego, karty SIM ani konta. Telefony łączą się ze sobą bezpośrednio przez Bluetooth i Wi-Fi, a każdy telefon z Ripplo może przekazywać wiadomości dalej.</p></details>
       <details class="faq rv"><summary>Jak działa komunikacja w sieci mesh?</summary><p>W sieci mesh każdy telefon jest jednocześnie nadawcą i pomocnikiem. Jeśli znajomy jest za daleko, by połączyć się bezpośrednio, Twoja wiadomość przeskakuje przez inne telefony z Ripplo, aż dotrze do celu. Telefony pośredniczące tylko przekazują zaszyfrowane dane i nie mogą ich odczytać.</p></details>
-      <details class="faq rv"><summary>Czy Ripplo jest prywatny i bezpieczny?</summary><p>Tak. Wiadomości, wiadomości głosowe, zdjęcia i filmy są szyfrowane end-to-end oficjalną biblioteką Signal libsignal, z ochroną postkwantową (PQXDH i potrójny mechanizm SPQR). Telefony przekaźnikowe nie mogą odczytać wiadomości ani zobaczyć, kto je napisał (sealed sender). Klucze prywatne zostają na Twoim telefonie.</p></details>
+      <details class="faq rv"><summary>Czy Ripplo jest prywatny i bezpieczny?</summary><p>Tak. Wiadomości, wiadomości głosowe, zdjęcia i filmy są szyfrowane end-to-end oficjalną biblioteką Signal libsignal, z ochroną postkwantową (PQXDH i potrójny mechanizm SPQR). Telefony pośredniczące nie mogą odczytać wiadomości ani zobaczyć, kto je napisał. Klucze prywatne zostają na Twoim telefonie.</p></details>
       <details class="faq rv"><summary>Czy potrzebuję numeru telefonu lub konta?</summary><p>Nie. Wybierasz tylko nazwę. Nie ma serwerów, rejestracji ani numerów telefonów. Znajomych dodajesz osobiście, przez kod QR lub wysyłając link z zaproszeniem.</p></details>
-      <details class="faq rv"><summary>Jakich technologii Ripplo używa do łączenia telefonów?</summary><p>Bluetooth Low Energy (BLE, z szybkim kanałem L2CAP), LAN przez tę samą sieć Wi-Fi lub hotspot, Wi-Fi Direct i Wi-Fi Aware na Androidzie oraz Apple Multipeer Connectivity na iPhone'ie. Kilka może działać jednocześnie, a aplikacja zawsze korzysta z najszybszego działającego połączenia.</p></details>
+      <details class="faq rv"><summary>Jakich technologii Ripplo używa do łączenia telefonów?</summary><p>Bluetooth Low Energy (BLE, z szybkim kanałem L2CAP), LAN przez tę samą sieć Wi-Fi lub hotspot, Wi-Fi Direct i Wi-Fi Aware na Androidzie oraz Apple Multipeer Connectivity na iPhone'ie.</p></details>
       <details class="faq rv"><summary>Czy Ripplo jest darmowy?</summary><p>Tak. Ripplo jest całkowicie darmowy, nie ma reklam ani subskrypcji, a jego kod źródłowy jest otwarty na licencji AGPL-3.0.</p></details>
-      <details class="faq rv"><summary>Jakie telefony obsługuje Ripplo?</summary><p>Androida i iPhone'a. Mogą ze sobą rozmawiać przez Bluetooth i LAN. Aplikacja na Androida to podpisany plik APK. Wersja na iPhone'a to obecnie niepodpisany plik IPA, który instalujesz za pomocą narzędzia do instalacji spoza App Store (sideloading).</p></details>
-      <details class="faq rv"><summary>Kiedy komunikator offline jest przydatny?</summary><p>Na festiwalach i koncertach, gdzie sieci są przeciążone, podczas wędrówek lub podróży bez zasięgu, w czasie blackoutów i klęsk żywiołowych, w miejscach ze słabym lub ograniczonym internetem, albo gdy chcesz porozmawiać z osobami w pobliżu bez pośrednictwa serwera firmy.</p></details>
+      <details class="faq rv"><summary>Jakie telefony obsługuje Ripplo?</summary><p>Androida i iPhone'a. Telefony te mogą ze sobą rozmawiać przez Bluetooth i LAN. Aplikacja na Androida to podpisany plik APK. Wersja na iPhone'a to obecnie niepodpisany plik IPA, który instalujesz za pomocą narzędzia do instalacji spoza App Store.</p></details>
+      <details class="faq rv"><summary>Kiedy komunikator offline jest przydatny?</summary><p>Na festiwalach i koncertach, gdzie sieci są przeciążone, podczas wędrówek lub podróży bez zasięgu, w czasie blackoutów i klęsk żywiołowych, w miejscach ze słabym lub ograniczonym internetem, albo gdy chcesz porozmawiać z osobami w pobliżu bez pośrednictwa serwera innej firmy.</p></details>
     </div>
   </div>
 </section>
@@ -353,8 +353,7 @@
 <footer>
   <div class="wrap">
     <div>
-      <p><b style="color:var(--text)">Ripplo</b>: offline, szyfrowany end-to-end komunikator siatkowy. Otwarte oprogramowanie na licencji AGPL-3.0.</p>
-      <p style="margin-top:8px;font-size:13px">Ta strona nie ma trackerów i nie ładuje zewnętrznych czcionek ani skryptów. Jedyne zewnętrzne zapytanie idzie do GitHuba, po liczby pobrań.</p>
+      <p><b style="color:var(--text)">Ripplo</b>: offline, szyfrowany end-to-end komunikator mesh. Otwarte oprogramowanie na licencji AGPL-3.0.</p>
     </div>
     <nav aria-label="Stopka">
       <a href="https://github.com/Nahida4479/Ripplo" rel="noopener">GitHub</a>

@@ -117,7 +117,9 @@ The release contains an **unsigned** IPA file (`Ripplo-vX.Y.Z-unsigned.ipa`). It
 
 # Contributors
 
-- [Nahida4479](https://github.com/Nahida4479)
+<a href="https://github.com/Nahida4479/Ripplo/graphs/contributors">
+  <img src="https://contrib.rocks/image?repo=Nahida4479/Ripplo" alt="Contributors">
+</a>
 
 # License
 Released under the [GNU Affero General Public License v3.0](./LICENSE) (AGPL-3.0-only) © 2026 [nahida4479](https://github.com/Nahida4479).
