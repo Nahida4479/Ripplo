@@ -59,6 +59,8 @@ const row = r => {
   return tr
 }
 
+const dls = n => n === 1 && L.dls1 ? L.dls1 : L.dls2 && n % 10 >= 2 && n % 10 <= 4 && (n % 100 < 12 || n % 100 > 14) ? L.dls2 : L.dls
+
 const fill = rels => {
   const latest = rels[0]
   const sum = k => rels.reduce((s, r) => s + (r.assets[k] ? r.assets[k].n : 0), 0)
@@ -75,7 +77,7 @@ const fill = rels => {
   })
   $$('[data-meta]').forEach(el => {
     const a = latest.assets[el.dataset.meta]
-    if (a) el.textContent = `${a.name} · ${(a.size / 1048576).toFixed(1)} MB · ${nf.format(a.n)} ${L.dls}`
+    if (a) el.textContent = `${a.name} · ${(a.size / 1048576).toFixed(1)} MB · ${nf.format(a.n)} ${dls(a.n)}`
   })
   $('#rel-body').replaceChildren(...rels.map(row))
 }
