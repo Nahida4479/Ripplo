@@ -130,6 +130,7 @@
     <a href="#why">Why Ripplo</a>
     <a href="#protocols">Connections</a>
     <a href="#download">Download</a>
+    <a href="#ios">iPhone</a>
     <a href="#faq">FAQ</a>
     <a href="https://github.com/Nahida4479/Ripplo" rel="noopener">GitHub</a>
     <a href="pl/" hreflang="pl" lang="pl">PL</a>
@@ -143,6 +144,7 @@
         <a href="#why">Why Ripplo</a>
         <a href="#protocols">Connections</a>
         <a href="#download">Download</a>
+        <a href="#ios">iPhone</a>
         <a href="#faq">FAQ</a>
         <a href="https://github.com/Nahida4479/Ripplo" rel="noopener">GitHub</a>
         <a href="pl/" hreflang="pl" lang="pl">Polski</a>
@@ -290,7 +292,7 @@
       </article>
       <article class="dlcard rv" id="card-ipa" style="--rd:.08s">
         <h3><svg class="ico"><use href="icons.svg#i-phone"/></svg>iOS</h3>
-        <p>Unsigned IPA. Not on the App Store yet, so install it with a sideloading tool such as AltStore or Sideloadly.</p>
+        <p>Unsigned IPA. Not on the App Store yet, so install it with a sideloading tool such as SideStore. <a href="#ios" style="text-decoration:underline">Step-by-step guide</a>.</p>
         <a class="pill line" href="https://github.com/Nahida4479/Ripplo/releases/latest" data-dl="ipa" rel="noopener"><svg class="ico"><use href="icons.svg#i-download"/></svg>Download IPA</a>
         <p class="meta" data-meta="ipa">Latest release on GitHub</p>
         <ol><li>Download the IPA file.</li><li>Open it with your sideloading tool.</li><li>Sign and install it with your own Apple ID.</li></ol>
@@ -303,6 +305,29 @@
           <tbody id="rel-body"><tr><td colspan="2"><a href="https://github.com/Nahida4479/Ripplo/releases" rel="noopener">See all releases on GitHub</a></td></tr></tbody>
         </table>
       </div>
+    </div>
+  </div>
+</section>
+
+<section class="sec" id="ios">
+  <div class="wrap">
+    <p class="eyebrow mono rv">iPhone</p>
+    <h2 class="rv">Install Ripplo on iPhone with SideStore.</h2>
+    <p class="sub rv">Apple only runs apps that are signed. The Ripplo file for iPhone is not signed yet, so SideStore signs it on your phone with your own Apple ID. It is free and the app is not changed.</p>
+    <div class="steps">
+      <div class="step rv"><div><h3>Get ready</h3><p>You need an iPhone with iOS 15 or newer, a free Apple ID (a spare one is a good idea), and a computer for the one-time SideStore setup. Turn on Developer Mode: Settings, Privacy &amp; Security, Developer Mode (iOS 16 and newer), then restart.</p></div></div>
+      <div class="step rv" style="--rd:.08s"><div><h3>Install SideStore once</h3><p>Follow the official guide at <a href="https://docs.sidestore.io/" rel="noopener" style="text-decoration:underline">docs.sidestore.io</a>. It installs SideStore on your phone and creates a pairing file, so that later SideStore can sign apps without a computer.</p></div></div>
+      <div class="step rv" style="--rd:.16s"><div><h3>Download the Ripplo IPA</h3><p>On your iPhone open the <a href="https://github.com/Nahida4479/Ripplo/releases/latest" rel="noopener" style="text-decoration:underline">latest release</a> in Safari and download the file ending in <code>-unsigned.ipa</code>. Save it to Files.</p></div></div>
+      <div class="step rv"><div><h3>Add it in SideStore</h3><p>Open SideStore, go to My Apps, tap the + button and pick the Ripplo IPA. Enter your Apple ID if it asks and wait until it says Ripplo is installed.</p></div></div>
+      <div class="step rv" style="--rd:.08s"><div><h3>Trust the app</h3><p>If iOS says the developer is not trusted: Settings, General, VPN &amp; Device Management, tap your Apple ID, then Trust. Open Ripplo, allow Bluetooth and Local Network, and pick a name.</p></div></div>
+      <div class="step rv" style="--rd:.16s"><div><h3>Keep it alive</h3><p>With a free Apple ID the app stops opening after 7 days. SideStore can renew it in the background if its VPN is on and Background App Refresh is allowed, but iOS does not always run it. Do not count on it: open SideStore every few days and tap Refresh All.</p></div></div>
+    </div>
+    <div class="grid" style="gap:10px;margin-top:28px">
+      <details class="faq rv"><summary>Does SideStore change or see my messages?</summary><p>No. SideStore only signs the file and installs it. Ripplo keeps its keys in the iOS Keychain on your phone, and messages never go through SideStore or Apple.</p></details>
+      <details class="faq rv"><summary>The app no longer opens</summary><p>The 7 days ran out. Open SideStore, go to My Apps and tap Refresh next to Ripplo. Your chats stay. Do not delete the app, because that also deletes your keys and chats.</p></details>
+      <details class="faq rv"><summary>How do I update Ripplo?</summary><p>Download the new IPA and add it in SideStore the same way, with the same Apple ID. Your chats and keys stay. A different Apple ID can install a separate copy with a new identity, so keep the same one.</p></details>
+      <details class="faq rv"><summary>Free Apple ID limits</summary><p>A free Apple ID allows 3 sideloaded apps at once and 10 new app IDs per week. If the install fails with a limit error, remove an app you do not use from SideStore or wait a few days.</p></details>
+      <details class="faq rv"><summary>Is the file the real one?</summary><p>Each release has a <code>SHA256SUMS</code> file. Compare the checksum of the IPA with the line in that file before you install. The code is open, so anyone can build the same IPA.</p></details>
     </div>
   </div>
 </section>

@@ -126,7 +126,7 @@ sha256sum -c SHA256SUMS --ignore-missing
 
 ## iOS
 
-Wydanie zawiera **niepodpisany** plik IPA (`Ripplo-vX.Y.Z-unsigned.ipa`). Trzeba go zainstalować metodą sideload lub podpisać ponownie własnym Apple ID, na przykład za pomocą [AltStore](https://altstore.io/) lub [SideStore](https://sidestore.io/).
+Wydanie zawiera **niepodpisany** plik IPA (`Ripplo-vX.Y.Z-unsigned.ipa`). Trzeba go zainstalować metodą sideload lub podpisać ponownie własnym Apple ID, na przykład za pomocą [AltStore](https://altstore.io/) lub [SideStore](https://sidestore.io/). Instrukcja krok po kroku dla SideStore: [nahida4479.github.io/Ripplo/pl/#ios](https://nahida4479.github.io/Ripplo/pl/#ios).
 
 # Budowanie ze źródeł
 

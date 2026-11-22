@@ -133,7 +133,7 @@ sha256sum -c SHA256SUMS --ignore-missing
 
 ## iOS
 
-The release contains an **unsigned** IPA (`Ripplo-vX.Y.Z-unsigned.ipa`). It must be sideloaded or re-signed with your own Apple ID, for example with [AltStore](https://altstore.io/) or [SideStore](https://sidestore.io/).
+The release contains an **unsigned** IPA (`Ripplo-vX.Y.Z-unsigned.ipa`). It must be sideloaded or re-signed with your own Apple ID, for example with [AltStore](https://altstore.io/) or [SideStore](https://sidestore.io/). Step-by-step SideStore guide: [nahida4479.github.io/Ripplo/#ios](https://nahida4479.github.io/Ripplo/#ios).
 
 # Build from source
 
