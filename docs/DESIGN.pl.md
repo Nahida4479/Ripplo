@@ -83,7 +83,7 @@ Stan pusty: ilustracja fal + „Dodaj znajomego kodem QR lub linkiem zaproszenia
 ## Zakładka Ludzie
 
 Nagłówek: ikona odświeżania (kręci się podczas DISCOVER), „Ostatnio odświeżono 03:12 · następne dziś w nocy”.
-Sekcje: **W pobliżu** (bezpośredni sąsiedzi, na żywo, z plakietkami medium `BLE`, `LAN`, `Wi-Fi Direct` i
+Sekcje: **W pobliżu** (bezpośredni sąsiedzi, na żywo, z jedną plakietką na każde wykryte medium (`BLE`, `LAN`, `Wi-Fi Direct`, ...), używane łącze oznaczone ptaszkiem, i
 prędkością), **W zasięgu sieci** (odpowiedzi DISCOVER, z liczbą przeskoków). Nad sekcjami jest pole szukania (pełna nazwa lub ID, w sieci tylko skrót); wyniki zastępują listę z meshu, a X ją przywraca.
 Akcja w wierszu: **Zaproś** → arkusz potwierdzenia
 („Osoba dostanie prośbę i może ją przyjąć lub odrzucić”). Po wysłaniu wiersz pokazuje plakietkę **Zaproszono** (**Ponów**, gdy

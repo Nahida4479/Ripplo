@@ -83,7 +83,7 @@ Empty state: illustration of ripples + "Add a friend by QR code or invite link".
 ## People tab
 
 Header: refresh icon (spins while DISCOVER runs), "Last refreshed 03:12 · next tonight".
-Sections: **Nearby** (direct neighbors, live, with medium chips `BLE`, `LAN`, `Wi-Fi Direct` and
+Sections: **Nearby** (direct neighbors, live, with one chip per detected medium (`BLE`, `LAN`, `Wi-Fi Direct`, ...), the link in use marked with a check, and
 speed), **In mesh range** (DISCOVER replies, with hop count). A search field (exact full name or ID, hash only on the wire) sits above the sections; results replace the mesh list and an X restores it.
 Row action: **Invite** → confirm sheet
 ("They get a request and can accept or decline"). After sending the row shows an **Invited** chip (**Retry** if

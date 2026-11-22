@@ -10,6 +10,7 @@ on:
 
 permissions:
   contents: write
+  actions: write
 
 jobs:
   repo:
@@ -55,3 +56,8 @@ jobs:
           git add github_pages/repo
           git diff --cached --quiet || git commit -m "Publish F-Droid repo $TAG"
           git push
+
+      - name: Deploy Pages
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run pages.yml --ref main

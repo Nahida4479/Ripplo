@@ -9,6 +9,10 @@ import Avatar from '../components/Avatar.vue'
 
 const MEDIUM = { ble: 'BLE', lan: 'LAN', wifi_direct: 'Wi-Fi Direct', wifidirect: 'Wi-Fi Direct', aware: 'Wi-Fi Aware', multipeer: 'Multipeer', l2cap: 'BLE' }
 const medium = m => MEDIUM[String(m).toLowerCase()] || m
+const chips = n => {
+  const names = [...new Set((n.links?.length ? n.links : [n]).map(l => medium(l.medium)))]
+  return names.map((name, i) => ({ name, active: i === 0 }))
+}
 const nearby = computed(() => state.neighbors.filter(n => n.card))
 const isContact = id => !!state.contacts[id] && !state.contacts[id].request
 const request = id => state.contacts[id]?.request
@@ -52,7 +56,7 @@ const nearbyPerson = n => ({ id: n.card.id, name: n.card.name, card: n.card.card
       <div v-for="n in nearby" :key="n.node" class="row">
         <Avatar :name="n.card.name" :photo="state.contacts[n.card.id]?.avatar" :size="40" />
         <span class="grow"><span class="label">{{ n.card.name }}</span><br />
-          <span class="chip">{{ medium(n.medium) }}</span> <span class="hint">{{ n.kbps }} kbps</span></span>
+          <span v-for="c in chips(n)" :key="c.name" class="chip" style="margin-right: 4px">{{ c.name }}<Check v-if="c.active" :size="12" color="var(--ok)" /></span> <span class="hint">{{ n.kbps }} kbps</span></span>
         <Check v-if="isContact(n.card.id)" :size="22" color="var(--ok)" :aria-label="t('inContacts')" />
         <button v-else-if="request(n.card.id) === 'in'" class="btn sm" @click="accept(n.card.id)">{{ t('accept') }}</button>
         <span v-else-if="request(n.card.id) === 'out' && !state.contacts[n.card.id].inviteFailed" class="chip">{{ t('invited') }}</span>
