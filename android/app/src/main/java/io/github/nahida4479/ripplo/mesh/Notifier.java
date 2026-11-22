@@ -71,6 +71,7 @@ final class Notifier {
                 .setContentTitle(ctx.getString(R.string.app_name))
                 .setContentText(ctx.getString(R.string.relay_text))
                 .setOngoing(true)
+                .setOnlyAlertOnce(true)
                 .setPriority(NotificationCompat.PRIORITY_MIN)
                 .setCategory(NotificationCompat.CATEGORY_SERVICE)
                 .setContentIntent(open(ctx))

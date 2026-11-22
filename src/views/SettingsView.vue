@@ -42,7 +42,7 @@ const initials = l => l.slice(0, 2).toUpperCase()
 
     <h2 class="section">{{ t('profile') }}</h2>
     <div class="card">
-      <div class="row">
+      <div class="row profrow">
         <div class="avcol">
           <button class="icon-btn" style="width: auto; height: auto" :aria-label="t('changePhoto')" @click="photoInput.click()"><Avatar :name="state.profile?.name" :photo="state.profile?.avatar" :size="44" /></button>
           <button v-if="state.profile?.avatar && draft === null" class="btn sm ghost" @click="setAvatar('')">{{ t('removePhoto') }}</button>
@@ -153,6 +153,9 @@ const initials = l => l.slice(0, 2).toUpperCase()
 .namebtn { text-align: left; min-width: 0; padding: 0; }
 .profile-acts { flex-wrap: wrap; justify-content: flex-end; }
 .avcol { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+.card .profrow { align-items: flex-start; }
+.profrow .namebtn { min-height: 44px; display: flex; flex-direction: column; justify-content: center; align-items: flex-start; }
+.profrow .field { min-height: 44px; }
 .contrib { display: flex; align-items: center; gap: 12px; }
 .contrib img, .ini { width: 44px; height: 44px; border-radius: 50%; flex: none; }
 .ini { display: grid; place-items: center; background: var(--surface-2); font-weight: 600; }

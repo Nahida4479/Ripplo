@@ -9,7 +9,10 @@ import androidx.core.app.ServiceCompat;
 import androidx.core.content.ContextCompat;
 
 public class MeshService extends Service {
+    private static volatile boolean active;
+
     static void launch(Context ctx) {
+        if (active) return;
         try {
             ContextCompat.startForegroundService(ctx, new Intent(ctx, MeshService.class));
         } catch (RuntimeException ignored) {
@@ -24,6 +27,7 @@ public class MeshService extends Service {
             stopSelf();
             return START_NOT_STICKY;
         }
+        active = true;
         MeshEngine engine = MeshEngine.get(this);
         if (!engine.isRunning() && !engine.resumeFromPrefs()) {
             stopSelf();
@@ -39,6 +43,12 @@ public class MeshService extends Service {
             engine.stop();
             stopSelf();
         }
+    }
+
+    @Override
+    public void onDestroy() {
+        active = false;
+        super.onDestroy();
     }
 
     @Override
