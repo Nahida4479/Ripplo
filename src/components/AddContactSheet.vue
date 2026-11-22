@@ -7,7 +7,8 @@ import { useRouter } from 'vue-router'
 import { state } from '../core/state.js'
 import { myInviteLink, addContactFromLink, verifyByQr } from '../core/api.js'
 import { ui, toast } from './ui.js'
-import { t } from '../i18n.js'
+import { webLink } from '../crypto/identity.js'
+import { t, locale } from '../i18n.js'
 
 const router = useRouter()
 const tab = ref('code')
@@ -98,8 +99,9 @@ onBeforeUnmount(() => { stopScan(); stopCycle() })
 
 async function share() {
   try {
-    if (navigator.share) await navigator.share({ title: 'Ripplo', text: link.value })
-    else { await navigator.clipboard.writeText(link.value); toast(t('copied')) }
+    const text = `${t('inviteShareText')}\n${webLink(link.value, locale.value)}`
+    if (navigator.share) await navigator.share({ title: 'Ripplo', text })
+    else { await navigator.clipboard.writeText(text); toast(t('copied')) }
   } catch {}
 }
 async function paste() {
@@ -122,7 +124,8 @@ async function paste() {
         <p v-if="frameCount > 1" class="hint" style="margin: 0; text-align: center">{{ t('codeFramesHint') }}</p>
         <div style="font-weight: 600">{{ state.profile?.name }}</div>
         <div class="mono hint">{{ state.profile?.ripploId }}</div>
-        <button class="btn block" @click="share">{{ t('shareLink') }}</button>
+        <button class="btn block" @click="share">{{ t('inviteFriend') }}</button>
+        <p class="hint" style="margin: 0; text-align: center">{{ t('inviteHint') }}</p>
       </div>
 
       <div v-else-if="tab === 'scan'">

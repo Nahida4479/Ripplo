@@ -232,13 +232,13 @@ public final class MeshEngine implements Router.Host {
         try {
             p = Packet.decode(frame);
         } catch (IllegalArgumentException e) {
-            link.close();
+            if (frame.length < Packet.HEADER || frame[0] == 1) link.close();
             return;
         }
         switch (p.type) {
             case Packet.LINK_HELLO:
-                if (p.payload.length != 16) { link.close(); return; }
-                onHello(link, Packet.hex(p.payload));
+                if (p.payload.length < 16) { link.close(); return; }
+                onHello(link, Packet.hex(java.util.Arrays.copyOf(p.payload, 16)));
                 return;
             case Packet.PING:
                 if (link.node != null && p.payload.length >= 16) {

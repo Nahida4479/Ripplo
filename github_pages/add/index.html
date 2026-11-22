@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex">
+<meta name="referrer" content="no-referrer">
+<meta name="theme-color" content="#0b0b0c">
+<title>Ripplo invite</title>
+<link rel="icon" href="../icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="../apple-touch-icon.png">
+<link rel="stylesheet" href="../style.css">
+<style>
+.inv { min-height: 100svh; display: grid; align-content: center; justify-items: center; gap: 18px; text-align: center; padding: 48px 0; }
+.inv img { width: 72px; height: 72px; border-radius: 18px; }
+.inv h1 { font-size: clamp(30px, 8vw, 48px); font-weight: 800; line-height: 1.1; letter-spacing: -.02em; }
+.inv p { color: var(--mut); max-width: 32em; }
+.inv .acts { display: grid; gap: 12px; width: min(100%, 360px); }
+.inv .dlcard { text-align: left; width: min(100%, 440px); }
+.inv [hidden] { display: none; }
+</style>
+</head>
+<body>
+<main class="wrap inv">
+  <img src="../icon.svg" alt="" width="72" height="72">
+  <section id="ok" class="inv" style="min-height:0;padding:0" hidden>
+    <h1>You are invited to Ripplo</h1>
+    <p>Ripplo is a messenger that works without internet. Someone wants to add you as a contact. Nothing is sent to any server: the invite stays in this link.</p>
+    <div class="acts">
+      <a class="pill grad" id="open" href="#">Open in Ripplo</a>
+      <button class="pill line" id="copy" type="button">Copy invite</button>
+    </div>
+    <article class="dlcard">
+      <h3>Not installed yet?</h3>
+      <ol>
+        <li>Install Ripplo with the button below.</li>
+        <li>Come back to this page (open the same link again).</li>
+        <li>Tap Open in Ripplo and confirm. You are added as an unverified contact; verify when you meet.</li>
+      </ol>
+      <a class="pill line" href="../#download">Download the app</a>
+      <a class="pill line" href="../#ios">iPhone install guide</a>
+    </article>
+    <p style="font-size:13px">The invite is in the part of the address after #, which your browser never sends to this website.</p>
+  </section>
+  <section id="bad" hidden>
+    <h1>This invite does not work</h1>
+    <p>The link is broken or cut off. Ask for a new invite.</p>
+    <a class="pill grad" href="../">Back to Ripplo</a>
+  </section>
+  <noscript><p>This page needs JavaScript to read the invite.</p></noscript>
+</main>
+<script>
+(function () {
+  var h = location.hash.slice(1)
+  var good = /^[A-Za-z0-9_-]{20,8000}\.[A-Za-z0-9_-]{8}(\.[A-Za-z0-9_-]{11})?$/.test(h)
+  document.getElementById(good ? 'ok' : 'bad').hidden = false
+  if (!good) return
+  var link = 'ripplo://add/' + h
+  document.getElementById('open').href = link
+  var copy = document.getElementById('copy')
+  copy.addEventListener('click', function () {
+    var done = function () { copy.textContent = 'Copied' }
+    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(link).then(done, function () { prompt('', link) })
+    else prompt('', link)
+  })
+})()
+</script>
+</body>
+</html>

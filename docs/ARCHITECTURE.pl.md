@@ -58,6 +58,14 @@ link jest cięty na kawałki po 420 znaków, każdy pokazywany jako `ripplo://p/
 SHA-256(link)[0..6]; około 6 klatek, QR wersja 13, 69 × 69 modułów), a klatki powtarzają się co 700 ms. Skaner zbiera kawałki
 w dowolnej kolejności (do 20 na zestaw, 4 zestawy naraz, powtórzenia ignorowane), skleja je, gdy są wszystkie, sprawdza id zestawu względem
 SHA-256 wyniku i dopiero wtedy obsługuje link tak, jakby został wklejony. Niezgodny zestaw jest odrzucany z błędem sumy kontrolnej.
+
+**Zaproszenie do udostępniania („Zaproś znajomego”).** Przycisk udostępniania wysyła tekst i ten sam link w postaci webowej,
+`https://nahida4479.github.io/Ripplo/add/#<ten sam ładunek>` (`/pl/add/#…` po polsku), za każdym razem z nowym jednorazowym tokenem. Ładunek jest we
+fragmencie, którego przeglądarka nigdy nie wysyła do strony, więc GitHub Pages niczego się nie dowiaduje. Strona sprawdza kształt, nie pokazuje imienia z
+karty (to nieuwierzytelniony tekst) i oferuje *Otwórz w Ripplo* (`ripplo://add/…`), *Skopiuj zaproszenie* oraz przewodnik pobierania/SideStore. Budowy z sideloadu
+nie mają referrera instalacji ani linków uniwersalnych (te wymagają katalogu głównego domeny i płatnego konta Apple), więc po instalacji osoba otwiera
+ten sam link jeszcze raz albo wkleja go w *Dodaj kontakt → Wklej link*. `parseLink` przyjmuje obie postaci, tylko dla tej dokładnej strony. Link otwarty
+przed utworzeniem profilu jest zapamiętany i proponowany po zakończeniu powitania. Dodanie to zwykły niezweryfikowany kontakt (dowód bliskości, QR lub ręczna weryfikacja później).
 QR weryfikacji (60 cyfr) zostaje pojedynczym, małym kodem.
 
 Przyrostek to suma kontrolna integralności (wychwytuje obcięcie / uszkodzenie). NIE jest to uwierzytelnienie —
@@ -140,6 +148,12 @@ Maksymalny pakiet to 65 536 bajtów. Typy:
 
 Pierwszy bajt payloadu DATA: `0x01` wiadomość sealed, `0x02` fragment załącznika
 (`0x02 | attId(16) | index u32 | total u32 | bytes`).
+
+**Zgodność między wersjami.** Telefony z różnymi wersjami muszą się nadal widzieć. Zasady: zmiany protokołu są addytywne; nieznane
+tagi ładunku DATA/APP, typy wiadomości, pola JSON i typy pakietów są ignorowane, nigdy krytyczne; ramka z nieznaną wersją pakietu jest
+pomijana bez zamykania łącza (zamyka je tylko błędna długość); `LINK_HELLO` niesie tag węzła w pierwszych 16 bajtach, a wszystko po nich jest ignorowane;
+identyfikatory wykrywania (UUID BLE, `_ripplo._tcp`, typ Multipeer) nigdy się nie zmieniają. Sąsiad, którego karty z `hello` ta wersja nie
+potrafi odczytać, zostaje sąsiadem i jest pokazany w Ustawieniach jako „Wymaga aktualizacji”, więc różnica wersji jest widoczna, a nie cicha.
 
 Brak limitu przeskoków. Wartości domyślne: wpisy seen/reverse/route wygasają po 10 min, limit pamięci podręcznej seen to 20 000.
 

@@ -105,7 +105,7 @@ czatu wysyła od razu i otwiera ten czat.
 
 ## Arkusz dodawania kontaktu
 
-Zakładki: **Mój kod** (animowany QR linku zaproszenia, około 6 klatek po 700 ms z kropkami postępu i podpowiedzią, by trzymać drugi telefon na nim do końca, + ripploId + przycisk Udostępnij link przez Web Share API /
+Zakładki: **Mój kod** (animowany QR linku zaproszenia, około 6 klatek po 700 ms z kropkami postępu i podpowiedzią, by trzymać drugi telefon na nim do końca, + ripploId + przycisk Zaproś znajomego (udostępnia tekst i link webowy; linijka podpowiedzi mówi, że kontakt zostanie dodany jako niezweryfikowany) przez Web Share API /
 kopiowanie), **Skanuj** (wizjer kamery z zaokrągloną maską; ciągłe automatyczne wykrywanie, natywny `BarcodeDetector`, gdy działa, w przeciwnym razie ZXing skompilowany do WebAssembly (jsQR tylko podczas ładowania); bez przycisku. Trafienie od razu zamyka arkusz z komunikatem „Klucze zostały poprawnie zweryfikowane” lub „Dodano do kontaktów” i krótką wibracją), **Wklej link**.
 
 ## Strona kontaktu
@@ -119,7 +119,7 @@ czcionką monospace) + jego QR, akcje: Zweryfikuj kodem QR, Ponów sprawdzenie w
 
 ## Ustawienia (lista zgrupowanych kart, jak w referencyjnej aplikacji muzycznej)
 
-- **Profil**: przełącznik „Widoczność w Znajdź osoby”, stuknięcie w nazwę edytuje ją w miejscu (Zapisz / Anuluj; nie ma osobnego przycisku), awatar do kliknięcia (wybór zdjęcia, kadr do kwadratu; przycisk Usuń gdy ustawione), imię, ripploId, Mój QR. Zdjęcia widać na liście czatów, w nagłówku czatu, na stronie kontaktu, w Szukaj osób i Nowy czat; inaczej inicjały.
+- **Profil**: przełącznik „Widoczność w Znajdź osoby”, stuknięcie w nazwę edytuje ją w miejscu (Zapisz / Anuluj; nie ma osobnego przycisku), awatar do kliknięcia (wybór zdjęcia, kadr do kwadratu; gdy ustawione, mały przycisk **Wyczyść profilowe** wyśrodkowany tuż pod nim), imię, ripploId, Mój QR. Zdjęcia widać na liście czatów, w nagłówku czatu, na stronie kontaktu, w Szukaj osób i Nowy czat; inaczej inicjały.
 - **Wygląd**: kontrolka segmentowa trybu, próbki Koloru akcentu, próbki Tła (gradient),
   Język.
 - **Sieć**: lista transportów na żywo ze stanem + zmierzoną prędkością; przełącznik Przekazywania w tle

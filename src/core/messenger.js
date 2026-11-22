@@ -867,7 +867,12 @@ export function createCore({ mesh, dbName = 'ripplo', state = createState(), not
     const nb = state.neighbors.find((n) => n.node === from)
     if (!msg || typeof msg !== 'object') return
     if (msg.t === 'hello') {
-      const v = checkCard(unb64(msg.card))
+      let v
+      try { v = checkCard(unb64(msg.card)) } catch {
+        if (nb) nb.unsupported = true
+        return
+      }
+      if (nb) nb.unsupported = false
       if (v.id === me.id) return
       const card = { id: v.id, name: v.name, ik: b64(v.ik), card: b64(v.card) }
       if (helloCards.size >= MAX_HELLOS && !helloCards.has(from)) helloCards.delete(helloCards.keys().next().value)

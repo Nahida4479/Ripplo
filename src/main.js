@@ -1,17 +1,18 @@
-import { createApp } from 'vue'
+import { createApp, watch } from 'vue'
 import { App as Cap } from '@capacitor/app'
 import App from './App.vue'
 import router from './router.js'
 import { initTheme } from './services/theme.js'
-import { addContactFromLink } from './core/api.js'
+import { addContactFromLink, state } from './core/api.js'
 import { ui, toast } from './components/ui.js'
 import { t } from './i18n.js'
 import './styles/main.css'
 
 initTheme()
 
-Cap.addListener('appUrlOpen', ({ url }) => {
-  if (!url?.startsWith('ripplo://add/')) return
+let pending = null
+
+function askAdd(url) {
   ui.confirm = {
     title: t('addContact'), text: t('deepLinkConfirm'), ok: t('add'),
     onOk: async () => {
@@ -19,6 +20,19 @@ Cap.addListener('appUrlOpen', ({ url }) => {
       catch (e) { toast(t('err_' + (e.code || 'bad_link'))) }
     }
   }
+}
+
+Cap.addListener('appUrlOpen', ({ url }) => {
+  if (!url?.startsWith('ripplo://add/')) return
+  if (!state.ready || state.needsOnboarding) pending = url
+  else askAdd(url)
+})
+
+watch(() => state.ready && !state.needsOnboarding, (ok) => {
+  if (!ok || !pending) return
+  const url = pending
+  pending = null
+  askAdd(url)
 })
 
 createApp(App).use(router).mount('#app')

@@ -39,8 +39,16 @@ export function encodeLink(card, token) {
   return `ripplo://add/${b64url(card)}.${b64url(sha256(card).slice(0, 6))}${token ? '.' + b64url(token) : ''}`
 }
 
+const SITE = 'https://nahida4479.github.io/Ripplo'
+
+export function webLink(link, lang) {
+  const m = /^ripplo:\/\/add\/(.+)$/.exec(link)
+  if (!m) throw new RipploError('bad_link', 'not a Ripplo link')
+  return `${SITE}${lang === 'pl' ? '/pl' : ''}/add/#${m[1]}`
+}
+
 export function parseLink(text) {
-  const m = /ripplo:\/\/add\/([A-Za-z0-9_-]+)\.([A-Za-z0-9_-]{8})(?:\.([A-Za-z0-9_-]{11}))?/.exec(String(text).replace(/\s+/g, ''))
+  const m = /(?:ripplo:\/\/add\/|https:\/\/nahida4479\.github\.io\/Ripplo\/(?:pl\/)?add\/?#)([A-Za-z0-9_-]+)\.([A-Za-z0-9_-]{8})(?:\.([A-Za-z0-9_-]{11}))?/.exec(String(text).replace(/\s+/g, ''))
   if (!m) throw new RipploError('bad_link', 'not a Ripplo link')
   let card
   try {

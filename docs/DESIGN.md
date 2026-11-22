@@ -104,7 +104,7 @@ immediately and opens that chat.
 
 ## Add contact sheet
 
-Tabs: **My code** (animated QR of the invite link, about 6 frames of 700 ms with progress dots and a hint to keep the other phone on it until it finishes, + ripploId + Share link button via Web Share API /
+Tabs: **My code** (animated QR of the invite link, about 6 frames of 700 ms with progress dots and a hint to keep the other phone on it until it finishes, + ripploId + Invite a friend button (shares text + web link; a hint line says the contact is added unverified) via Web Share API /
 copy), **Scan** (camera viewfinder with rounded mask; continuous automatic detection, native `BarcodeDetector` when it works, otherwise ZXing compiled to WebAssembly (jsQR only while it loads); no button to press. A match closes the sheet at once with "Keys verified successfully" or "Added to contacts" and a short vibration), **Paste link**.
 
 ## Contact page
@@ -118,7 +118,7 @@ monospace) + QR of it, actions: Verify with QR, Retry nearby, I'm sure it's them
 
 ## Settings (list of grouped cards, like the music app reference)
 
-- **Profile**: "Visible in Find people" switch, tapping the name edits it in place (Save / Cancel; there is no separate button), tappable avatar (pick a photo, cropped square; Remove button when set), name, ripploId, My QR. Photos show in chat list, chat header, contact page, People and New chat; initials otherwise.
+- **Profile**: "Visible in Find people" switch, tapping the name edits it in place (Save / Cancel; there is no separate button), tappable avatar (pick a photo, cropped square; when set, a small **Clear photo** button sits centered right under it), name, ripploId, My QR. Photos show in chat list, chat header, contact page, People and New chat; initials otherwise.
 - **Appearance**: mode segmented control, Accent color swatches, Background gradient swatches,
   Language.
 - **Network**: live list of transports with state + measured speed; Background relay toggle

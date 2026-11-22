@@ -265,8 +265,8 @@ final class MeshEngine {
     }
 
     private func onHello(_ s: State, _ p: Packet) {
-        guard s.node == nil, p.payload.count == 16, p.payload != nodeTag else { return }
-        let node = p.payload.hex
+        guard s.node == nil, p.payload.count >= 16, Data(p.payload.prefix(16)) != nodeTag else { return }
+        let node = Data(p.payload.prefix(16)).hex
         s.node = node
         let known = states.values.contains { $0 !== s && $0.node == node }
         let keepInitiated = nodeHex < node

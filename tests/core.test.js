@@ -4,7 +4,7 @@ import { resolveObjectURL } from 'node:buffer'
 import { createCore } from '../src/core/messenger.js'
 import { TYPE, encodePacket, decodePacket, newId } from '../src/mesh/packet.js'
 import { createDevSignal } from '../src/mesh/devSignal.js'
-import { parseLink, deriveIds } from '../src/crypto/identity.js'
+import { parseLink, deriveIds, webLink } from '../src/crypto/identity.js'
 import { isAvatar } from '../src/lib/avatar.js'
 import { importCallKey, sealFrame, openFrame, packFrames, unpackFrames, createReplay } from '../src/crypto/callFrame.js'
 import { slotOf, isDue, windowStart, SLOT_MS, WINDOW_MS, STALE_MS } from '../src/lib/schedule.js'
@@ -1311,5 +1311,31 @@ describe('typing indicator and resend', () => {
     b.mesh.offline = false
     connect(a.mesh, b.mesh)
     await waitFor(() => m.status === 'delivered', 6000)
+  })
+})
+
+describe('web invite links and newer peers', () => {
+  it('adds a contact from the shareable web link in both languages', async () => {
+    const a = await user('Alice'), b = await user('Bob'), c = await user('Carol')
+    const web = webLink(a.link, 'pl')
+    expect(web).toMatch(/^https:\/\/nahida4479\.github\.io\/Ripplo\/pl\/add\/#/)
+    expect(parseLink(web).id).toBe(a.id)
+    expect((await b.core.addContactFromLink(web)).id).toBe(a.id)
+    expect((await c.core.addContactFromLink(webLink(a.link, 'en'))).id).toBe(a.id)
+    expect(b.state.contacts[a.id].verification).toBe('none')
+  })
+
+  it('rejects a web link that is not from the Ripplo site', async () => {
+    const a = await user('Alice')
+    const evil = webLink(a.link, 'en').replace('nahida4479.github.io', 'example.com')
+    expect(() => parseLink(evil)).toThrow()
+  })
+
+  it('flags a neighbor whose hello card this version cannot read', async () => {
+    const a = await user('Alice'), b = await user('Bob')
+    connect(a.mesh, b.mesh)
+    await waitFor(() => b.state.neighbors[0]?.card)
+    await a.mesh.sendApp(b.mesh.node, utf8(JSON.stringify({ t: 'hello', card: b64(Uint8Array.of(9, 9, 9)) })))
+    await waitFor(() => b.state.neighbors[0].unsupported === true)
   })
 })

@@ -58,6 +58,14 @@ the link is cut into pieces of 420 characters, each shown as `ripplo://p/<set>.<
 SHA-256(link)[0..6]; about 6 frames, QR version 13, 69 × 69 modules) and the frames repeat every 700 ms. The scanner collects pieces
 in any order (up to 20 per set, 4 sets in flight, repeats ignored), joins them when all are present, checks the set id against
 SHA-256 of the result and only then handles the link as if it had been pasted. A mismatching set is discarded with a checksum error.
+
+**Shareable invite ("Invite a friend").** The share button sends the text plus the same link in web form,
+`https://nahida4479.github.io/Ripplo/add/#<same payload>` (`/pl/add/#…` for Polish), with a fresh single-use token each time. The payload is in the
+fragment, which the browser never sends to the site, so GitHub Pages learns nothing. The page validates the shape, shows no name from the
+card (it is unauthenticated text), and offers *Open in Ripplo* (`ripplo://add/…`), *Copy invite* and the download/SideStore guide. Sideloaded builds
+have no install referrer and no universal links (those need a domain root and a paid Apple team), so after installing the person opens the
+same link again or pastes it under *Add contact → Paste link*. `parseLink` accepts both forms, only for that exact site. A link opened
+before the profile exists is kept and offered once onboarding ends. Adding is the usual unverified contact (nearby proof, QR or manual verification later).
 The verification QR (60 digits) stays a single small code.
 
 The suffix is an integrity checksum (catches truncation / corruption). It is NOT authentication —
@@ -141,6 +149,12 @@ Max packet 65 536 bytes. Types:
 
 DATA payload first byte: `0x01` sealed message, `0x02` attachment chunk
 (`0x02 | attId(16) | index u32 | total u32 | bytes`).
+
+**Compatibility between versions.** Phones of different versions must keep seeing each other. Rules: wire changes are additive; unknown
+DATA/APP payload tags, message types, JSON fields and packet types are ignored, never fatal; a frame with an unknown packet version is
+skipped without closing the link (only a malformed length closes it); `LINK_HELLO` carries the node tag in its first 16 bytes and anything after
+them is ignored; discovery identifiers (BLE UUIDs, `_ripplo._tcp`, Multipeer type) never change. A neighbor whose `hello` card this
+version cannot read stays a neighbor and is shown as "Update needed" in Settings, so a version gap is visible instead of silent.
 
 No hop limit. Defaults: seen/reverse/route entries expire after 10 min, seen-cache cap 20 000.
 
