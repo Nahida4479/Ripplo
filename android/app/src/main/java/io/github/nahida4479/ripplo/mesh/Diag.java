@@ -21,6 +21,22 @@ final class Diag {
         android.util.Log.w("ripplo", m);
     }
 
+    interface StageSink {
+        void onStage(String medium, String node, String stage, String detail);
+    }
+
+    static volatile StageSink sink;
+
+    /** Connection step for the developer card: stage is attempt, connecting, connected, linked, rejected, failed, timeout or closed. */
+    static void stage(String medium, String node, String stage, String detail) {
+        String n = node == null || node.isEmpty() ? "-" : node.substring(0, Math.min(8, node.length()));
+        String d = detail == null ? "" : detail;
+        add(medium + " " + n + " " + stage + (d.isEmpty() ? "" : " " + d));
+        android.util.Log.i("ripplo", medium + " " + n + " " + stage + " " + d);
+        StageSink s = sink;
+        if (s != null) s.onStage(medium, n, stage, d);
+    }
+
     private static synchronized void add(String m) {
         if (lines.size() >= MAX) lines.removeFirst();
         lines.addLast(new SimpleDateFormat("HH:mm:ss.SSS", Locale.US).format(new Date()) + " " + m);

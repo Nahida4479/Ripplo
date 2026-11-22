@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { QrCode, ExternalLink, ShieldCheck, ShieldAlert, ShieldQuestion, TriangleAlert, Lock } from 'lucide-vue-next'
 import { state } from '../core/state.js'
 import { saveSettings, setAvatar, setName } from '../core/api.js'
@@ -38,7 +38,13 @@ function aboutTap() {
   if (on) loadDev()
 }
 const devLog = ref('')
-const bleCaps = ref({ coded: false, extended: false, enabled: false })
+const bleCaps = ref({ coded: false, extended: false })
+const stageLog = ref([])
+const stageTime = at => new Date(at).toLocaleTimeString([], { hour12: false })
+const offStage = mesh.on('devStage', e => {
+  stageLog.value = [{ ...e, time: stageTime(e.at) }, ...stageLog.value].slice(0, 40)
+})
+onUnmounted(() => offStage())
 const forceSpec = ref({})
 const SPECS = ['lan', 'wifi-direct', 'wifi-aware', 'ble:1m', 'ble:coded']
 const specOf = n => forceSpec.value[n.node] || 'lan'
@@ -51,10 +57,6 @@ async function forceConnect(n) {
 async function forceClose(n) {
   await mesh.devDisconnect(n.node, specOf(n).split(':')[0])
   setTimeout(loadDev, 500)
-}
-async function toggleCoded() {
-  await mesh.setBleCoded(!bleCaps.value.enabled)
-  await loadDev()
 }
 const devTransports = ref([])
 async function loadDev() {
@@ -213,8 +215,10 @@ const initials = l => l.slice(0, 2).toUpperCase()
         <div v-for="x in devTransports" :key="x.name" class="row"><span class="grow label">{{ x.name }}</span><span class="chip" :class="x.running ? 'ok' : x.unsupported ? 'bad' : 'warn'">{{ x.running ? 'running' : x.unsupported ? 'unsupported' : 'stopped' }}</span></div>
         <div class="row">
           <span class="grow"><span class="label">{{ t('devBleCoded') }}</span><br /><span class="hint">{{ t('devBleCodedHint', { coded: bleCaps.coded ? '✓' : '✗', ext: bleCaps.extended ? '✓' : '✗' }) }}</span></span>
-          <button class="switch" role="switch" :aria-checked="bleCaps.enabled" :aria-label="t('devBleCoded')" :disabled="!bleCaps.coded || !bleCaps.extended" @click="toggleCoded" />
         </div>
+        <div class="row hint">{{ t('devStageTitle') }}</div>
+        <div v-for="(s, i) in stageLog" :key="i" class="row mono"><span class="hint devlog">{{ s.time }} {{ s.medium }} {{ s.node }} <b>{{ t('devStage_' + s.stage) }}</b> {{ s.detail }}</span></div>
+        <div v-if="!stageLog.length" class="row hint">–</div>
         <div class="row hint">{{ t('devForce') }}</div>
         <div v-for="n in state.neighbors" :key="n.node" class="row forcerow">
           <span class="grow label">{{ n.card?.name || n.node.slice(0, 8) }}</span>

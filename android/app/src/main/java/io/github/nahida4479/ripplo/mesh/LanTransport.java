@@ -191,8 +191,10 @@ final class LanTransport extends Transport {
         }
         if (target == null) {
             log("force: no lan peer for node");
+            Diag.stage("lan", node, "rejected", "no LAN peer for this node");
             return false;
         }
+        Diag.stage("lan", node, "attempt", target.host.getHostAddress() + ":" + target.port);
         connect(target, true);
         return true;
     }
@@ -212,10 +214,13 @@ final class LanTransport extends Transport {
         Thread t = new Thread(() -> {
             try {
                 Socket s = new Socket();
+                if (force) Diag.stage("lan", p.tag, "connecting", key);
                 s.connect(new InetSocketAddress(p.host, p.port), 5000);
                 open(s, true);
+                if (force) Diag.stage("lan", p.tag, "connected", key);
                 p.fails = 0;
             } catch (Exception e) {
+                if (force) Diag.stage("lan", p.tag, "failed", e.getClass().getSimpleName() + " " + e.getMessage());
                 log("connect failed " + p.host.getHostAddress() + " " + e);
                 boolean refused = e.getMessage() != null && e.getMessage().contains("ECONNREFUSED");
                 if (refused && ++p.fails >= 6) {

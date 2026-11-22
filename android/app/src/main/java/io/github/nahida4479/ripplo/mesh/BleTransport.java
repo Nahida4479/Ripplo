@@ -73,7 +73,7 @@ final class BleTransport extends Transport {
     }
 
     private boolean codedOn() {
-        return Build.VERSION.SDK_INT >= 26 && engine.bleCoded() && adapter != null
+        return Build.VERSION.SDK_INT >= 26 && adapter != null
                 && adapter.isLeCodedPhySupported() && adapter.isLeExtendedAdvertisingSupported();
     }
 
@@ -134,8 +134,12 @@ final class BleTransport extends Transport {
 
     @Override
     boolean forceConnect(String node, String option) {
-        if (adapter == null || !running) return false;
         boolean coded = "coded".equals(option);
+        if (adapter == null || !running) {
+            Diag.stage("ble", node, "rejected", "BLE transport not running");
+            return false;
+        }
+        Diag.stage("ble", node, "attempt", coded ? "coded" : "1m");
         long now = System.currentTimeMillis();
         int started = 0;
         for (Hit h : new ArrayList<>(hits.values())) {
@@ -150,6 +154,7 @@ final class BleTransport extends Transport {
             started++;
         }
         Diag.i("ble force " + (coded ? "coded" : "1m") + " started=" + started);
+        if (started == 0) Diag.stage("ble", node, "rejected", "no " + (coded ? "coded" : "1m") + " hit in the last 60 s");
         return started > 0;
     }
 
@@ -437,15 +442,24 @@ final class BleTransport extends Transport {
             } catch (Exception e) {
                 gatt = null;
             }
-            if (gatt == null) { close(); return; }
-            main.postDelayed(() -> { if (!registered) close(); }, 30000);
+            if (gatt == null) { Diag.stage("ble", device.getAddress(), "failed", "connectGatt error"); close(); return; }
+            Diag.stage("ble", device.getAddress(), "connecting", "");
+            main.postDelayed(() -> {
+                if (registered) return;
+                Diag.stage("ble", device.getAddress(), "timeout", "no link after 30 s");
+                close();
+            }, 30000);
         }
 
         private void finish(int psm) {
             if (!alive.get()) return;
             registered = true;
             Diag.i("ble client link up " + device.getAddress() + " psm=" + psm);
-            if (!engine.addLink(this)) return;
+            if (!engine.addLink(this)) {
+                Diag.stage("ble", device.getAddress(), "rejected", "engine did not accept the link");
+                return;
+            }
+            Diag.stage("ble", device.getAddress(), "linked", "psm=" + psm);
             if (psm > 0 && Build.VERSION.SDK_INT >= 29) connectL2cap(device, psm);
         }
 
@@ -460,9 +474,12 @@ final class BleTransport extends Transport {
             public void onConnectionStateChange(BluetoothGatt g, int status, int newState) {
                 Diag.i("ble client state " + device.getAddress() + " status=" + status + " new=" + newState);
                 if (newState == BluetoothProfile.STATE_CONNECTED && status == BluetoothGatt.GATT_SUCCESS) {
+                    Diag.stage("ble", device.getAddress(), "connected", "GATT up, discovering services");
                     if (Build.VERSION.SDK_INT >= 26) g.readPhy();
                     if (!g.requestMtu(517)) g.discoverServices();
                 } else {
+                    if (!registered) Diag.stage("ble", device.getAddress(), "failed", "GATT status=" + status + " new=" + newState);
+                    else Diag.stage("ble", device.getAddress(), "closed", "status=" + status);
                     close();
                 }
             }

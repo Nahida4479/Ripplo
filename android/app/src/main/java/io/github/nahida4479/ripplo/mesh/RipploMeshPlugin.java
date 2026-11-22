@@ -107,6 +107,17 @@ public class RipploMeshPlugin extends Plugin implements MeshEngine.Listener {
     public void load() {
         engine = MeshEngine.get(getContext());
         engine.setListener(this);
+        Diag.sink = (medium, node, stage, detail) -> {
+            android.app.Activity act = getActivity();
+            if (act == null) return;
+            JSObject o = new JSObject();
+            o.put("medium", medium);
+            o.put("node", node);
+            o.put("stage", stage);
+            o.put("detail", detail);
+            o.put("at", System.currentTimeMillis());
+            act.runOnUiThread(() -> notifyListeners("devStage", o));
+        };
         readShare(getActivity() == null ? null : getActivity().getIntent());
         readOpen(getActivity() == null ? null : getActivity().getIntent());
     }
@@ -418,14 +429,7 @@ public class RipploMeshPlugin extends Plugin implements MeshEngine.Listener {
         JSObject r = new JSObject();
         r.put("coded", coded);
         r.put("extended", ext);
-        r.put("enabled", engine.bleCoded());
         call.resolve(r);
-    }
-
-    @PluginMethod
-    public void setBleCoded(PluginCall call) {
-        engine.setBleCoded(call.getBoolean("enabled", false));
-        call.resolve();
     }
 
     @PluginMethod

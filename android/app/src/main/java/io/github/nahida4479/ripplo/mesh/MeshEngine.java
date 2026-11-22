@@ -229,6 +229,7 @@ public final class MeshEngine implements Router.Host {
             }
         }
         Diag.i("link down " + link.medium + " node=" + (node == null ? "none" : node.substring(0, 8)) + " last=" + down);
+        if (node != null) Diag.stage(link.medium, node, "closed", "link down, last=" + down);
         if (down) {
             Router r = router;
             if (r != null) r.linkDown(node);
@@ -415,17 +416,6 @@ public final class MeshEngine implements Router.Host {
                 seen.put(node, m);
             }
             m.put(medium, System.currentTimeMillis());
-        }
-    }
-
-    public boolean bleCoded() { return prefs.getBoolean("ble_coded", false); }
-
-    public void setBleCoded(boolean on) {
-        prefs.edit().putBoolean("ble_coded", on).apply();
-        for (final Transport t : new ArrayList<>(transports)) {
-            if (!t.name().equals("ble")) continue;
-            t.stop();
-            sched.execute(t::start);
         }
     }
 

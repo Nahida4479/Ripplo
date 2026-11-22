@@ -147,8 +147,10 @@ final class WifiAwareTransport extends Transport {
         PeerHandle h = handles.get(node);
         if (h == null || sub == null) {
             log("force: peer not discovered");
+            Diag.stage("wifi-aware", node, "rejected", "peer not discovered");
             return false;
         }
+        Diag.stage("wifi-aware", node, "attempt", "");
         initiate(h);
         return true;
     }
