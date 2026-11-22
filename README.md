@@ -73,6 +73,8 @@ Every transport carries the same byte stream, so one person can be reachable ove
 - **Invite link**: `ripplo://add/...` contains your name and public keys.
 - **"People nearby" tab**: asks the mesh who is nearby. The **People nearby** tab can return at most 20 people (a safeguard against overloading the network). 
 
+<img src="./public/Screen/Ripplo_Invite.png" width="200px">
+
 ## Verifying a contact (checking that the public key has not been swapped)
 
 | Level | Meaning |

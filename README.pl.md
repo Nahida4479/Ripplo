@@ -73,7 +73,7 @@ Każdy transport przenosi ten sam strumień bajtów, więc jedna osoba może by�
 - **Link zaproszenia**: `ripplo://add/...` zawiera twoje imię i klucze publiczne.
 - **Zakładka "Osoby w pobliżu"**: pyta sieć mesh, kto jest w pobliżu. Zakładka **Osoby w pobliżu** może zwrócić maksymalnie 20 osób (zabezpieczenie przed przeciążeniem sieci). 
 
-<img src="./public/Screen/Ripplo_Invite.png" width="200px">
+<img src="./public/Screen/Ripplo_Invite.png" width="350px">
 
 ## Weryfikacja kontaktu (spradzenie czy klucz publiczny nie został podmieniony)
 
@@ -83,7 +83,7 @@ Każdy transport przenosi ten sam strumień bajtów, więc jedna osoba może by�
 | QR | Zeskanowanie osobiście kodu QR. |
 | Ręcznie | Ręczne zaznaczenia że dany kontakt jest tym za kogo się podaje. |
 
-<img src="./public/Screen/Ripplo_QR.png" width="200px">
+<img src="./public/Screen/Ripplo_QR.png" width="350px">
 
 ## Jak podróżują wiadomości
 
