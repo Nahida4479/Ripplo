@@ -383,7 +383,8 @@ A name search keeps at most 50 matches, shows them instead of the list, and clea
 Refreshed automatically once a night, or when the user taps refresh. DISCOVER floods the whole mesh, hence
 the schedule: the 02:00-05:00 local window is cut into 720 slots of 15 s and each phone owns the slot
 `parseInt(tag[0..4 bytes]) mod 720` (stable, so phones scan one after another instead of all at once). A phone that
-was asleep at its slot scans as soon as the app wakes inside the window, at most once per 20 h.
+was asleep at its slot scans as soon as the app wakes inside the window, at most once per 20 h. The time of the last scan is stored (`kv/peopleRefreshedAt`), so the header
+shows it and the 20 h limit holds across restarts.
 The search ends after 30 s, or earlier when the aggregated DEAD_END has arrived and no REPLY came for 10 s
 (a leaf phone dead-ends immediately but its REPLY is built by JS a moment later, so a dead end alone must not
 end the search), or at once when the DISCOVER reached no neighbor. A person added from here is

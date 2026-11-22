@@ -36,7 +36,7 @@ const nearbyPerson = n => ({ id: n.card.id, name: n.card.name, card: n.card.card
     <header class="hdr">
       <div style="flex: 1">
         <h1>{{ t('people') }}</h1>
-        <div class="sub">{{ t('lastRefreshed', { time: last }) }} · {{ t('nextTonight') }}</div>
+        <div class="sub">{{ t('lastRefreshed', { time: last }) }} {{ t('nextTonight') }}</div>
       </div>
       <button class="icon-btn" :class="{ spin: state.peopleRefreshing }" :aria-label="t('refresh')" :disabled="state.peopleRefreshing" @click="refreshPeople()">
         <RefreshCw :size="22" :stroke-width="1.75" />

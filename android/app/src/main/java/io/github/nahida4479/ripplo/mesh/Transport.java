@@ -27,6 +27,7 @@ abstract class Transport {
             startImpl();
             running = true;
         } catch (Throwable t) {
+            android.util.Log.w("ripplo", name() + " start failed: " + t);
             try { stopImpl(); } catch (Throwable ignored) { }
         }
     }

@@ -380,7 +380,8 @@ poprzednią listę.
 Odświeżane automatycznie raz w nocy albo gdy użytkownik stuknie odśwież. DISCOVER zalewa całą sieć mesh, stąd
 harmonogram: okno 02:00-05:00 czasu lokalnego jest pocięte na 720 slotów po 15 s, a każdy telefon ma swój slot
 `parseInt(tag[0..4 bajty]) mod 720` (stały, więc telefony skanują jeden po drugim, a nie wszystkie naraz). Telefon,
-który spał w swoim slocie, skanuje, gdy tylko aplikacja obudzi się w oknie, najwyżej raz na 20 h.
+który spał w swoim slocie, skanuje, gdy tylko aplikacja obudzi się w oknie, najwyżej raz na 20 h. Czas ostatniego skanu jest zapisywany (`kv/peopleRefreshedAt`), więc nagłówek
+pokazuje go, a limit 20 h działa także po restarcie.
 Wyszukiwanie kończy się po 30 s albo wcześniej, gdy przyszedł zagregowany DEAD_END i przez 10 s nie dotarła żadna
 odpowiedź REPLY (telefon na końcu łańcucha od razu odsyła ślepy zaułek, ale jego REPLY buduje JS chwilę później, więc
 sam ślepy zaułek nie może kończyć wyszukiwania), albo od razu, gdy DISCOVER nie dotarł do żadnego sąsiada. Osoba dodana stąd jest

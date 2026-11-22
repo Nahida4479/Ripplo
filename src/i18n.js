@@ -71,7 +71,7 @@ const pl = {
   verifiedOk: 'Klucze zostały poprawnie zweryfikowane', verifyMismatch: 'Numery bezpieczeństwa się nie zgadzają', verifyFailed: 'Nie udało się zweryfikować przez sieć',
   err_bad_link: 'To nie jest prawidłowy link Ripplo', err_bad_checksum: 'Link jest uszkodzony lub zmodyfikowany', err_self: 'To twój własny kod',
   deepLinkConfirm: 'Dodać kontakt z tego linku? Jego klucz pozostanie niezweryfikowany, dopóki go nie sprawdzisz.',
-  lastRefreshed: 'Ostatnio odświeżono {time}', nextTonight: 'następne dziś w nocy', refresh: 'Odśwież', nearby: 'W pobliżu', inMesh: 'W zasięgu sieci',
+  lastRefreshed: 'Ostatnio odświeżono {time}', nextTonight: 'następne odświeżenie dziś w nocy', refresh: 'Odśwież', nearby: 'W pobliżu', inMesh: 'W zasięgu sieci',
   nobodyNearby: 'Nikogo teraz w pobliżu', nobodyInMesh: 'Nikogo jeszcze nie znaleziono. Stuknij odśwież.', hops_one: '1 przeskok stąd', hops_few: '{n} przeskoki stąd', hops_many: '{n} przeskoków stąd', inContacts: 'Już w kontaktach',
   addPersonTitle: 'Dodać {name}?', added: 'Dodano do kontaktów',
   unverifiedWarning: 'Nie udało się zweryfikować tego klucza publicznego. Nie masz pewności, że osoba po drugiej stronie jest tą, którą dodałeś/aś.',

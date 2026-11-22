@@ -180,6 +180,7 @@ export function createCore({ mesh, dbName = 'ripplo', state = createState(), not
     tokens = (await db.get('kv', 'tokens')) || { pending: [], used: {} }
     unsent = new Set((await db.get('kv', 'unsent')) || [])
     unsends = (await db.get('kv', 'unsends')) || []
+    state.peopleRefreshedAt = (await db.get('kv', 'peopleRefreshedAt')) || 0
     const profile = await db.get('kv', 'profile')
     state.needsOnboarding = !profile
     if (profile) {
@@ -1197,6 +1198,7 @@ export function createCore({ mesh, dbName = 'ripplo', state = createState(), not
     } finally {
       state.peopleRefreshing = false
       state.peopleRefreshedAt = Date.now()
+      db.put('kv', 'peopleRefreshedAt', state.peopleRefreshedAt).catch(() => {})
     }
   }
 
