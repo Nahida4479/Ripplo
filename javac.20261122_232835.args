@@ -1,0 +1,6 @@
+-proc:none
+-d
+/tmp/jcheck
+-cp
+/dev/null
+android/app/src/main/java/io/github/nahida4479/ripplo/mesh/BleTransport.java

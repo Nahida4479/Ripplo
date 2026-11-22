@@ -106,9 +106,11 @@ final class WifiDirectTransport extends Transport {
         WifiP2pDevice dev = devices.get(node);
         if (dev == null || manager == null || channel == null) {
             log("force: peer not discovered, starting discovery");
+            Diag.stage("wifi-direct", node, "rejected", "peer not discovered, discovery started");
             if (manager != null && channel != null) discover();
             return false;
         }
+        Diag.stage("wifi-direct", node, "attempt", "");
         requestConnect(node, dev);
         return true;
     }
@@ -120,8 +122,14 @@ final class WifiDirectTransport extends Transport {
         cfg.wps.setup = WpsInfo.PBC;
         log("connect " + tag.substring(0, Math.min(8, tag.length())));
         manager.connect(channel, cfg, new WifiP2pManager.ActionListener() {
-            @Override public void onSuccess() { log("connect requested"); }
-            @Override public void onFailure(int reason) { log("connect failed reason=" + reason); }
+            @Override public void onSuccess() {
+                log("connect requested");
+                Diag.stage("wifi-direct", tag, "connecting", "request accepted by system");
+            }
+            @Override public void onFailure(int reason) {
+                log("connect failed reason=" + reason);
+                Diag.stage("wifi-direct", tag, "rejected", "system refused, reason=" + reason);
+            }
         });
     }
 

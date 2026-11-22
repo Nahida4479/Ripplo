@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { QrCode, ExternalLink, ShieldCheck, ShieldAlert, ShieldQuestion, TriangleAlert, Lock } from 'lucide-vue-next'
 import { state } from '../core/state.js'
 import { saveSettings, setAvatar, setName } from '../core/api.js'
@@ -39,6 +39,12 @@ function aboutTap() {
 }
 const devLog = ref('')
 const bleCaps = ref({ coded: false, extended: false })
+const stageLog = ref([])
+const stageTime = at => new Date(at).toLocaleTimeString([], { hour12: false })
+const offStage = mesh.on('devStage', e => {
+  stageLog.value = [{ ...e, time: stageTime(e.at) }, ...stageLog.value].slice(0, 40)
+})
+onUnmounted(() => offStage())
 const forceSpec = ref({})
 const SPECS = ['lan', 'wifi-direct', 'wifi-aware', 'ble:1m', 'ble:coded']
 const specOf = n => forceSpec.value[n.node] || 'lan'
@@ -210,6 +216,9 @@ const initials = l => l.slice(0, 2).toUpperCase()
         <div class="row">
           <span class="grow"><span class="label">{{ t('devBleCoded') }}</span><br /><span class="hint">{{ t('devBleCodedHint', { coded: bleCaps.coded ? '✓' : '✗', ext: bleCaps.extended ? '✓' : '✗' }) }}</span></span>
         </div>
+        <div class="row hint">{{ t('devStageTitle') }}</div>
+        <div v-for="(s, i) in stageLog" :key="i" class="row mono"><span class="hint devlog">{{ s.time }} {{ s.medium }} {{ s.node }} <b>{{ t('devStage_' + s.stage) }}</b> {{ s.detail }}</span></div>
+        <div v-if="!stageLog.length" class="row hint">–</div>
         <div class="row hint">{{ t('devForce') }}</div>
         <div v-for="n in state.neighbors" :key="n.node" class="row forcerow">
           <span class="grow label">{{ n.card?.name || n.node.slice(0, 8) }}</span>

@@ -229,6 +229,7 @@ public final class MeshEngine implements Router.Host {
             }
         }
         Diag.i("link down " + link.medium + " node=" + (node == null ? "none" : node.substring(0, 8)) + " last=" + down);
+        if (node != null) Diag.stage(link.medium, node, "closed", "link down, last=" + down);
         if (down) {
             Router r = router;
             if (r != null) r.linkDown(node);

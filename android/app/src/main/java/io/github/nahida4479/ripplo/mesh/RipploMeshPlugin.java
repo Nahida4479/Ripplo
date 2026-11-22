@@ -107,6 +107,17 @@ public class RipploMeshPlugin extends Plugin implements MeshEngine.Listener {
     public void load() {
         engine = MeshEngine.get(getContext());
         engine.setListener(this);
+        Diag.sink = (medium, node, stage, detail) -> {
+            android.app.Activity act = getActivity();
+            if (act == null) return;
+            JSObject o = new JSObject();
+            o.put("medium", medium);
+            o.put("node", node);
+            o.put("stage", stage);
+            o.put("detail", detail);
+            o.put("at", System.currentTimeMillis());
+            act.runOnUiThread(() -> notifyListeners("devStage", o));
+        };
         readShare(getActivity() == null ? null : getActivity().getIntent());
         readOpen(getActivity() == null ? null : getActivity().getIntent());
     }
