@@ -968,24 +968,26 @@ describe('hidden mode', () => {
 })
 
 describe('verification memory and hints', () => {
-  it('remembers a verified key across delete and re-add', async () => {
+  it('does not carry verification over when the same person is added again', async () => {
     const a = await user('Alice'), b = await user('Bob')
     await b.core.addContactFromLink(a.link)
     await b.core.markVerified(a.id)
     expect(b.state.contacts[a.id].verification).toBe('manual')
     await b.core.deleteContact(a.id)
     const again = await b.core.addContactFromLink(a.link)
-    expect(again.verification).toBe('manual')
-    expect(again.verifiedAt).toBeGreaterThan(0)
+    expect(again.verification).toBe('none')
+    expect(again.verifiedAt).toBe(0)
   })
 
-  it('does not restore verification for a different key under the same id', async () => {
-    const a = await user('Alice'), b = await user('Bob'), c = await user('Carol')
+  it('verifies a re-added contact again over a direct link', async () => {
+    const a = await user('Alice'), b = await user('Bob')
     await b.core.addContactFromLink(a.link)
     await b.core.markVerified(a.id)
     await b.core.deleteContact(a.id)
-    const other = await b.core.addContactFromLink(c.link)
-    expect(other.verification).toBe('none')
+    connect(a.mesh, b.mesh)
+    const again = await b.core.addContactFromLink(a.link)
+    expect(again.verification).toBe('none')
+    await waitFor(() => b.state.contacts[a.id].verification === 'nearby')
   })
 
   it('tells the other person that you verified their key, as a hint only', async () => {
@@ -1261,5 +1263,53 @@ describe('calls survive a reopened app', () => {
     await waitFor(() => a.state.contacts[b.id].node === a.state.neighbors[0].node)
     a.state.neighbors[0].card = undefined
     expect(a.state.neighbors.find((n) => n.node === a.state.contacts[b.id].node)).toBeTruthy()
+  })
+})
+
+describe('typing indicator and resend', () => {
+  const FAST = { ...TIMING, typing: 50, typingTtl: 400, resend: 50 }
+  const near = async (a, b) => {
+    await a.core.addContactFromLink(b.link)
+    await unlock(a, b)
+    connect(a.mesh, b.mesh)
+    await waitFor(() => a.state.neighbors[0]?.card && b.state.neighbors[0]?.card)
+  }
+
+  it('shows that the other person is typing and clears it after a moment', async () => {
+    const a = await user('Alice', FAST), b = await user('Bob', FAST)
+    await near(a, b)
+    await a.core.sendTyping(b.id)
+    await waitFor(() => b.state.typing[a.id]?.includes(a.id))
+    await waitFor(() => !b.state.typing[a.id]?.length)
+  })
+
+  it('clears the indicator when the message arrives', async () => {
+    const a = await user('Alice', { ...FAST, typingTtl: 5000 }), b = await user('Bob', { ...FAST, typingTtl: 5000 })
+    await near(a, b)
+    await a.core.sendTyping(b.id)
+    await waitFor(() => b.state.typing[a.id]?.length)
+    await a.core.sendText(b.id, 'done')
+    await waitFor(() => !b.state.typing[a.id]?.length)
+  })
+
+  it('does not send typing to someone who is not a direct neighbor', async () => {
+    const a = await user('Alice', FAST), b = await user('Bob', FAST)
+    await a.core.addContactFromLink(b.link)
+    await unlock(a, b)
+    await a.core.sendTyping(b.id)
+    await new Promise((r) => setTimeout(r, 200))
+    expect(b.state.typing[a.id]?.length || 0).toBe(0)
+  })
+
+  it('resends an undelivered message when the contact comes back into range', async () => {
+    const a = await user('Alice', FAST), b = await user('Bob', FAST)
+    await a.core.addContactFromLink(b.link)
+    await unlock(a, b)
+    b.mesh.offline = true
+    const m = await a.core.sendText(b.id, 'later')
+    await waitFor(() => m.status === 'out_of_range')
+    b.mesh.offline = false
+    connect(a.mesh, b.mesh)
+    await waitFor(() => m.status === 'delivered', 6000)
   })
 })

@@ -181,7 +181,7 @@ Why messages cannot loop: every node forwards a given `id` at most once (seen-se
 packet can never pass the same phone twice, and duplicates are answered with DEAD_END instead of being forwarded. When every
 branch dies the DEAD_ENDs aggregate back to the sender, which shows *"Contact is out of mesh range"*.
 There is no hop limit, so a message crosses any chain of phones, however long. JS also gives up
-after 5 min without ACK/DEAD_END (links can vanish mid-flight).
+after 60 s without ACK/DEAD_END (links can vanish mid-flight); attachment chunks wait 20 s and are re-sent up to 4 times with fresh packet ids.
 
 The ACK on the way back teaches every relay `routes[dest] = neighbor`, so later packets (e.g. media
 chunks) go unicast along the learned path instead of flooding.
@@ -195,17 +195,17 @@ Abuse limits (native): max 200 packets/s per neighbor, max 32 MiB queued per lin
 
 Every transport delivers a byte stream; frames are `u32 length | packet`. The first frame on a new
 link is LINK_HELLO with the random per-process `nodeTag`. Links are grouped by `nodeTag`, so one
-neighbor may have several links (e.g. BLE + LAN). On link up and every 60 s the engine sends
+neighbor may have several links (e.g. BLE + LAN). On link up and every 5 s (every 15 s on BLE) the engine sends
 PING with filler (16 KiB on Wi-Fi/L2CAP media, 2 KiB on BLE GATT) and measures
 `kbps = bits / rttMs`. The router always sends through the neighbor's fastest live link and falls
 back to the next on failure. Before the first measurement, nominal kbps: lan 20000,
 wifi-aware 20000, wifi-direct 20000, multipeer 10000, l2cap 300, ble 50.
 
-A link is closed only when it has proved silent twice in a row: our PING has been unanswered for more than 90 s and no byte at all has arrived for
-more than 90 s, on two consecutive 60 s checks (the first strike keeps the ping outstanding instead of sending a new one). Any received byte counts, so a
-long transfer never trips it, and a phone that merely dozed (no ping was outstanding) is not cut off. Without this a link whose peer vanished without closing the socket stayed in the neighbor list, the
+A link is closed when no byte at all has arrived for more than 30 s on two consecutive 5 s checks. Any received byte counts, so a
+long transfer never trips it. A link that has been silent for more than 12 s is tried only after the neighbor's other links, so a dead Wi-Fi link no longer swallows packets while BLE would still work. Without this a link whose peer vanished without closing the socket stayed in the neighbor list, the
 router kept unicasting along the route learned from an earlier ACK, and messages ended as "out of range" with the phones side by side.
 Closing it clears the routes through it, so the next DATA floods again.
+Android LAN retries a known peer every 4 s and a failed service resolve up to 5 times, so the fast link comes up within seconds instead of a minute.
 
 Duplicate links of the same medium to the same node: keep the one initiated by the lower nodeTag.
 
@@ -267,8 +267,8 @@ the same-name conflict check. Names inside cards are NOT signed, so a name from 
 
 ### Verification memory, always-on checks and hints
 
-- Every verified key (nearby, qr, manual) is remembered by `ripploId` and key in `kv/verified`, also after the contact is deleted.
-  Adding the same key again restores the verification at once; a different key under the same id does not.
+- Verification is never inherited. A contact added again (for example by link after deleting it) starts as not verified and is proven over a
+  direct link again, because a link or card on its own cannot show that the key was not swapped.
 - A nearby proof is tried for every new contact (also one who wrote first) and again whenever a neighbor whose card matches an
   unverified contact shows up (at most every 30 s), as long as the contact is not a pending request.
 - When you verify someone, they get `vf` (nearby / qr / manual) in the next message, plus an immediate `{ "t": "profile" }`. The
@@ -378,10 +378,17 @@ unverified (a relay could have swapped the card) and gets the same warning as an
 ## 8. Message lifecycle (what the sender sees)
 
 `encrypting` → `sending` (handed to N neighbors; attachments show chunk progress %) →
-`delivered` (ACK, "via k phones") or `out_of_range` (all branches dead-ended or 5 min timeout,
+`delivered` (ACK, "via k phones") or `out_of_range` (all branches dead-ended or 60 s timeout,
 with **Retry**). `failed` = local error. Incoming: shown and notified only once complete
 (for attachments the pointer arrives after all chunks). Native ACKs DATA as soon as it is
 persisted to the inbox, so delivery works with the screen off and the app closed.
+When a contact's hello arrives (it came back into range or switched link), its `out_of_range` and `failed` messages are re-sent
+automatically (at most every 15 s per contact).
+
+**Typing indicator.** While the composer has text, the app sends `{ "t": "typing", "ts", "g"? }` at most every 3 s, Signal-sealed,
+only to contacts that have replied and are direct neighbors. It travels as an APP packet `[2] + sealed`, so it is never stored in the
+inbox or notified, and Android drops it while the UI is detached. The receiver shows three animated dots in that chat for 5 s (or until the
+message arrives), ignores it from anyone who is not an accepted contact, and ignores one older than 5 s.
 
 ## 9. Native plugin contract — `RipploMesh` (Capacitor)
 

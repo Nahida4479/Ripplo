@@ -192,17 +192,17 @@ Limity nadużyć (native): maks. 200 pakietów/s na sąsiada, maks. 32 MiB w kol
 
 Każdy transport dostarcza strumień bajtów; ramki mają postać `u32 length | packet`. Pierwszą ramką na nowym
 łączu jest LINK_HELLO z losowym, per proces `nodeTag`. Łącza są grupowane według `nodeTag`, więc jeden
-sąsiad może mieć kilka łączy (np. BLE + LAN). Po nawiązaniu łącza i co 60 s silnik wysyła
+sąsiad może mieć kilka łączy (np. BLE + LAN). Po nawiązaniu łącza i co 5 s (co 15 s w BLE) silnik wysyła
 PING z wypełnieniem (16 KiB dla mediów Wi-Fi/L2CAP, 2 KiB dla BLE GATT) i mierzy
 `kbps = bits / rttMs`. Router zawsze wysyła przez najszybsze działające łącze sąsiada i w razie awarii
 przełącza się na następne. Przed pierwszym pomiarem nominalne kbps: lan 20000,
 wifi-aware 20000, wifi-direct 20000, multipeer 10000, l2cap 300, ble 50.
 
-Łącze jest zamykane dopiero, gdy dwa razy z rzędu okazało się ciche: nasz PING jest bez odpowiedzi dłużej niż 90 s i przez ponad 90 s nie dotarł żaden bajt, w dwóch
-kolejnych kontrolach co 60 s (pierwsze uderzenie zostawia ping jako niepotwierdzony zamiast wysyłać nowy). Liczy się każdy odebrany bajt, więc długi transfer go nie
-wyzwoli, a telefon, który tylko przysnął (bez niepotwierdzonego pinga), nie jest odcinany. Bez tego łącze, którego druga strona zniknęła bez zamknięcia gniazda, zostawało na liście
+Łącze jest zamykane, gdy przez ponad 30 s nie dotarł żaden bajt, w dwóch kolejnych kontrolach co 5 s. Liczy się każdy odebrany bajt, więc długi transfer go nie
+wyzwoli. Łącze ciche dłużej niż 12 s jest próbowane dopiero po pozostałych łączach sąsiada, więc martwe łącze Wi-Fi nie połyka już pakietów, gdy BLE nadal działa. Bez tego łącze, którego druga strona zniknęła bez zamknięcia gniazda, zostawało na liście
 sąsiadów, router dalej wysyłał jednoadresowo trasą nauczoną z wcześniejszego ACK, a wiadomości kończyły jako „poza zasięgiem” przy telefonach obok siebie.
 Zamknięcie czyści trasy przez nie, więc następny DATA znów zalewa sieć.
+LAN na Androidzie ponawia znanego sąsiada co 4 s, a nieudane rozpoznanie usługi do 5 razy, więc szybkie łącze powstaje w kilka sekund zamiast po minucie.
 
 Zduplikowane łącza tego samego medium do tego samego węzła: zostaw to zainicjowane przez niższy nodeTag.
 
@@ -264,8 +264,8 @@ NIE są podpisane, więc nazwa z karty, `hello` lub `REPLY` nigdy nie nadpisuje 
 
 ### Pamięć weryfikacji, stałe próby i podpowiedzi
 
-- Każdy zweryfikowany klucz (nearby, qr, manual) jest pamiętany po `ripploId` i kluczu w `kv/verified`, także po usunięciu kontaktu. Ponowne
-  dodanie tego samego klucza od razu przywraca weryfikację; inny klucz pod tym samym id nie.
+- Weryfikacja nigdy nie jest dziedziczona. Kontakt dodany ponownie (np. linkiem po usunięciu) zaczyna jako niezweryfikowany i jest
+  sprawdzany od nowa przez bezpośrednie łącze, bo sam link lub karta nie pokazują, że klucz nie został podmieniony.
 - Dowód bliskości jest próbowany dla każdego nowego kontaktu (także tego, który napisał pierwszy) i ponownie, gdy pojawia się sąsiad,
   którego karta pasuje do niezweryfikowanego kontaktu (najwyżej co 30 s), o ile kontakt nie jest oczekującą prośbą.
 - Gdy kogoś zweryfikujesz, dostaje `vf` (nearby / qr / manual) w następnej wiadomości oraz od razu `{ "t": "profile" }`. Odbiorca zapisuje to
@@ -376,9 +376,16 @@ niezweryfikowana (przekaźnik mógł podmienić wizytówkę) i dostaje to samo o
 
 `encrypting` → `sending` (przekazano N sąsiadom; załączniki pokazują postęp fragmentów w %) →
 `delivered` (ACK, „przez k telefonów”) lub `out_of_range` (wszystkie gałęzie zakończyły się dead-endem albo upłynął
-limit 5 min, z przyciskiem **Ponów**). `failed` = błąd lokalny. Wiadomości przychodzące: wyświetlane i zgłaszane powiadomieniem dopiero
+limit 60 s, z przyciskiem **Ponów**). `failed` = błąd lokalny. Wiadomości przychodzące: wyświetlane i zgłaszane powiadomieniem dopiero
 po otrzymaniu w całości (w przypadku załączników wskaźnik przychodzi po wszystkich fragmentach). Warstwa natywna wysyła ACK dla DATA zaraz po
 zapisaniu do skrzynki (inbox), więc dostarczanie działa przy wyłączonym ekranie i zamkniętej aplikacji.
+Gdy przyjdzie hello kontaktu (wrócił w zasięg albo zmienił łącze), jego wiadomości `out_of_range` i `failed` są wysyłane ponownie
+automatycznie (najwyżej co 15 s na kontakt).
+
+**Wskaźnik pisania.** Gdy w polu wiadomości jest tekst, aplikacja co najwyżej co 3 s wysyła `{ "t": "typing", "ts", "g"? }`, zaszyfrowane
+protokołem Signal, tylko do kontaktów, które odpowiedziały i są bezpośrednimi sąsiadami. Idzie jako pakiet APP `[2] + zaszyfrowane`, więc nigdy
+nie trafia do skrzynki ani powiadomienia, a Android odrzuca go, gdy interfejs jest odłączony. Odbiorca pokazuje w tym czacie trzy animowane
+kropki przez 5 s (lub do nadejścia wiadomości), ignoruje je od kogoś, kto nie jest zaakceptowanym kontaktem, i ignoruje starsze niż 5 s.
 
 ## 9. Kontrakt wtyczki natywnej — `RipploMesh` (Capacitor)
 

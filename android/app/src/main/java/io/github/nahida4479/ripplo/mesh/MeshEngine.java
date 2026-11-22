@@ -54,7 +54,9 @@ public final class MeshEngine implements Router.Host {
     private final SharedPreferences prefs;
     private final Inbox inbox;
     private final PowerManager.WakeLock wake;
-    private static final long QUIET_NANOS = 90L * 1000000000L;
+    private static final long QUIET_NANOS = 30L * 1000000000L;
+    private static final long TICK_SECONDS = 5;
+    private int tickCount;
     private final String nodeTag;
     private final Object lock = new Object();
     private final Map<String, List<Link>> byNode = new HashMap<>();
@@ -111,7 +113,7 @@ public final class MeshEngine implements Router.Host {
         transports.add(new LanTransport(ctx, this));
         transports.add(new WifiDirectTransport(ctx, this));
         for (Transport t : transports) sched.execute(t::start);
-        tickTask = sched.scheduleWithFixedDelay(this::tick, 60, 60, TimeUnit.SECONDS);
+        tickTask = sched.scheduleWithFixedDelay(this::tick, TICK_SECONDS, TICK_SECONDS, TimeUnit.SECONDS);
         if (launchService) MeshService.launch(ctx);
     }
 
@@ -148,15 +150,16 @@ public final class MeshEngine implements Router.Host {
             for (List<Link> l : byNode.values()) all.addAll(l);
         }
         long now = System.nanoTime();
+        tickCount++;
         for (Link l : all) {
-            long asked = l.pingStartNanos;
-            boolean silent = asked != 0 && now - asked > QUIET_NANOS && now - l.lastRx > QUIET_NANOS;
-            if (!silent) {
-                l.strikes = 0;
-                sendPing(l);
-            } else if (++l.strikes >= 2) {
-                l.close();
+            if (now - l.lastRx > QUIET_NANOS) {
+                if (++l.strikes >= 2) l.close();
+                continue;
             }
+            l.strikes = 0;
+            long asked = l.pingStartNanos;
+            boolean due = asked == 0 || now - asked > QUIET_NANOS;
+            if (due && (!l.medium.equals("ble") || tickCount % 3 == 0)) sendPing(l);
         }
         for (Transport t : new ArrayList<>(transports)) t.tick();
     }
@@ -316,7 +319,10 @@ public final class MeshEngine implements Router.Host {
     public boolean send(String to, Packet p) {
         byte[] bytes = p.encode();
         if (p.type == Packet.DATA || p.type == Packet.ACK) touchWake();
-        for (Link l : sortedLinks(to)) if (l.send(bytes)) return true;
+        List<Link> links = sortedLinks(to);
+        long now = System.nanoTime();
+        for (Link l : links) if (!l.stale(now) && l.send(bytes)) return true;
+        for (Link l : links) if (l.stale(now) && l.send(bytes)) return true;
         return false;
     }
 

@@ -10,6 +10,7 @@ export function createState() {
     contacts: {},
     chats: [],
     messages: {},
+    typing: {},
     neighbors: [],
     people: [],
     peopleRefreshedAt: 0,

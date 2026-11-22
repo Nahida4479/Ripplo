@@ -28,6 +28,7 @@ final class WifiDirectTransport extends Transport {
     private WifiP2pManager manager;
     private WifiP2pManager.Channel channel;
     private ServerSocket server;
+    private long lastDiscover;
     private BroadcastReceiver receiver;
     private WifiP2pDnsSdServiceInfo localService;
     private WifiP2pDnsSdServiceRequest request;
@@ -151,7 +152,11 @@ final class WifiDirectTransport extends Transport {
 
     @Override
     void tickImpl() {
-        if (manager != null && channel != null && engine.neighbors().isEmpty()) discover();
+        long now = System.currentTimeMillis();
+        if (manager != null && channel != null && engine.neighbors().isEmpty() && now - lastDiscover > 60000) {
+            lastDiscover = now;
+            discover();
+        }
     }
 
     @Override

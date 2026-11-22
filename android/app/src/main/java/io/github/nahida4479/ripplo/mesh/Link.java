@@ -8,6 +8,7 @@ import java.util.concurrent.atomic.AtomicLong;
 
 abstract class Link {
     static final long QUEUE_CAP = 32L * 1024 * 1024;
+    static final long STALE_NANOS = 12L * 1000000000L;
 
     final MeshEngine engine;
     final String medium;
@@ -57,6 +58,10 @@ abstract class Link {
         }, "ripplo-link-w");
         writer.setDaemon(true);
         writer.start();
+    }
+
+    final boolean stale(long nowNanos) {
+        return nowNanos - lastRx > STALE_NANOS;
     }
 
     final boolean send(byte[] packet) {

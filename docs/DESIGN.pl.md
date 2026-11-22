@@ -68,6 +68,7 @@ Stan pusty: ilustracja fal + „Dodaj znajomego kodem QR lub linkiem zaproszenia
 - Status wychodzącej pod/wewnątrz dymka (ikona + etykieta po stuknięciu):
   encrypting (obracająca się kłódka), sending (pojedynczy ptaszek + `%` dla załączników), delivered (podwójny ptaszek,
   „przez 3 telefony”), out_of_range (czerwona chmura-off + „Poza zasięgiem sieci” + **Ponów**), failed.
+- Pisanie: gdy druga osoba pisze, na końcu logu jest dymek jak przychodzący z trzema kropkami (7 px, naprzemienne podskoki co 1,2 s, nieruchome przy ograniczonym ruchu).
 - Multimedia: miniatury obrazów/wideo maks. 240, zaokrąglone 14; wiadomość głosowa = przycisk odtwarzania + słupki fali +
   czas trwania. Przychodzące multimedia pojawiają się dopiero po otrzymaniu w całości.
 - Odpowiedź: przeciągnij wiadomość w bok (w dowolną stronę, 56 px) i puść; pojawia się ikona odpowiedzi, dymek sprężynuje z powrotem, a nad

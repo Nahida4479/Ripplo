@@ -3,7 +3,7 @@ import { ref, computed, watch, nextTick, onMounted, onBeforeUnmount } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ChevronLeft, Phone, Reply, Lock, Check, CheckCheck, CloudOff, CircleAlert, Plus, Mic, Send, X, Play, Pause, ShieldAlert } from 'lucide-vue-next'
 import { state } from '../core/state.js'
-import { startCall, unsendMessage, loadMessages, markRead, sendText, sendAttachment, retry, verifyNearby, markVerified, MAX_TEXT, MAX_FILE } from '../core/api.js'
+import { startCall, sendTyping, unsendMessage, loadMessages, markRead, sendText, sendAttachment, retry, verifyNearby, markVerified, MAX_TEXT, MAX_FILE } from '../core/api.js'
 import { ui, toast } from '../components/ui.js'
 import { t, locale } from '../i18n.js'
 import Avatar from '../components/Avatar.vue'
@@ -45,7 +45,9 @@ const dur = s => `${Math.floor((s || 0) / 60)}:${String(Math.round((s || 0) % 60
 
 function toBottom() { nextTick(() => scroller.value && (scroller.value.scrollTop = scroller.value.scrollHeight)) }
 onMounted(async () => { await loadMessages(id); await markRead(id); toBottom() })
+const typers = computed(() => state.typing[id] || [])
 watch(() => msgs.value.length, () => { toBottom(); markRead(id) })
+watch(() => typers.value.length, n => n && toBottom())
 
 const replyTo = ref(null)
 const staged = ref([])
@@ -301,6 +303,9 @@ function sure() { ui.confirm = { title: t('imSure'), text: t('imSureConfirm'), o
           </div>
         </div>
       </template>
+      <div v-if="typers.length" class="msg in">
+        <div class="bubble dots" role="status" :aria-label="t('typing')"><i /><i /><i /></div>
+      </div>
     </div>
 
     <div v-if="viewer" class="viewer" role="dialog" aria-modal="true" @click.self="viewer = null">
@@ -329,7 +334,7 @@ function sure() { ui.confirm = { title: t('imSure'), text: t('imSureConfirm'), o
         <button class="icon-btn" :aria-label="t('attach')" @click="mediaLocked ? toast(t('err_media_locked')) : fileIn.click()"><Plus :size="22" /></button>
         <input ref="fileIn" type="file" accept="image/*,video/*" multiple hidden @change="pickFile" />
         <div class="box">
-          <textarea v-model="text" rows="1" :placeholder="t('message')" :aria-label="t('message')" @keydown.enter.exact.prevent="send" @input="e => { e.target.style.height = 'auto'; e.target.style.height = e.target.scrollHeight + 'px' }" />
+          <textarea v-model="text" rows="1" :placeholder="t('message')" :aria-label="t('message')" @keydown.enter.exact.prevent="send" @input="e => { e.target.style.height = 'auto'; e.target.style.height = e.target.scrollHeight + 'px'; if (text.trim()) sendTyping(id) }" />
           <small v-if="text.length >= 900" :class="{ over: text.length >= MAX_TEXT }">{{ text.length }}/{{ MAX_TEXT }}</small>
         </div>
         <button v-if="text.trim() || staged.length" class="send" :aria-label="t('send')" @click="send"><Send :size="20" /></button>
@@ -373,6 +378,12 @@ function sure() { ui.confirm = { title: t('imSure'), text: t('imSureConfirm'), o
 .viewer .close { position: absolute; top: calc(var(--sat, 0px) + 8px); right: 8px; color: #fff; }
 .msg { position: relative; touch-action: pan-y; }
 .bubble { touch-action: pan-y; user-select: none; }
+.dots { display: flex; gap: 4px; align-items: center; height: 36px; padding: 0 14px; }
+.dots i { width: 7px; height: 7px; border-radius: 50%; background: var(--text-2); animation: dot 1.2s infinite ease-in-out; }
+.dots i:nth-child(2) { animation-delay: .15s; }
+.dots i:nth-child(3) { animation-delay: .3s; }
+@keyframes dot { 0%, 60%, 100% { opacity: .3; transform: translateY(0); } 30% { opacity: 1; transform: translateY(-4px); } }
+@media (prefers-reduced-motion: reduce) { .dots i { animation: none; opacity: .6; } }
 .bubble.rest { transition: transform .18s ease; }
 .swipe-ic { position: absolute; top: 50%; left: -30px; transform: translateY(-50%); color: var(--text-2); }
 .swipe-ic.right { left: auto; right: -30px; }

@@ -68,6 +68,7 @@ Empty state: illustration of ripples + "Add a friend by QR code or invite link".
 - Outgoing status under/inside the bubble (icon + label on tap):
   encrypting (lock spinning), sending (single tick + `%` for attachments), delivered (double tick,
   "via 3 phones"), out_of_range (red cloud-off + "Out of mesh range" + **Retry**), failed.
+- Typing: while the other person types, an incoming-style bubble with three dots (7 px, 1.2 s staggered bounce, still under reduced motion) sits at the end of the log.
 - Media: images/video thumbnails 240 max, rounded 14; voice note = play button + waveform bars +
   duration. Incoming media appears only when complete.
 - Reply: drag a message sideways (either direction, 56 px) and let go; a reply icon fades in, the bubble springs back and a reply bar

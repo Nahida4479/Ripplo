@@ -94,6 +94,7 @@ final class MeshEngine {
         var rttMs = 0
         var lastRx = Date()
         var strikes = 0
+        var lastPing = Date.distantPast
         var pings = [Data: (Date, Int)]()
         init(_ link: MeshLink) {
             self.link = link
@@ -145,7 +146,7 @@ final class MeshEngine {
                 let hex = nodeHex
                 transports.forEach { $0.start(nodeTag: hex) }
                 let t = DispatchSource.makeTimerSource(queue: q)
-                t.schedule(deadline: .now() + 15, repeating: 15)
+                t.schedule(deadline: .now() + 5, repeating: 5)
                 t.setEventHandler { [weak self] in self?.tick() }
                 t.resume()
                 timer = t
@@ -309,7 +310,9 @@ final class MeshEngine {
 
     private func send(to node: String, _ p: Packet) -> Bool {
         let frame = p.frame()
-        let cands = states.values.filter { $0.node == node && !$0.link.closed }.sorted { $0.kbps > $1.kbps }
+        let now = Date()
+        let sorted = states.values.filter { $0.node == node && !$0.link.closed }.sorted { $0.kbps > $1.kbps }
+        let cands = sorted.filter { now.timeIntervalSince($0.lastRx) <= 12 } + sorted.filter { now.timeIntervalSince($0.lastRx) > 12 }
         for s in cands where s.link.queuedBytes + frame.count <= MeshConst.maxQueuedBytes {
             if s.link.write(frame) { return true }
         }
@@ -334,15 +337,15 @@ final class MeshEngine {
         payload.append(Data(count: s.link.medium == "ble" ? 2048 : 16384))
         let frame = Packet(type: PacketType.ping, ttl: 1, payload: payload).frame()
         s.pings[nonce] = (Date(), frame.count)
+        s.lastPing = Date()
         _ = s.link.write(frame)
     }
 
     private func tick() {
         tickCount += 1
         transports.forEach { $0.tick() }
-        guard tickCount % 4 == 0 else { return }
         for s in states.values {
-            if Date().timeIntervalSince(s.lastRx) > 90 { s.strikes += 1 } else { s.strikes = 0 }
+            if Date().timeIntervalSince(s.lastRx) > 30 { s.strikes += 1 } else { s.strikes = 0 }
         }
         let dead = states.values.filter { $0.strikes >= 2 }
         for s in dead {
@@ -353,9 +356,10 @@ final class MeshEngine {
         let cutoff = Date().addingTimeInterval(-60)
         for s in states.values {
             s.pings = s.pings.filter { $0.value.0 > cutoff }
-            if s.node != nil { sendPing(s) }
+            let every: TimeInterval = s.link.medium == "ble" ? 15 : 5
+            if s.node != nil, Date().timeIntervalSince(s.lastPing) >= every - 0.5 { sendPing(s) }
         }
-        router.prune()
+        if tickCount % 12 == 0 { router.prune() }
     }
 
     private func deliverToJS(_ p: Packet, _ from: String) {

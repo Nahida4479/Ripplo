@@ -30,6 +30,7 @@ final class LanTransport extends Transport {
     private ServerSocket server;
     private final Map<String, Peer> peers = new HashMap<>();
     private final Set<String> connecting = new HashSet<>();
+    private final Map<String, Integer> resolveTries = new HashMap<>();
     private final ArrayDeque<NsdServiceInfo> toResolve = new ArrayDeque<>();
     private boolean resolving;
     private String serviceName;
@@ -106,7 +107,10 @@ final class LanTransport extends Transport {
         try {
             nsd.resolveService(next, new NsdManager.ResolveListener() {
                 @Override
-                public void onResolveFailed(NsdServiceInfo i, int e) { done(); }
+                public void onResolveFailed(NsdServiceInfo i, int e) {
+                    retryResolve(i);
+                    done();
+                }
 
                 @Override
                 public void onServiceResolved(NsdServiceInfo i) {
@@ -116,6 +120,27 @@ final class LanTransport extends Transport {
         } catch (Exception e) {
             done();
         }
+    }
+
+    private void retryResolve(final NsdServiceInfo i) {
+        final String name = i.getServiceName();
+        int n;
+        synchronized (this) {
+            Integer t = resolveTries.get(name);
+            n = t == null ? 1 : t + 1;
+            resolveTries.put(name, n);
+        }
+        if (n > 5) return;
+        Thread t = new Thread(() -> {
+            try { Thread.sleep(1500L * n); } catch (InterruptedException e) { return; }
+            synchronized (LanTransport.this) {
+                if (nsd == null) return;
+                toResolve.add(i);
+            }
+            resolveNext();
+        }, "ripplo-lan-resolve");
+        t.setDaemon(true);
+        t.start();
     }
 
     private void done() {
@@ -130,7 +155,10 @@ final class LanTransport extends Transport {
         String tag = nt == null ? "" : new String(nt, StandardCharsets.US_ASCII);
         if (tag.equals(engine.nodeTag())) return;
         Peer p = new Peer(host, i.getPort(), tag);
-        synchronized (this) { peers.put(i.getServiceName(), p); }
+        synchronized (this) {
+            peers.put(i.getServiceName(), p);
+            resolveTries.remove(i.getServiceName());
+        }
         connect(p);
     }
 
@@ -165,7 +193,7 @@ final class LanTransport extends Transport {
         long now = System.currentTimeMillis();
         ArrayList<Peer> list;
         synchronized (this) { list = new ArrayList<>(peers.values()); }
-        for (Peer p : list) if (now - p.lastTry > 30000) connect(p);
+        for (Peer p : list) if (now - p.lastTry > 4000) connect(p);
     }
 
     @Override
@@ -178,6 +206,7 @@ final class LanTransport extends Transport {
         server = null;
         synchronized (this) {
             peers.clear();
+            resolveTries.clear();
             toResolve.clear();
             resolving = false;
         }

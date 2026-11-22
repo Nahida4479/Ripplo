@@ -35,7 +35,8 @@ const ID_RE = /^[0-9A-HJKMNP-TV-Z]{16}$/
 const WIRE_ID_RE = /^[A-Za-z0-9_-]{1,64}$/
 const KINDS = ['image', 'video', 'voice']
 const RESET_GAP = 10 * 60 * 1000
-const DEFAULT_TIMING = { ack: 300000, discover: 30000, quiet: 10000, ring: 8000, quietRing: 3000, helloRetry: 3000, verify: 60000, proof: 5000, poll: 500 }
+const TYPING_TAG = 2
+const DEFAULT_TIMING = { ack: 60000, chunkAck: 20000, tries: 4, retry: 2000, resend: 15000, typing: 3000, typingTtl: 5000, discover: 30000, quiet: 10000, ring: 8000, quietRing: 3000, helloRetry: 3000, verify: 60000, proof: 5000, poll: 500 }
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
 const latin1 = (bytes) => Array.from(bytes, (b) => String.fromCharCode(b)).join('')
@@ -55,7 +56,6 @@ export function createCore({ mesh, dbName = 'ripplo', state = createState(), not
   let pending = {}
   let discover = null
   let tokens = { pending: [], used: {} }
-  let ledger = {}
   let unsent = new Set()
   let unsends = []
   let flushing = false
@@ -71,6 +71,9 @@ export function createCore({ mesh, dbName = 'ripplo', state = createState(), not
   const helloCards = new Map()
   const greeted = new Set()
   const byed = new Set()
+  const lastResend = new Map()
+  const lastTyping = new Map()
+  const typingTimers = new Map()
 
   const enqueue = (fn) => { queue = queue.then(fn).catch(() => {}) }
 
@@ -85,12 +88,6 @@ export function createCore({ mesh, dbName = 'ripplo', state = createState(), not
   const persistTokens = () => db.put('kv', 'tokens', { pending: tokens.pending, used: tokens.used })
 
   const consented = (c) => !!c && !c.request && (c.addedVia !== 'incoming' || !!c.cardSent)
-
-  const remember = (c) => {
-    if (c.verification === 'none') return
-    ledger[c.id] = { ik: c.ik, level: c.verification, at: c.verifiedAt }
-    db.put('kv', 'verified', ledger).catch(() => {})
-  }
 
   function tellVerified(c) {
     if (!consented(c)) return
@@ -181,7 +178,6 @@ export function createCore({ mesh, dbName = 'ripplo', state = createState(), not
     state.chats = (await db.all('chats')).map(([, c]) => c).sort((a, b) => b.lastTs - a.lastTs)
     pending = (await db.get('kv', 'pending')) || {}
     tokens = (await db.get('kv', 'tokens')) || { pending: [], used: {} }
-    ledger = (await db.get('kv', 'verified')) || {}
     unsent = new Set((await db.get('kv', 'unsent')) || [])
     unsends = (await db.get('kv', 'unsends')) || []
     const profile = await db.get('kv', 'profile')
@@ -250,6 +246,8 @@ export function createCore({ mesh, dbName = 'ripplo', state = createState(), not
     unsubs = []
     waits.forEach((w) => clearTimeout(w.timer))
     waits.clear()
+    typingTimers.forEach((tm) => clearTimeout(tm))
+    typingTimers.clear()
     return db && db.close()
   }
 
@@ -319,10 +317,10 @@ export function createCore({ mesh, dbName = 'ripplo', state = createState(), not
     }
   }
 
-  function transmit(pkt) {
+  function transmit(pkt, ms = T.ack) {
     const id = pktId(pkt)
     return new Promise((resolve) => {
-      const timer = setTimeout(() => settle(id, { ok: false }), T.ack)
+      const timer = setTimeout(() => settle(id, { ok: false }), ms)
       waits.set(id, { resolve, timer })
       mesh.send(pkt).catch(() => settle(id, { ok: false, error: true }))
     })
@@ -517,11 +515,18 @@ export function createCore({ mesh, dbName = 'ripplo', state = createState(), not
       const dest = tagOf(state.contacts[rid])
       let next = 0
       let failed = false
+      const sendChunk = async (i) => {
+        for (let k = 0; k < T.tries; k++) {
+          const r = await transmit(encodePacket({ type: TYPE.DATA, dest, payload: chunkPayload(attId, ct, i, total) }), T.chunkAck)
+          if (r.ok) return true
+          if (k + 1 < T.tries) await sleep(T.retry)
+        }
+        return false
+      }
       const worker = async () => {
         while (!failed && next < total) {
           const i = next++
-          const r = await transmit(encodePacket({ type: TYPE.DATA, dest, payload: chunkPayload(attId, ct, i, total) }))
-          if (!r.ok) { failed = true; return }
+          if (!(await sendChunk(i))) { failed = true; return }
           acked++
           m.progress = acked / all
         }
@@ -545,6 +550,52 @@ export function createCore({ mesh, dbName = 'ripplo', state = createState(), not
     m.errored = false
     if (!m.att) fanout(m, textBody(m, groupOf(m.chatId)), recips).catch(() => {})
     else runAttachment(m, await db.getBin('blobs', m.att.attId), recips).catch(() => { m.status = 'failed'; persistMsg(m) })
+  }
+
+  function resendFor(id) {
+    if (Date.now() - (lastResend.get(id) || 0) < T.resend) return
+    lastResend.set(id, Date.now())
+    for (const list of Object.values(state.messages)) {
+      for (const m of list) {
+        if (m.from === 'me' && ['out_of_range', 'failed'].includes(m.status) && m.undelivered?.includes(id)) retry(m.id).catch(() => {})
+      }
+    }
+  }
+
+  function clearTyping(chatId, from) {
+    const k = `${chatId}/${from}`
+    clearTimeout(typingTimers.get(k))
+    typingTimers.delete(k)
+    if (state.typing[chatId]?.includes(from)) state.typing = { ...state.typing, [chatId]: state.typing[chatId].filter((x) => x !== from) }
+  }
+
+  function onTyping(c, msg) {
+    if (Number.isFinite(msg.ts) && Date.now() - msg.ts > T.typingTtl) return
+    const chatId = routeChat(c.id, msg.g)
+    if (!chatId) return
+    const k = `${chatId}/${c.id}`
+    clearTimeout(typingTimers.get(k))
+    const list = state.typing[chatId] || []
+    if (!list.includes(c.id)) state.typing = { ...state.typing, [chatId]: [...list, c.id] }
+    const timer = setTimeout(() => clearTyping(chatId, c.id), T.typingTtl)
+    if (timer.unref) timer.unref()
+    typingTimers.set(k, timer)
+  }
+
+  async function sendTyping(chatId) {
+    const now = Date.now()
+    if (now - (lastTyping.get(chatId) || 0) < T.typing) return
+    let recips
+    try { recips = recipientsOf(chatId) } catch { return }
+    lastTyping.set(chatId, now)
+    const g = groupOf(chatId)
+    const body = utf8(JSON.stringify({ t: 'typing', ts: now, ...(g && { g }) }))
+    for (const rid of recips) {
+      const c = state.contacts[rid]
+      const nb = c && c.cardAck && !c.request && neighborOf(rid, c.node)
+      if (!nb) continue
+      try { await mesh.sendApp(nb.node, concat(Uint8Array.of(TYPING_TAG), await mesh.signalSeal(hex(tagOf(c)), body))) } catch {}
+    }
   }
 
   async function onSealed(payload) {
@@ -574,6 +625,11 @@ export function createCore({ mesh, dbName = 'ripplo', state = createState(), not
     const f = ids.ripploId
     if (hex(ids.tag) !== tag || f === me.id) return
     const msg = JSON.parse(unutf8(plaintext))
+    if (msg?.t === 'typing') {
+      const peer = state.contacts[f]
+      if (peer && !peer.request) onTyping(peer, msg)
+      return
+    }
     if (!state.contacts[f]) {
       const asking = msg?.t === 'invite'
       if (asking && state.settings.hidden) return
@@ -678,6 +734,7 @@ export function createCore({ mesh, dbName = 'ripplo', state = createState(), not
   async function receive(m, preview, notifyBody = preview) {
     if (unsent.has(m.id) || (await db.hasMsg(m.id))) return
     const msg = addMsg({ ...m, ts: Date.now(), status: 'received' })
+    clearTyping(m.chatId, m.from)
     touchChat(m.chatId, preview, msg.ts, 1, m.att?.kind)
     const chat = state.chats.find((c) => c.id === m.chatId)
     if (!silentNow) notifier({ title: chat?.type === 'group' ? `${chat.name}: ${state.contacts[m.from]?.name}` : state.contacts[m.from]?.name, body: notifyBody, chatId: m.chatId })
@@ -698,16 +755,15 @@ export function createCore({ mesh, dbName = 'ripplo', state = createState(), not
   }
 
   async function addContact({ id, name, ik, card, addedVia, request, token }) {
-    const prior = ledger[id] && ledger[id].ik === ik ? ledger[id] : null
     state.contacts[id] = {
-      id, name, ik, card, verification: prior ? prior.level : 'none', verifiedAt: prior ? prior.at : 0, verifyState: 'idle',
+      id, name, ik, card, verification: 'none', verifiedAt: 0, verifyState: 'idle',
       addedVia, addedAt: Date.now(), conflict: false, ...(request && { request }), ...(token && { token }),
     }
     const c = state.contacts[id]
     markConflicts(name, id)
     if (!request) ensureChat(id, 'direct', name)
     await persistContact(c)
-    if (!request && c.verification === 'none') verifyNearby(id).catch(() => {})
+    if (!request) verifyNearby(id).catch(() => {})
     return c
   }
 
@@ -806,6 +862,7 @@ export function createCore({ mesh, dbName = 'ripplo', state = createState(), not
 
   async function onApp(p, from) {
     if (p.payload[0] === FRAME_TAG) return calls.onMedia(p.payload, from)
+    if (p.payload[0] === TYPING_TAG) { enqueue(() => onSealed(p.payload.subarray(1))); return }
     const msg = JSON.parse(unutf8(p.payload))
     const nb = state.neighbors.find((n) => n.node === from)
     if (!msg || typeof msg !== 'object') return
@@ -824,6 +881,7 @@ export function createCore({ mesh, dbName = 'ripplo', state = createState(), not
         known.node = from
         persistContact(known)
       }
+      if (known && !known.request) resendFor(known.id)
       if (known && !known.request && known.verification === 'none' && known.verifyState !== 'checking' && Date.now() - (known.verifyTried || 0) > 30000) {
         known.verifyTried = Date.now()
         verifyNearby(v.id).catch(() => {})
@@ -889,7 +947,6 @@ export function createCore({ mesh, dbName = 'ripplo', state = createState(), not
         cur.verifiedAt = Date.now()
         cur.verifyState = 'idle'
       } else cur.verifyState = 'failed'
-      if (ok) remember(cur)
       await persistContact(cur)
       if (ok) tellVerified(cur)
       return ok
@@ -960,7 +1017,6 @@ export function createCore({ mesh, dbName = 'ripplo', state = createState(), not
     const c = state.contacts[id]
     if (!c) return false
     Object.assign(c, { verification: level, verifiedAt: Date.now(), verifyState: 'idle' })
-    remember(c)
     await persistContact(c)
     tellVerified(c)
     return true
@@ -1209,7 +1265,6 @@ export function createCore({ mesh, dbName = 'ripplo', state = createState(), not
   async function deleteContact(id) {
     await deleteChat(id)
     const c = state.contacts[id]
-    if (c) remember(c)
     delete state.contacts[id]
     await db.del('contacts', id)
     if (c) await mesh.signalForget(hex(tagOf(c))).catch(() => {})
@@ -1229,7 +1284,7 @@ export function createCore({ mesh, dbName = 'ripplo', state = createState(), not
 
   return {
     state, init, close, createProfile, setAvatar, setName, searchPeople, unsendMessage, startCall: async (id) => { if (!canCall(state.contacts[id])) throw new RipploError('call_no_contact'); return calls.start(id) }, acceptCall: calls.accept, hangUp: calls.hangup, setMuted: calls.setMuted, myInviteLink: newInviteLink, addContactFromLink, invite, acceptRequest, declineRequest,
-    verifyNearby, verifyByQr, markVerified, safetyNumber, sendText, sendAttachment, retry, loadMessages,
+    verifyNearby, verifyByQr, markVerified, safetyNumber, sendTyping, sendText, sendAttachment, retry, loadMessages,
     markRead, createGroup, refreshPeople, deleteChat, deleteContact, saveSettings, restoreBackup,
   }
 }
