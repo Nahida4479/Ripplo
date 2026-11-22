@@ -53,6 +53,7 @@ Every transport carries the same byte stream, so one person can be reachable ove
 |---|---|---|---|
 | BLE (GATT) | yes | yes | yes |
 | Bluetooth L2CAP (BLE CoC) | yes (Android 10+) | yes | yes |
+|Bluetooth Long Range| yes | no | no |
 | LAN | yes | yes | yes |
 | Wi-Fi Direct | yes | no | no |
 | Wi-Fi Aware | yes (Android 8+, needs hardware support) | no | no |
