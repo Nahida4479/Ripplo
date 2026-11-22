@@ -396,6 +396,8 @@ unverified (a relay could have swapped the card) and gets the same warning as an
 with **Retry**). `failed` = local error. Incoming: shown and notified only once complete
 (for attachments the pointer arrives after all chunks). Native ACKs DATA as soon as it is
 persisted to the inbox, so delivery works with the screen off and the app closed.
+While the mesh runs, Android holds a partial wake lock, a Wi-Fi lock and a multicast lock (released on stop), so the CPU, Wi-Fi radio and mDNS multicast stay
+awake with a dimmed or off screen; without them DNS-SD discovery and open links stall until the screen turns on.
 When a contact's hello arrives (it came back into range or switched link), its `out_of_range` and `failed` messages are re-sent
 automatically (at most every 15 s per contact).
 

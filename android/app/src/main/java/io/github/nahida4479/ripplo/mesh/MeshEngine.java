@@ -3,6 +3,7 @@ package io.github.nahida4479.ripplo.mesh;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.net.wifi.WifiManager;
 import android.os.Build;
 import android.os.PowerManager;
 import java.nio.ByteBuffer;
@@ -54,6 +55,8 @@ public final class MeshEngine implements Router.Host {
     private final SharedPreferences prefs;
     private final Inbox inbox;
     private final PowerManager.WakeLock wake;
+    private final WifiManager.WifiLock wifiLock;
+    private final WifiManager.MulticastLock multicastLock;
     private static final long QUIET_NANOS = 30L * 1000000000L;
     private static final long TICK_SECONDS = 5;
     private int tickCount;
@@ -84,6 +87,25 @@ public final class MeshEngine implements Router.Host {
         PowerManager pm = (PowerManager) ctx.getSystemService(Context.POWER_SERVICE);
         wake = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "ripplo:mesh");
         wake.setReferenceCounted(false);
+        WifiManager wm = (WifiManager) ctx.getApplicationContext().getSystemService(Context.WIFI_SERVICE);
+        wifiLock = wm.createWifiLock(WifiManager.WIFI_MODE_FULL_HIGH_PERF, "ripplo:wifi");
+        wifiLock.setReferenceCounted(false);
+        multicastLock = wm.createMulticastLock("ripplo:mdns");
+        multicastLock.setReferenceCounted(false);
+    }
+
+    private void holdLocks(boolean hold) {
+        try {
+            if (hold) {
+                wake.acquire();
+                wifiLock.acquire();
+                multicastLock.acquire();
+            } else {
+                if (wake.isHeld()) wake.release();
+                if (wifiLock.isHeld()) wifiLock.release();
+                if (multicastLock.isHeld()) multicastLock.release();
+            }
+        } catch (RuntimeException ignored) { }
     }
 
     public String nodeTag() { return nodeTag; }
@@ -108,6 +130,7 @@ public final class MeshEngine implements Router.Host {
         selfTag = self;
         router = new Router(this, self);
         running = true;
+        holdLocks(true);
         if (Build.VERSION.SDK_INT >= 29) transports.add(new WifiAwareTransport(ctx, this));
         transports.add(new BleTransport(ctx, this));
         transports.add(new LanTransport(ctx, this));
@@ -128,6 +151,7 @@ public final class MeshEngine implements Router.Host {
 
     private synchronized void stop(boolean clear) {
         running = false;
+        holdLocks(false);
         if (tickTask != null) tickTask.cancel(false);
         for (Transport t : transports) t.stop();
         transports.clear();
@@ -165,6 +189,7 @@ public final class MeshEngine implements Router.Host {
     }
 
     void touchWake() {
+        if (wake.isHeld()) return;
         try { wake.acquire(30000); } catch (RuntimeException ignored) { }
     }
 

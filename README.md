@@ -33,6 +33,8 @@
 - Checksum verification during updates.
 - Polish and English languages.
 
+<img src="./public/Screen/en/chat.png" width="200px">
+
 # How to use?
 1. [Install Ripplo](#install).
 2. Enter a username. The keys are generated on the phone and never leave it.
@@ -73,7 +75,7 @@ Every transport carries the same byte stream, so one person can be reachable ove
 - **Invite link**: `ripplo://add/...` contains your name and public keys.
 - **"People nearby" tab**: asks the mesh who is nearby. The **People nearby** tab can return at most 20 people (a safeguard against overloading the network). 
 
-<img src="./public/Screen/Ripplo_Invite.png" width="200px">
+<img src="./public/Screen/en/add-contact.png" width="200px">
 
 ## Verifying a contact (checking that the public key has not been swapped)
 
@@ -83,7 +85,7 @@ Every transport carries the same byte stream, so one person can be reachable ove
 | QR | Scanning the QR code in person. |
 | Manual | Manually marking that the contact is who they claim to be. |
 
-<img src="./public/Screen/Ripplo_QR.png" width="200px">
+<img src="./public/Screen/en/request.png" width="350px">
 
 ## How messages travel
 

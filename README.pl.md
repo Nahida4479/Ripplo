@@ -17,6 +17,8 @@
 <img src="https://github.com/Nahida4479/Ripplo/actions/workflows/build.yml/badge.svg">
 </div>
 
+<table align="center"><tr><td align="center"><img src="./public/Screen/pl/chats.png" alt="Czaty" width="180"><br><sub>Czaty</sub></td><td align="center"><img src="./public/Screen/pl/chat.png" alt="Czat szyfrowany end-to-end" width="180"><br><sub>Czat szyfrowany end-to-end</sub></td><td align="center"><img src="./public/Screen/pl/find-people.png" alt="Osoby w pobliżu" width="180"><br><sub>Osoby w pobliżu</sub></td><td align="center"><img src="./public/Screen/pl/add-contact.png" alt="Dodaj znajomego kodem QR lub linkiem" width="180"><br><sub>Dodaj znajomego kodem QR lub linkiem</sub></td></tr></table>
+
 # Funkcje
 
 - **Bez serwerów, kont i numerów telefonu, nie potrzeba połączenia z internetem.**
@@ -32,6 +34,8 @@
 - Różnorodne motywy aplikacji.
 - Sprawdzanie sum kontrolnych podczas aktualizacji.
 - Język Polski i Angielski.
+
+<img src="./public/Screen/pl/add-contact.png" width="200px">
 
 # Jak używać?
 1. [Zainstaluj Ripplo](#instalacja).
@@ -56,7 +60,6 @@ Każdy transport przenosi ten sam strumień bajtów, więc jedna osoba może by�
 | Wi-Fi Aware | tak (Android 8+, wymaga wsparcia sprzętowego) | nie | nie |
 | Apple Multipeer | nie | tak | nie |
 
-
 ## Szyfrowanie
 
 - **Protokołem Signal**, biblioteka `libsignal`, z ochroną postkwantową.
@@ -73,7 +76,7 @@ Każdy transport przenosi ten sam strumień bajtów, więc jedna osoba może by�
 - **Link zaproszenia**: `ripplo://add/...` zawiera twoje imię i klucze publiczne.
 - **Zakładka "Osoby w pobliżu"**: pyta sieć mesh, kto jest w pobliżu. Zakładka **Osoby w pobliżu** może zwrócić maksymalnie 20 osób (zabezpieczenie przed przeciążeniem sieci). 
 
-<img src="./public/Screen/Ripplo_Invite.png" width="350px">
+<img src="./public/Screen/pl/add-contact.png" width="200px">
 
 ## Weryfikacja kontaktu (spradzenie czy klucz publiczny nie został podmieniony)
 
@@ -83,7 +86,7 @@ Każdy transport przenosi ten sam strumień bajtów, więc jedna osoba może by�
 | QR | Zeskanowanie osobiście kodu QR. |
 | Ręcznie | Ręczne zaznaczenia że dany kontakt jest tym za kogo się podaje. |
 
-<img src="./public/Screen/Ripplo_QR.png" width="350px">
+<img src="./public/Screen/pl/request.png" width="200px">
 
 ## Jak podróżują wiadomości
 
@@ -116,7 +119,6 @@ Pobierz `Ripplo-vX.Y.Z.apk` z [Releases](https://github.com/Nahida4479/Ripplo/re
 ## IOS
 
 Wydanie zawiera **niepodpisany** plik IPA (`Ripplo-vX.Y.Z-unsigned.ipa`). Trzeba go podpisać z użyciem [SideStore](https://sidestore.io/). Instrukcja krok po kroku dla SideStore: [nahida4479.github.io/Ripplo/pl/#ios](https://nahida4479.github.io/Ripplo/pl/#ios).
-
 
 # Współtwórcy
 

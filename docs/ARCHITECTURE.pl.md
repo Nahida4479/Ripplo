@@ -393,6 +393,8 @@ niezweryfikowana (przekaźnik mógł podmienić wizytówkę) i dostaje to samo o
 limit 60 s, z przyciskiem **Ponów**). `failed` = błąd lokalny. Wiadomości przychodzące: wyświetlane i zgłaszane powiadomieniem dopiero
 po otrzymaniu w całości (w przypadku załączników wskaźnik przychodzi po wszystkich fragmentach). Warstwa natywna wysyła ACK dla DATA zaraz po
 zapisaniu do skrzynki (inbox), więc dostarczanie działa przy wyłączonym ekranie i zamkniętej aplikacji.
+Gdy mesh działa, Android trzyma częściową blokadę wybudzania, blokadę Wi-Fi i blokadę multicastu (zwalniane przy zatrzymaniu), więc procesor, radio Wi-Fi
+i multicast mDNS pozostają aktywne przy przygaszonym lub wyłączonym ekranie; bez nich wykrywanie DNS-SD i otwarte łącza zamierają do włączenia ekranu.
 Gdy przyjdzie hello kontaktu (wrócił w zasięg albo zmienił łącze), jego wiadomości `out_of_range` i `failed` są wysyłane ponownie
 automatycznie (najwyżej co 15 s na kontakt).
 
