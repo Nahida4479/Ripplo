@@ -55,7 +55,7 @@ final class WifiAwareTransport extends Transport {
     @Override
     @SuppressWarnings("MissingPermission")
     void startImpl() throws Exception {
-        if (Build.VERSION.SDK_INT < 29 || !ctx.getPackageManager().hasSystemFeature(PackageManager.FEATURE_WIFI_AWARE)) throw new IllegalStateException("no aware");
+        if (Build.VERSION.SDK_INT < 29 || !ctx.getPackageManager().hasSystemFeature(PackageManager.FEATURE_WIFI_AWARE)) throw new UnsupportedOperationException("no aware");
         String perm = Build.VERSION.SDK_INT >= 33 ? Manifest.permission.NEARBY_WIFI_DEVICES : Manifest.permission.ACCESS_FINE_LOCATION;
         if (!has(perm)) throw new SecurityException("wifi permission");
         manager = (WifiAwareManager) ctx.getSystemService(Context.WIFI_AWARE_SERVICE);

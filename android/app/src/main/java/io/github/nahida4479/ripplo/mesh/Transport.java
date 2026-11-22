@@ -7,6 +7,7 @@ abstract class Transport {
     final Context ctx;
     final MeshEngine engine;
     volatile boolean running;
+    private volatile boolean unsupported;
 
     Transport(Context ctx, MeshEngine engine) {
         this.ctx = ctx;
@@ -28,6 +29,7 @@ abstract class Transport {
             running = true;
         } catch (Throwable t) {
             android.util.Log.w("ripplo", name() + " start failed: " + t);
+            if (t instanceof UnsupportedOperationException) unsupported = true;
             try { stopImpl(); } catch (Throwable ignored) { }
         }
     }
@@ -38,7 +40,7 @@ abstract class Transport {
     }
 
     final synchronized void tick() {
-        if (!running) start();
+        if (!running) { if (!unsupported) start(); }
         else try { tickImpl(); } catch (Throwable ignored) { }
     }
 

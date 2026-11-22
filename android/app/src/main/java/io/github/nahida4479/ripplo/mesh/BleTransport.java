@@ -70,7 +70,7 @@ final class BleTransport extends Transport {
 
     @Override
     void startImpl() throws Exception {
-        if (!ctx.getPackageManager().hasSystemFeature(PackageManager.FEATURE_BLUETOOTH_LE)) throw new IllegalStateException("no ble");
+        if (!ctx.getPackageManager().hasSystemFeature(PackageManager.FEATURE_BLUETOOTH_LE)) throw new UnsupportedOperationException("no ble");
         if (Build.VERSION.SDK_INT >= 31) {
             if (!has(Manifest.permission.BLUETOOTH_SCAN) || !has(Manifest.permission.BLUETOOTH_ADVERTISE)
                     || !has(Manifest.permission.BLUETOOTH_CONNECT)) throw new SecurityException("ble permissions");
@@ -193,6 +193,7 @@ final class BleTransport extends Transport {
         public void onScanResult(int callbackType, ScanResult result) {
             BluetoothDevice d = result.getDevice();
             String a = d.getAddress();
+            android.util.Log.i("ripplo", "ble scan hit " + a);
             long now = System.currentTimeMillis();
             synchronized (active) {
                 if (active.contains(a) || active.size() >= MAX_CLIENTS) return;
@@ -234,6 +235,7 @@ final class BleTransport extends Transport {
             if (!CCCD.equals(descriptor.getUuid()) || value == null || value.length < 1) return;
             String a = device.getAddress();
             if (value[0] != 0) {
+                android.util.Log.i("ripplo", "ble server link up " + a);
                 if (serverLinks.containsKey(a)) return;
                 ServerLink l = new ServerLink(device);
                 serverLinks.put(a, l);
@@ -350,6 +352,7 @@ final class BleTransport extends Transport {
         private void finish(int psm) {
             if (!alive.get()) return;
             registered = true;
+            android.util.Log.i("ripplo", "ble client link up " + device.getAddress() + " psm=" + psm);
             if (!engine.addLink(this)) return;
             if (psm > 0 && Build.VERSION.SDK_INT >= 29) connectL2cap(device, psm);
         }
@@ -363,6 +366,7 @@ final class BleTransport extends Transport {
         private final BluetoothGattCallback cb = new BluetoothGattCallback() {
             @Override
             public void onConnectionStateChange(BluetoothGatt g, int status, int newState) {
+                android.util.Log.i("ripplo", "ble client state " + device.getAddress() + " status=" + status + " new=" + newState);
                 if (newState == BluetoothProfile.STATE_CONNECTED && status == BluetoothGatt.GATT_SUCCESS) {
                     if (!g.requestMtu(517)) g.discoverServices();
                 } else {
@@ -379,7 +383,7 @@ final class BleTransport extends Transport {
             @Override
             public void onServicesDiscovered(BluetoothGatt g, int status) {
                 BluetoothGattService svc = status == BluetoothGatt.GATT_SUCCESS ? g.getService(SERVICE) : null;
-                if (svc == null) { close(); return; }
+                if (svc == null) { android.util.Log.i("ripplo", "ble no service " + device.getAddress() + " status=" + status); close(); return; }
                 rxChar = svc.getCharacteristic(RX);
                 BluetoothGattCharacteristic tx = svc.getCharacteristic(TX);
                 psmChar = svc.getCharacteristic(PSM);
