@@ -290,6 +290,11 @@ export function createCore({ mesh, dbName = 'ripplo', state = createState(), not
       askCard(node, 0)
       flushUnsends()
     }
+    mesh.getNeighbors().then((all) => {
+      const fresh = (all || []).find((x) => x.node === node)
+      const cur = state.neighbors.find((n) => n.node === node)
+      if (fresh?.links && cur) cur.links = fresh.links
+    }).catch(() => {})
     const nb = state.neighbors.find((n) => n.node === node)
     if (!nb.card && helloCards.has(node)) nb.card = helloCards.get(node)
     sendHello(node, !nb.card)
