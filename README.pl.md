@@ -108,9 +108,9 @@ Każdy transport przenosi ten sam strumień bajtów, więc jedna osoba może by�
 
 ## Android
 
-Pobierz `Ripplo-vX.Y.Z.apk` z [Releases](https://github.com/Nahida4479/Ripplo/releases). Bądź ze strony z [oficjalnej strony](ripplo.nahida4479.org/) 
+Pobierz `Ripplo-vX.Y.Z.apk` z [Releases](https://github.com/Nahida4479/Ripplo/releases). Bądź ze strony z [oficjalnej strony](https://ripplo.nahida4479.org/) 
 
-## iOS
+## IOS
 
 Wydanie zawiera **niepodpisany** plik IPA (`Ripplo-vX.Y.Z-unsigned.ipa`). Trzeba go podpisać z użyciem [SideStore](https://sidestore.io/). Instrukcja krok po kroku dla SideStore: [nahida4479.github.io/Ripplo/pl/#ios](https://nahida4479.github.io/Ripplo/pl/#ios).
 
