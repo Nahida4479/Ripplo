@@ -35,8 +35,6 @@
 - Sprawdzanie sum kontrolnych podczas aktualizacji.
 - Język Polski i Angielski.
 
-<img src="./public/Screen/pl/add-contact.png" width="200px">
-
 # Jak używać?
 1. [Zainstaluj Ripplo](#instalacja).
 2. Podaj nazwę użytkownika. Klucze są generowane na telefonie i nigdy go nie opuszczają.
