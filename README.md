@@ -81,6 +81,7 @@ Every transport carries the same byte stream, so one person can be reachable ove
 | QR | Scanning the QR code in person. |
 | Manual | Manually marking that the contact is who they claim to be. |
 
+<img src="./public/Screen/Ripplo_QR.png" width="200px">
 
 ## How messages travel
 
