@@ -14,6 +14,7 @@ abstract class Link {
     final String medium;
     final boolean outbound;
     volatile String node;
+    volatile String note = "";
     volatile long kbps;
     volatile long rttMs;
     volatile long lastRx = System.nanoTime();

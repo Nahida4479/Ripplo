@@ -18,6 +18,9 @@ import android.bluetooth.BluetoothStatusCodes;
 import android.bluetooth.le.AdvertiseCallback;
 import android.bluetooth.le.AdvertiseData;
 import android.bluetooth.le.AdvertiseSettings;
+import android.bluetooth.le.AdvertisingSet;
+import android.bluetooth.le.AdvertisingSetCallback;
+import android.bluetooth.le.AdvertisingSetParameters;
 import android.bluetooth.le.BluetoothLeAdvertiser;
 import android.bluetooth.le.BluetoothLeScanner;
 import android.bluetooth.le.ScanCallback;
@@ -31,6 +34,7 @@ import android.os.Handler;
 import android.os.Looper;
 import android.os.ParcelUuid;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -58,6 +62,24 @@ final class BleTransport extends Transport {
     private final Map<String, ServerLink> serverLinks = new ConcurrentHashMap<>();
     private final Map<String, Integer> mtus = new ConcurrentHashMap<>();
     private final Map<String, Long> attempts = new HashMap<>();
+    private final Map<String, Hit> hits = new ConcurrentHashMap<>();
+    private AdvertisingSetCallback codedAdvCb;
+
+    private static final class Hit {
+        final BluetoothDevice device;
+        final int phy;
+        final long at;
+        Hit(BluetoothDevice device, int phy, long at) { this.device = device; this.phy = phy; this.at = at; }
+    }
+
+    private boolean codedOn() {
+        return Build.VERSION.SDK_INT >= 26 && engine.bleCoded() && adapter != null
+                && adapter.isLeCodedPhySupported() && adapter.isLeExtendedAdvertisingSupported();
+    }
+
+    private static int mask(boolean coded) {
+        return Build.VERSION.SDK_INT >= 26 ? (coded ? BluetoothDevice.PHY_LE_CODED_MASK : BluetoothDevice.PHY_LE_1M_MASK) : 0;
+    }
     private final Set<String> active = new HashSet<>();
     private final Set<String> l2capActive = new HashSet<>();
     private final Set<Link> mine = Collections.synchronizedSet(new HashSet<Link>());
@@ -91,6 +113,9 @@ final class BleTransport extends Transport {
     void stopImpl() {
         try { if (scanner != null) scanner.stopScan(scanCb); } catch (Exception ignored) { }
         try { if (advertiser != null) advertiser.stopAdvertising(advCb); } catch (Exception ignored) { }
+        try { if (advertiser != null && codedAdvCb != null) advertiser.stopAdvertisingSet(codedAdvCb); } catch (Exception ignored) { }
+        codedAdvCb = null;
+        hits.clear();
         scanner = null;
         advertiser = null;
         Link[] all;
@@ -105,6 +130,27 @@ final class BleTransport extends Transport {
             l2capActive.clear();
         }
         psmBytes = new byte[]{0, 0};
+    }
+
+    @Override
+    boolean forceConnect(String node, String option) {
+        if (adapter == null || !running) return false;
+        boolean coded = "coded".equals(option);
+        long now = System.currentTimeMillis();
+        int started = 0;
+        for (Hit h : new ArrayList<>(hits.values())) {
+            boolean isCoded = Build.VERSION.SDK_INT >= 26 && h.phy == BluetoothDevice.PHY_LE_CODED;
+            if (now - h.at > 60000 || isCoded != coded) continue;
+            String a = h.device.getAddress();
+            synchronized (active) {
+                if (active.contains(a)) continue;
+                active.add(a);
+            }
+            new ClientLink(h.device, mask(coded)).connect();
+            started++;
+        }
+        Diag.i("ble force " + (coded ? "coded" : "1m") + " started=" + started);
+        return started > 0;
     }
 
     private void startL2capServer() throws IOException {
@@ -177,13 +223,37 @@ final class BleTransport extends Transport {
                 .addServiceUuid(new ParcelUuid(SERVICE))
                 .build();
         advertiser.startAdvertising(s, d, advCb);
+        if (codedOn()) startCodedAdvertise(d);
+    }
+
+    private void startCodedAdvertise(AdvertiseData d) {
+        try {
+            AdvertisingSetParameters p = new AdvertisingSetParameters.Builder()
+                    .setLegacyMode(false)
+                    .setConnectable(true)
+                    .setScannable(false)
+                    .setPrimaryPhy(BluetoothDevice.PHY_LE_CODED)
+                    .setSecondaryPhy(BluetoothDevice.PHY_LE_CODED)
+                    .setInterval(AdvertisingSetParameters.INTERVAL_MEDIUM)
+                    .setTxPowerLevel(AdvertisingSetParameters.TX_POWER_MEDIUM)
+                    .build();
+            codedAdvCb = new AdvertisingSetCallback() {
+                @Override
+                public void onAdvertisingSetStarted(AdvertisingSet set, int txPower, int status) { Diag.i("ble coded advertising status=" + status); }
+            };
+            advertiser.startAdvertisingSet(p, d, null, null, null, codedAdvCb);
+        } catch (Exception e) {
+            Diag.w("ble coded advertise failed " + e);
+        }
     }
 
     private void startScan() {
         scanner = adapter.getBluetoothLeScanner();
         if (scanner == null) return;
         ScanFilter f = new ScanFilter.Builder().setServiceUuid(new ParcelUuid(SERVICE)).build();
-        ScanSettings s = new ScanSettings.Builder().setScanMode(ScanSettings.SCAN_MODE_BALANCED).build();
+        ScanSettings.Builder sb = new ScanSettings.Builder().setScanMode(ScanSettings.SCAN_MODE_BALANCED);
+        if (codedOn()) sb.setLegacy(false).setPhy(ScanSettings.PHY_LE_ALL_SUPPORTED);
+        ScanSettings s = sb.build();
         scanner.startScan(Collections.singletonList(f), s, scanCb);
     }
 
@@ -203,8 +273,15 @@ final class BleTransport extends Transport {
         public void onScanResult(int callbackType, ScanResult result) {
             BluetoothDevice d = result.getDevice();
             String a = d.getAddress();
-            Diag.i("ble scan hit " + a);
+            int phy = Build.VERSION.SDK_INT >= 26 ? result.getPrimaryPhy() : BluetoothDevice.PHY_LE_1M;
+            boolean coded = Build.VERSION.SDK_INT >= 26 && phy == BluetoothDevice.PHY_LE_CODED;
+            Diag.i("ble scan hit " + a + (coded ? " coded" : ""));
             long now = System.currentTimeMillis();
+            hits.put(a + (coded ? "/c" : "/1"), new Hit(d, phy, now));
+            if (coded) {
+                Hit oneM = hits.get(a + "/1");
+                if (oneM != null && now - oneM.at < 20000) return;
+            }
             synchronized (active) {
                 if (active.contains(a) || active.size() >= MAX_CLIENTS) return;
                 Long last = attempts.get(a);
@@ -213,7 +290,7 @@ final class BleTransport extends Transport {
                 if (attempts.size() > 200) attempts.clear();
                 active.add(a);
             }
-            new ClientLink(d).connect();
+            new ClientLink(d, mask(coded)).connect();
         }
     };
 
@@ -341,18 +418,22 @@ final class BleTransport extends Transport {
         volatile BluetoothGatt gatt;
         volatile int mtu = 23;
         volatile boolean registered;
+        final int phyMask;
         BluetoothGattCharacteristic rxChar;
         BluetoothGattCharacteristic psmChar;
 
-        ClientLink(BluetoothDevice device) {
+        ClientLink(BluetoothDevice device, int phyMask) {
             super(BleTransport.this.engine, "ble", true);
+            this.phyMask = phyMask;
             this.device = device;
             mine.add(this);
         }
 
         void connect() {
             try {
-                gatt = device.connectGatt(ctx, false, cb, BluetoothDevice.TRANSPORT_LE);
+                gatt = Build.VERSION.SDK_INT >= 26
+                        ? device.connectGatt(ctx, false, cb, BluetoothDevice.TRANSPORT_LE, phyMask)
+                        : device.connectGatt(ctx, false, cb, BluetoothDevice.TRANSPORT_LE);
             } catch (Exception e) {
                 gatt = null;
             }
@@ -379,10 +460,17 @@ final class BleTransport extends Transport {
             public void onConnectionStateChange(BluetoothGatt g, int status, int newState) {
                 Diag.i("ble client state " + device.getAddress() + " status=" + status + " new=" + newState);
                 if (newState == BluetoothProfile.STATE_CONNECTED && status == BluetoothGatt.GATT_SUCCESS) {
+                    if (Build.VERSION.SDK_INT >= 26) g.readPhy();
                     if (!g.requestMtu(517)) g.discoverServices();
                 } else {
                     close();
                 }
+            }
+
+            @Override
+            public void onPhyRead(BluetoothGatt g, int txPhy, int rxPhy, int status) {
+                note = "phy " + (rxPhy == BluetoothDevice.PHY_LE_CODED ? "coded" : rxPhy == BluetoothDevice.PHY_LE_2M ? "2M" : "1M");
+                Diag.i("ble client " + note + " " + device.getAddress());
             }
 
             @Override

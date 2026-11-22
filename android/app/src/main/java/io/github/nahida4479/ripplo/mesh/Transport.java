@@ -20,6 +20,8 @@ abstract class Transport {
 
     abstract void stopImpl();
 
+    boolean forceConnect(String node, String option) { return false; }
+
     void tickImpl() { }
 
     final synchronized void start() {

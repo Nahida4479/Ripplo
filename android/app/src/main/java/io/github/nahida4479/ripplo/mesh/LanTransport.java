@@ -5,6 +5,7 @@ import android.net.nsd.NsdManager;
 import android.net.nsd.NsdServiceInfo;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
+import java.net.NetworkInterface;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.nio.charset.StandardCharsets;
@@ -23,6 +24,7 @@ final class LanTransport extends Transport {
         final int port;
         final String tag;
         long lastTry;
+        int fails;
         Peer(InetAddress host, int port, String tag) { this.host = host; this.port = port; this.tag = tag; }
     }
 
@@ -33,6 +35,7 @@ final class LanTransport extends Transport {
     private final Map<String, Integer> resolveTries = new HashMap<>();
     private final ArrayDeque<NsdServiceInfo> toResolve = new ArrayDeque<>();
     private boolean resolving;
+    private long resolveStart;
     private String serviceName;
     private NsdManager.RegistrationListener regListener;
     private NsdManager.DiscoveryListener discListener;
@@ -104,6 +107,7 @@ final class LanTransport extends Transport {
             if (resolving || toResolve.isEmpty() || nsd == null) return;
             next = toResolve.poll();
             resolving = true;
+            resolveStart = System.currentTimeMillis();
         }
         try {
             nsd.resolveService(next, new NsdManager.ResolveListener() {
@@ -153,9 +157,15 @@ final class LanTransport extends Transport {
     private void handleResolved(NsdServiceInfo i) {
         InetAddress host = i.getHost();
         if (host == null) return;
+        log("resolved " + i.getServiceName() + " " + host.getHostAddress() + ":" + i.getPort());
         byte[] nt = i.getAttributes() == null ? null : i.getAttributes().get("nt");
         String tag = nt == null ? "" : new String(nt, StandardCharsets.US_ASCII);
         if (tag.equals(engine.nodeTag())) return;
+        if (isLocal(host)) {
+            log("skip own address " + host.getHostAddress() + " " + i.getServiceName());
+            return;
+        }
+        engine.noteSeen(tag, "lan");
         Peer p = new Peer(host, i.getPort(), tag);
         synchronized (this) {
             peers.put(i.getServiceName(), p);
@@ -164,11 +174,38 @@ final class LanTransport extends Transport {
         connect(p);
     }
 
+    private static boolean isLocal(InetAddress a) {
+        if (a.isLoopbackAddress() || a.isAnyLocalAddress()) return true;
+        try {
+            return NetworkInterface.getByInetAddress(a) != null;
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    @Override
+    boolean forceConnect(String node, String option) {
+        Peer target = null;
+        synchronized (this) {
+            for (Peer p : peers.values()) if (p.tag.equals(node)) target = p;
+        }
+        if (target == null) {
+            log("force: no lan peer for node");
+            return false;
+        }
+        connect(target, true);
+        return true;
+    }
+
     private void connect(final Peer p) {
+        connect(p, false);
+    }
+
+    private void connect(final Peer p, final boolean force) {
         final String key = p.host.getHostAddress() + ":" + p.port;
         synchronized (this) {
             if (connecting.contains(key)) return;
-            if (!p.tag.isEmpty() && engine.hasLink(p.tag, "lan")) return;
+            if (!force && !p.tag.isEmpty() && engine.hasLink(p.tag, "lan")) return;
             connecting.add(key);
             p.lastTry = System.currentTimeMillis();
         }
@@ -177,8 +214,14 @@ final class LanTransport extends Transport {
                 Socket s = new Socket();
                 s.connect(new InetSocketAddress(p.host, p.port), 5000);
                 open(s, true);
+                p.fails = 0;
             } catch (Exception e) {
                 log("connect failed " + p.host.getHostAddress() + " " + e);
+                boolean refused = e.getMessage() != null && e.getMessage().contains("ECONNREFUSED");
+                if (refused && ++p.fails >= 6) {
+                    synchronized (LanTransport.this) { peers.values().remove(p); }
+                    log("dropped peer " + p.host.getHostAddress() + ":" + p.port);
+                }
             }
             synchronized (LanTransport.this) { connecting.remove(key); }
         }, "ripplo-lan-connect");
@@ -194,6 +237,12 @@ final class LanTransport extends Transport {
     @Override
     void tickImpl() {
         long now = System.currentTimeMillis();
+        boolean stuck;
+        synchronized (this) { stuck = resolving && now - resolveStart > 10000L; }
+        if (stuck) {
+            log("resolve timeout");
+            done();
+        }
         ArrayList<Peer> list;
         synchronized (this) { list = new ArrayList<>(peers.values()); }
         for (Peer p : list) if (now - p.lastTry > 4000) connect(p);

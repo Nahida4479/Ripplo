@@ -38,9 +38,28 @@ function aboutTap() {
   if (on) loadDev()
 }
 const devLog = ref('')
+const bleCaps = ref({ coded: false, extended: false, enabled: false })
+const forceSpec = ref({})
+const SPECS = ['lan', 'wifi-direct', 'wifi-aware', 'ble:1m', 'ble:coded']
+const specOf = n => forceSpec.value[n.node] || 'lan'
+const specName = s => ({ lan: 'LAN', 'wifi-direct': 'Wi-Fi Direct', 'wifi-aware': 'Wi-Fi Aware', 'ble:1m': 'BLE 1M PHY', 'ble:coded': 'BLE Coded PHY' }[s])
+async function forceConnect(n) {
+  const ok = await mesh.devConnect(n.node, specOf(n))
+  toast(t(ok ? 'devStarted' : 'devNotStarted'))
+  setTimeout(loadDev, 1500)
+}
+async function forceClose(n) {
+  await mesh.devDisconnect(n.node, specOf(n).split(':')[0])
+  setTimeout(loadDev, 500)
+}
+async function toggleCoded() {
+  await mesh.setBleCoded(!bleCaps.value.enabled)
+  await loadDev()
+}
 const devTransports = ref([])
 async function loadDev() {
   devTransports.value = (await mesh.getTransports()) || []
+  bleCaps.value = await mesh.getBleCaps()
   const native = await mesh.getDiag()
   devLog.value = (native ? native + '\n--- JS ---\n' : '') + diagText()
 }
@@ -192,6 +211,19 @@ const initials = l => l.slice(0, 2).toUpperCase()
       <h2 class="section">{{ t('developer') }}</h2>
       <div class="card">
         <div v-for="x in devTransports" :key="x.name" class="row"><span class="grow label">{{ x.name }}</span><span class="chip" :class="x.running ? 'ok' : x.unsupported ? 'bad' : 'warn'">{{ x.running ? 'running' : x.unsupported ? 'unsupported' : 'stopped' }}</span></div>
+        <div class="row">
+          <span class="grow"><span class="label">{{ t('devBleCoded') }}</span><br /><span class="hint">{{ t('devBleCodedHint', { coded: bleCaps.coded ? '✓' : '✗', ext: bleCaps.extended ? '✓' : '✗' }) }}</span></span>
+          <button class="switch" role="switch" :aria-checked="bleCaps.enabled" :aria-label="t('devBleCoded')" :disabled="!bleCaps.coded || !bleCaps.extended" @click="toggleCoded" />
+        </div>
+        <div class="row hint">{{ t('devForce') }}</div>
+        <div v-for="n in state.neighbors" :key="n.node" class="row forcerow">
+          <span class="grow label">{{ n.card?.name || n.node.slice(0, 8) }}</span>
+          <select class="field" :value="specOf(n)" :aria-label="t('devForce')" @change="forceSpec[n.node] = $event.target.value">
+            <option v-for="s in SPECS" :key="s" :value="s">{{ specName(s) }}</option>
+          </select>
+          <button class="btn sm" @click="forceConnect(n)">{{ t('devConnectBtn') }}</button>
+          <button class="btn sm ghost" @click="forceClose(n)">{{ t('devClose') }}</button>
+        </div>
         <div class="row netinfo"><span class="hint mono devlog">{{ devLog || '–' }}</span></div>
         <div class="row profile-acts">
           <button class="btn sm ghost" @click="loadDev">{{ t('refresh') }}</button>
@@ -219,6 +251,8 @@ const initials = l => l.slice(0, 2).toUpperCase()
 .profrow .namebtn .label, .profrow .namebtn .hint { line-height: 1.2; }
 .profrow .field { min-height: 44px; }
 .netinfo .hint { white-space: pre-wrap; overflow-wrap: anywhere; user-select: text; }
+.forcerow { flex-wrap: wrap; }
+.forcerow select { width: auto; flex: 1; min-width: 120px; }
 .devlog { max-height: 280px; overflow: auto; font-size: 11px; display: block; width: 100%; }
 .contrib { display: flex; align-items: center; gap: 12px; }
 .contrib img, .ini { width: 44px; height: 44px; border-radius: 50%; flex: none; }

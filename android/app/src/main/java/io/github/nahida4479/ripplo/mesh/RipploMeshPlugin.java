@@ -386,6 +386,49 @@ public class RipploMeshPlugin extends Plugin implements MeshEngine.Listener {
     }
 
     @PluginMethod
+    public void devConnect(PluginCall call) {
+        String node = call.getString("node", "");
+        String spec = call.getString("spec", "");
+        JSObject r = new JSObject();
+        r.put("started", !node.isEmpty() && !spec.isEmpty() && engine.forceConnect(node, spec));
+        call.resolve(r);
+    }
+
+    @PluginMethod
+    public void devDisconnect(PluginCall call) {
+        String node = call.getString("node", "");
+        String medium = call.getString("medium", "");
+        if (!node.isEmpty() && !medium.isEmpty()) engine.closeLinks(node, medium);
+        call.resolve();
+    }
+
+    @PluginMethod
+    public void getBleCaps(PluginCall call) {
+        boolean coded = false;
+        boolean ext = false;
+        try {
+            android.bluetooth.BluetoothManager bm = (android.bluetooth.BluetoothManager) getContext().getSystemService(Context.BLUETOOTH_SERVICE);
+            android.bluetooth.BluetoothAdapter a = bm == null ? null : bm.getAdapter();
+            if (a != null && Build.VERSION.SDK_INT >= 26) {
+                coded = a.isLeCodedPhySupported();
+                ext = a.isLeExtendedAdvertisingSupported();
+            }
+        } catch (RuntimeException ignored) {
+        }
+        JSObject r = new JSObject();
+        r.put("coded", coded);
+        r.put("extended", ext);
+        r.put("enabled", engine.bleCoded());
+        call.resolve(r);
+    }
+
+    @PluginMethod
+    public void setBleCoded(PluginCall call) {
+        engine.setBleCoded(call.getBoolean("enabled", false));
+        call.resolve();
+    }
+
+    @PluginMethod
     public void getDiag(PluginCall call) {
         JSObject r = new JSObject();
         r.put("log", Diag.dump());

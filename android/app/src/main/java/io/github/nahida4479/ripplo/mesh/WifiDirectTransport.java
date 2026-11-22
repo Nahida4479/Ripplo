@@ -84,7 +84,11 @@ final class WifiDirectTransport extends Transport {
     }
 
     @SuppressWarnings("MissingPermission")
+    private final java.util.Map<String, WifiP2pDevice> devices = new java.util.concurrent.ConcurrentHashMap<>();
+
     private void onPeer(String tag, WifiP2pDevice dev) {
+        if (!tag.equals(engine.nodeTag())) devices.put(tag, dev);
+        if (!tag.equals(engine.nodeTag())) engine.noteSeen(tag, "wifi-direct");
         log("peer " + tag.substring(0, Math.min(8, tag.length())) + " " + dev.deviceName + " initiator=" + (engine.nodeTag().compareTo(tag) < 0));
         if (engine.nodeTag().compareTo(tag) >= 0 || engine.hasLink(tag, "wifi-direct")) return;
         long now = System.currentTimeMillis();
@@ -93,6 +97,24 @@ final class WifiDirectTransport extends Transport {
             if (last != null && now - last < 60000) return;
             attempts.put(tag, now);
         }
+        requestConnect(tag, dev);
+    }
+
+    @Override
+    @SuppressWarnings("MissingPermission")
+    boolean forceConnect(String node, String option) {
+        WifiP2pDevice dev = devices.get(node);
+        if (dev == null || manager == null || channel == null) {
+            log("force: peer not discovered, starting discovery");
+            if (manager != null && channel != null) discover();
+            return false;
+        }
+        requestConnect(node, dev);
+        return true;
+    }
+
+    @SuppressWarnings("MissingPermission")
+    private void requestConnect(String tag, WifiP2pDevice dev) {
         WifiP2pConfig cfg = new WifiP2pConfig();
         cfg.deviceAddress = dev.deviceAddress;
         cfg.wps.setup = WpsInfo.PBC;
@@ -187,5 +209,6 @@ final class WifiDirectTransport extends Transport {
         }
         channel = null;
         manager = null;
+        devices.clear();
     }
 }

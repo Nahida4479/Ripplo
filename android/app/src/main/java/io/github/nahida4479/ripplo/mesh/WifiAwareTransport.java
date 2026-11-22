@@ -116,6 +116,10 @@ final class WifiAwareTransport extends Transport {
                 if (info == null) return;
                 String tag = new String(info, StandardCharsets.US_ASCII);
                 log("discovered " + tag.substring(0, Math.min(8, tag.length())));
+                if (!tag.equals(engine.nodeTag())) {
+                    engine.noteSeen(tag, "wifi-aware");
+                    handles.put(tag, peer);
+                }
                 if (engine.nodeTag().compareTo(tag) >= 0 || engine.hasLink(tag, "wifi-aware")) return;
                 long now = System.currentTimeMillis();
                 synchronized (attempts) {
@@ -136,6 +140,18 @@ final class WifiAwareTransport extends Transport {
     }
 
     private final Map<Integer, PeerHandle> pendingPeers = new HashMap<>();
+    private final Map<String, PeerHandle> handles = new java.util.concurrent.ConcurrentHashMap<>();
+
+    @Override
+    boolean forceConnect(String node, String option) {
+        PeerHandle h = handles.get(node);
+        if (h == null || sub == null) {
+            log("force: peer not discovered");
+            return false;
+        }
+        initiate(h);
+        return true;
+    }
 
     private void initiate(PeerHandle peer) {
         SubscribeDiscoverySession s = sub;
@@ -231,6 +247,7 @@ final class WifiAwareTransport extends Transport {
         try { if (session != null) session.close(); } catch (Exception ignored) { }
         try { if (server != null) server.close(); } catch (Exception ignored) { }
         if (thread != null) thread.quitSafely();
+        handles.clear();
         pub = null;
         sub = null;
         session = null;

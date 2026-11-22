@@ -53,6 +53,7 @@ Każdy transport przenosi ten sam strumień bajtów, więc jedna osoba może by�
 |---|---|---|---|
 | BLE (GATT) | tak | tak | tak |
 | Bluetooth L2CAP (BLE CoC) | tak (Android 10+) | tak | tak |
+| Bluetooth Long Range | tak | nie | nie |
 | LAN | tak | tak | tak |
 | Wi-Fi Direct | tak | nie | nie |
 | Wi-Fi Aware | tak (Android 8+, wymaga wsparcia sprzętowego) | nie | nie |

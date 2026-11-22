@@ -404,6 +404,49 @@ public final class MeshEngine implements Router.Host {
         return send(node, p);
     }
 
+    private final Map<String, Map<String, Long>> seen = new HashMap<>();
+
+    void noteSeen(String node, String medium) {
+        if (node == null || node.isEmpty()) return;
+        synchronized (lock) {
+            Map<String, Long> m = seen.get(node);
+            if (m == null) {
+                m = new HashMap<>();
+                seen.put(node, m);
+            }
+            m.put(medium, System.currentTimeMillis());
+        }
+    }
+
+    public boolean bleCoded() { return prefs.getBoolean("ble_coded", false); }
+
+    public void setBleCoded(boolean on) {
+        prefs.edit().putBoolean("ble_coded", on).apply();
+        for (final Transport t : new ArrayList<>(transports)) {
+            if (!t.name().equals("ble")) continue;
+            t.stop();
+            sched.execute(t::start);
+        }
+    }
+
+    public boolean forceConnect(String node, String spec) {
+        String[] p = spec.split(":", 2);
+        Diag.i("force connect " + p[0] + " node=" + node.substring(0, Math.min(8, node.length())));
+        for (Transport t : new ArrayList<>(transports)) {
+            if (t.name().equals(p[0])) return t.forceConnect(node, p.length > 1 ? p[1] : "");
+        }
+        return false;
+    }
+
+    public void closeLinks(String node, String medium) {
+        List<Link> out = new ArrayList<>();
+        synchronized (lock) {
+            List<Link> l = byNode.get(node);
+            if (l != null) for (Link k : l) if (k.medium.equals(medium) || (medium.equals("ble") && k.medium.equals("l2cap"))) out.add(k);
+        }
+        for (Link k : out) k.close();
+    }
+
     public JSONArray transportsJson() {
         JSONArray out = new JSONArray();
         for (Transport t : new ArrayList<>(transports)) {
@@ -427,8 +470,15 @@ public final class MeshEngine implements Router.Host {
                 o.put("kbps", links.get(0).kbps);
                 o.put("rttMs", links.get(0).rttMs);
                 JSONArray ls = new JSONArray();
-                for (Link l : links) ls.put(new JSONObject().put("medium", l.medium).put("kbps", l.kbps).put("rttMs", l.rttMs).put("outbound", l.outbound));
+                for (Link l : links) ls.put(new JSONObject().put("medium", l.medium).put("kbps", l.kbps).put("rttMs", l.rttMs).put("outbound", l.outbound).put("note", l.note));
                 o.put("links", ls);
+                JSONArray sn = new JSONArray();
+                long now = System.currentTimeMillis();
+                synchronized (lock) {
+                    Map<String, Long> m = seen.get(node);
+                    if (m != null) for (Map.Entry<String, Long> en : m.entrySet()) if (now - en.getValue() < 120000L) sn.put(en.getKey());
+                }
+                o.put("seen", sn);
                 out.put(o);
             } catch (JSONException ignored) {
             }

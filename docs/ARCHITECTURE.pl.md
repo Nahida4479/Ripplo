@@ -232,6 +232,13 @@ Zduplikowane łącza tego samego medium do tego samego węzła: zostaw to zainic
 BLE GATT to strumień bajtów w każdym kierunku: central zapisuje fragmenty o rozmiarze `mtu-3` do RX (zapis z
 odpowiedzią, uporządkowany); peripheral wysyła fragmenty powiadomieniami na TX. Żądaj MTU 517.
 
+**BLE Coded PHY (tylko Android, domyślnie wyłączone).** Gdy w trybie dewelopera włączony jest przełącznik, a telefon zgłasza
+`isLeCodedPhySupported()` i `isLeExtendedAdvertisingSupported()`, węzeł dodatkowo uruchamia rozszerzony zestaw ogłoszeń na Coded PHY
+(z możliwością połączenia, ten sam UUID usługi) i skanuje z `setLegacy(false)`. Trafienie skanu zawiera główny PHY; trafienie coded łączy się z
+`PHY_LE_CODED_MASK` (duży zasięg, 125 / 500 kbit/s), trafienie 1M z `PHY_LE_1M_MASK`. Jeśli w ciągu ostatnich 20 s widziano trafienie 1M tego samego adresu,
+trafienie coded jest ignorowane (1M jest szybsze). PHY łącza klienckiego jest odczytywany przez `readPhy()` i widoczny w szczegółach dewelopera. Przełącznik jest zapisany w prefs `ripplo_mesh` (`ble_coded`, domyślnie wyłączony) i restartuje transport BLE.
+iOS nie ma wyboru PHY w CoreBluetooth, więc używa wyłącznie 1M.
+
 Klasyczny Bluetooth RFCOMM nie jest używany: aplikacje iOS nie mogą z niego korzystać bez MFi; L2CAP CoC to
 wieloplatformowa szybka ścieżka Bluetooth. Wi-Fi Aware na iOS 26 wymaga uprawnienia (entitlement) dla płatnego konta deweloperskiego;
 dodaj je, gdy projekt będzie je miał.
@@ -414,7 +421,9 @@ Wartości binarne to ciągi base64 (standardowego); tagi węzłów to małe lite
 | `stop` | – |
 | `send` | `{ packet }` → `{ neighbors }` — JS-originated DATA/DISCOVER/REPLY (`from = SELF`) |
 | `sendApp` | `{ node, payload }` — link-local APP packet to one neighbor |
-| `getNeighbors` | → `{ neighbors: [{ node, medium, kbps, rttMs, links: [{medium,kbps,rttMs,outbound}] }] }` |
+| `getNeighbors` | → `{ neighbors: [{ node, medium, kbps, rttMs, links: [{medium,kbps,rttMs,outbound}], seen: [medium] }] }` — `seen` = media, na których sąsiad został wykryty w ostatnich 2 min (LAN, Wi-Fi Direct, Wi-Fi Aware) bez otwartego łącza; zakładka Znajdź osoby pokazuje je jako wyszarzone plakietki bez ptaszka |
+| `devConnect` / `devDisconnect` | Tryb dewelopera: `{ node, spec }` → `{ started }` wymusza próbę połączenia z sąsiadem jednym medium (`lan`, `wifi-direct`, `wifi-aware`, `ble:1m`, `ble:coded`), ignorując istniejące łącza i reguły inicjatora (BLE łączy się z niedawnymi trafieniami skanu, bo trafienie nie zawiera tagu węzła); `{ node, medium }` zamyka łącza tego medium |
+| `getBleCaps` / `setBleCoded` | → `{ coded, extended, enabled }`; `{ enabled }` zapisuje przełącznik Coded PHY i restartuje BLE |
 | `getDiag` / `clearDiag` / `getTransports` | Tryb dewelopera na Androidzie: dziennik diagnostyczny w pamięci (600 linii, te same co w logcat pod tagiem `ripplo`), jego czyszczenie oraz `{ transports: [{ name, running, unsupported }] }` |
 | `drainInbox` | → `{ packets: [{ packet, from }] }` — packets received while JS was not attached |
 | `getDbKey` | → `{ key }` 32 bytes, created once, stored with Keystore / Keychain |
