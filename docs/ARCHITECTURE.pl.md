@@ -414,7 +414,8 @@ Wartości binarne to ciągi base64 (standardowego); tagi węzłów to małe lite
 | `stop` | – |
 | `send` | `{ packet }` → `{ neighbors }` — JS-originated DATA/DISCOVER/REPLY (`from = SELF`) |
 | `sendApp` | `{ node, payload }` — link-local APP packet to one neighbor |
-| `getNeighbors` | → `{ neighbors: [{ node, medium, kbps, rttMs, links: [{medium,kbps}] }] }` |
+| `getNeighbors` | → `{ neighbors: [{ node, medium, kbps, rttMs, links: [{medium,kbps,rttMs,outbound}] }] }` |
+| `getDiag` / `clearDiag` / `getTransports` | Tryb dewelopera na Androidzie: dziennik diagnostyczny w pamięci (600 linii, te same co w logcat pod tagiem `ripplo`), jego czyszczenie oraz `{ transports: [{ name, running, unsupported }] }` |
 | `drainInbox` | → `{ packets: [{ packet, from }] }` — packets received while JS was not attached |
 | `getDbKey` | → `{ key }` 32 bytes, created once, stored with Keystore / Keychain |
 | `selfHash` | → `{ sha256 }` hex of the installed APK (Android only) |

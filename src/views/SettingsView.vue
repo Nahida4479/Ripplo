@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { QrCode, ExternalLink, ShieldCheck, ShieldAlert, ShieldQuestion, TriangleAlert, Lock } from 'lucide-vue-next'
 import { state } from '../core/state.js'
 import { saveSettings, setAvatar, setName } from '../core/api.js'
@@ -14,6 +14,7 @@ import Avatar from '../components/Avatar.vue'
 import BackupCard from '../components/BackupCard.vue'
 import { setAppLock } from '../services/lock.js'
 import { Capacitor } from '@capacitor/core'
+import { diagText, diagClear } from '../core/diag.js'
 
 const android = Capacitor.getPlatform() === 'android'
 const REPO = 'https://github.com/Nahida4479/Ripplo'
@@ -23,6 +24,35 @@ const integ = computed(() => ({
   ok: [ShieldCheck, 'ok', 'integrityOk'], mismatch: [ShieldAlert, 'bad', 'integrityBad']
 }[state.integrity.status] || [ShieldQuestion, '', 'integrityUnknown']))
 const kbps = n => n.kbps >= 1000 ? (n.kbps / 1000).toFixed(1) + ' Mbps' : n.kbps + ' kbps'
+let devTaps = 0
+let devTimer = null
+function aboutTap() {
+  devTaps++
+  clearTimeout(devTimer)
+  devTimer = setTimeout(() => { devTaps = 0 }, 2000)
+  if (devTaps < 5) return
+  devTaps = 0
+  const on = !state.settings.dev
+  saveSettings({ dev: on })
+  toast(t(on ? 'devOn' : 'devOff'))
+  if (on) loadDev()
+}
+const devLog = ref('')
+const devTransports = ref([])
+async function loadDev() {
+  devTransports.value = (await mesh.getTransports()) || []
+  const native = await mesh.getDiag()
+  devLog.value = (native ? native + '\n--- JS ---\n' : '') + diagText()
+}
+onMounted(() => { if (state.settings.dev) loadDev() })
+async function clearDev() {
+  await mesh.clearDiag()
+  diagClear()
+  await loadDev()
+}
+async function copyDev() {
+  try { await navigator.clipboard.writeText(devLog.value); toast(t('copiedLog')) } catch { toast(t('err_bad_link')) }
+}
 const openNode = ref(null)
 const detail = ref([])
 async function toggleNet(n) {
@@ -154,10 +184,22 @@ const initials = l => l.slice(0, 2).toUpperCase()
 
     <h2 class="section">{{ t('about') }}</h2>
     <div class="card">
-      <div class="row"><span class="grow"><span class="label">Ripplo</span><br /><span class="hint">{{ t('tagline') }}</span></span><span class="val">{{ state.update.current || '–' }}</span></div>
+      <div class="row" role="button" tabindex="0" @click="aboutTap"><span class="grow"><span class="label">Ripplo</span><br /><span class="hint">{{ t('tagline') }}</span></span><span class="val">{{ state.update.current || '–' }}</span></div>
       <a class="row" :href="REPO" target="_blank" rel="noopener"><span class="grow label">GitHub</span><ExternalLink :size="18" /></a>
       <div class="row"><span class="grow label">{{ t('license') }}</span><span class="val">AGPL-3.0</span></div>
     </div>
+    <template v-if="state.settings.dev">
+      <h2 class="section">{{ t('developer') }}</h2>
+      <div class="card">
+        <div v-for="x in devTransports" :key="x.name" class="row"><span class="grow label">{{ x.name }}</span><span class="chip" :class="x.running ? 'ok' : x.unsupported ? 'bad' : 'warn'">{{ x.running ? 'running' : x.unsupported ? 'unsupported' : 'stopped' }}</span></div>
+        <div class="row netinfo"><span class="hint mono devlog">{{ devLog || '–' }}</span></div>
+        <div class="row profile-acts">
+          <button class="btn sm ghost" @click="loadDev">{{ t('refresh') }}</button>
+          <button class="btn sm ghost" @click="copyDev">{{ t('copyLog') }}</button>
+          <button class="btn sm ghost" @click="clearDev">{{ t('clearLog') }}</button>
+        </div>
+      </div>
+    </template>
     <h2 class="section">{{ t('contributors') }}</h2>
     <a v-for="c in contributors" :key="c.login" class="card pad contrib" :href="'https://github.com/' + c.login" target="_blank" rel="noopener">
       <img v-if="!broken[c.login]" :src="`https://github.com/${c.login}.png?size=96`" width="44" height="44" alt="" @error="broken[c.login] = true" />
@@ -177,6 +219,7 @@ const initials = l => l.slice(0, 2).toUpperCase()
 .profrow .namebtn .label, .profrow .namebtn .hint { line-height: 1.2; }
 .profrow .field { min-height: 44px; }
 .netinfo .hint { white-space: pre-wrap; overflow-wrap: anywhere; user-select: text; }
+.devlog { max-height: 280px; overflow: auto; font-size: 11px; display: block; width: 100%; }
 .contrib { display: flex; align-items: center; gap: 12px; }
 .contrib img, .ini { width: 44px; height: 44px; border-radius: 50%; flex: none; }
 .ini { display: grid; place-items: center; background: var(--surface-2); font-weight: 600; }

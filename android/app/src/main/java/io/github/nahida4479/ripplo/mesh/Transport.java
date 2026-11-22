@@ -27,8 +27,9 @@ abstract class Transport {
         try {
             startImpl();
             running = true;
+            log("started");
         } catch (Throwable t) {
-            android.util.Log.w("ripplo", name() + " start failed: " + t);
+            Diag.w(name() + " start failed: " + t);
             if (t instanceof UnsupportedOperationException) unsupported = true;
             try { stopImpl(); } catch (Throwable ignored) { }
         }
@@ -42,6 +43,14 @@ abstract class Transport {
     final synchronized void tick() {
         if (!running) { if (!unsupported) start(); }
         else try { tickImpl(); } catch (Throwable ignored) { }
+    }
+
+    final void log(String m) {
+        Diag.i(name() + " " + m);
+    }
+
+    final boolean unsupported() {
+        return unsupported;
     }
 
     final boolean has(String perm) {

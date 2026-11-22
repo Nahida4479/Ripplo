@@ -12,6 +12,7 @@ import { createAudio, audioSupported } from './callAudio.js'
 import { createState } from './state.js'
 import { notify } from '../services/notifications.js'
 import { t } from '../i18n.js'
+import { diagLog } from './diag.js'
 
 export const MAX_TEXT = 1000
 export const MAX_FILE = 20 * 1024 * 1024
@@ -258,7 +259,7 @@ export function createCore({ mesh, dbName = 'ripplo', state = createState(), not
       if (!id || !state.contacts[id] || state.contacts[id].request) return
     }
     greeted.add(node)
-    console.info('ripplo hello out ' + node.slice(0, 8) + (ask ? ' ask' : ''))
+    diagLog('hello out ' + node.slice(0, 8) + (ask ? ' ask' : ''))
     mesh.sendApp(node, utf8(JSON.stringify({ t: 'hello', card: b64(me.card), ...(ask && { r: 1 }) }))).catch(() => {})
   }
 
@@ -277,6 +278,7 @@ export function createCore({ mesh, dbName = 'ripplo', state = createState(), not
   }
 
   function onNeighbor({ node, up, medium, kbps, rttMs }) {
+    diagLog('neighbor ' + (up ? 'up ' : 'down ') + node.slice(0, 8) + ' ' + medium + ' ' + kbps + 'kbps')
     const i = state.neighbors.findIndex((n) => n.node === node)
     if (!up) {
       if (i >= 0) state.neighbors.splice(i, 1)
@@ -876,11 +878,11 @@ export function createCore({ mesh, dbName = 'ripplo', state = createState(), not
     if (msg.t === 'hello') {
       let v
       try { v = checkCard(unb64(msg.card)) } catch {
-        console.info('ripplo hello rejected ' + from.slice(0, 8))
+        diagLog('hello rejected ' + from.slice(0, 8))
         if (nb) nb.unsupported = true
         return
       }
-      console.info('ripplo hello in ' + from.slice(0, 8) + ' ' + v.name + (nb ? '' : ' (no neighbor)'))
+      diagLog('hello in ' + from.slice(0, 8) + ' ' + v.name + (nb ? '' : ' (no neighbor)'))
       if (nb) nb.unsupported = false
       if (v.id === me.id) return
       const card = { id: v.id, name: v.name, ik: b64(v.ik), card: b64(v.card) }
@@ -904,6 +906,7 @@ export function createCore({ mesh, dbName = 'ripplo', state = createState(), not
     } else if (!nb) {
       return
     } else if (msg.t === 'bye') {
+      diagLog('bye in ' + from.slice(0, 8))
       byed.add(from)
       helloCards.delete(from)
       greeted.delete(from)
@@ -1286,7 +1289,7 @@ export function createCore({ mesh, dbName = 'ripplo', state = createState(), not
   }
 
   async function saveSettings(patch) {
-    for (const k of ['autoUpdate', 'backgroundRelay', 'appLock', 'hidden']) if (typeof patch[k] === 'boolean') state.settings[k] = patch[k]
+    for (const k of ['autoUpdate', 'backgroundRelay', 'appLock', 'hidden', 'dev']) if (typeof patch[k] === 'boolean') state.settings[k] = patch[k]
     if (patch.hidden === false) for (const n of state.neighbors) sendHello(n.node, !n.card)
     if (patch.hidden === true) {
       for (const n of state.neighbors) {

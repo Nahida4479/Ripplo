@@ -31,6 +31,7 @@ abstract class Link {
     private byte[] body;
     private int bodyGot;
     private Thread writer;
+    final long born = System.nanoTime();
 
     Link(MeshEngine engine, String medium, boolean outbound) {
         this.engine = engine;
@@ -53,6 +54,7 @@ abstract class Link {
                     queued.addAndGet(-f.length);
                 }
             } catch (Exception e) {
+                Diag.i("write failed " + medium + " node=" + (node == null ? "none" : node.substring(0, 8)) + " " + e);
                 close();
             }
         }, "ripplo-link-w");
@@ -105,12 +107,14 @@ abstract class Link {
                 }
             }
         } catch (IOException e) {
+            Diag.i("rx error " + medium + " " + e);
             close();
         }
     }
 
     final void close() {
         if (alive.compareAndSet(true, false)) {
+            Diag.i("close " + medium + " out=" + outbound + " node=" + (node == null ? "none" : node.substring(0, 8)) + " age=" + (System.nanoTime() - born) / 1000000L + "ms");
             try { closeImpl(); } catch (Exception ignored) { }
             engine.linkDown(this);
         }

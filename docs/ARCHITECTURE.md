@@ -417,7 +417,8 @@ Binary values are base64 (standard) strings; node tags are lowercase hex.
 | `stop` | – |
 | `send` | `{ packet }` → `{ neighbors }` — JS-originated DATA/DISCOVER/REPLY (`from = SELF`) |
 | `sendApp` | `{ node, payload }` — link-local APP packet to one neighbor |
-| `getNeighbors` | → `{ neighbors: [{ node, medium, kbps, rttMs, links: [{medium,kbps}] }] }` |
+| `getNeighbors` | → `{ neighbors: [{ node, medium, kbps, rttMs, links: [{medium,kbps,rttMs,outbound}] }] }` |
+| `getDiag` / `clearDiag` / `getTransports` | Android developer mode: the in-memory diagnostic log (600 lines, same lines as logcat tag `ripplo`), clear it, and `{ transports: [{ name, running, unsupported }] }` |
 | `drainInbox` | → `{ packets: [{ packet, from }] }` — packets received while JS was not attached |
 | `getDbKey` | → `{ key }` 32 bytes, created once, stored with Keystore / Keychain |
 | `selfHash` | → `{ sha256 }` hex of the installed APK (Android only) |

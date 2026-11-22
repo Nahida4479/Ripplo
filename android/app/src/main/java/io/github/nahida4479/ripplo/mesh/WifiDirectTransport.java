@@ -77,14 +77,15 @@ final class WifiDirectTransport extends Transport {
     @SuppressWarnings("MissingPermission")
     private void discover() {
         manager.discoverPeers(channel, new WifiP2pManager.ActionListener() {
-            @Override public void onSuccess() { }
-            @Override public void onFailure(int reason) { }
+            @Override public void onSuccess() { log("discover ok"); }
+            @Override public void onFailure(int reason) { log("discover failed reason=" + reason); }
         });
         manager.discoverServices(channel, null);
     }
 
     @SuppressWarnings("MissingPermission")
     private void onPeer(String tag, WifiP2pDevice dev) {
+        log("peer " + tag.substring(0, Math.min(8, tag.length())) + " " + dev.deviceName + " initiator=" + (engine.nodeTag().compareTo(tag) < 0));
         if (engine.nodeTag().compareTo(tag) >= 0 || engine.hasLink(tag, "wifi-direct")) return;
         long now = System.currentTimeMillis();
         synchronized (attempts) {
@@ -95,11 +96,16 @@ final class WifiDirectTransport extends Transport {
         WifiP2pConfig cfg = new WifiP2pConfig();
         cfg.deviceAddress = dev.deviceAddress;
         cfg.wps.setup = WpsInfo.PBC;
-        manager.connect(channel, cfg, null);
+        log("connect " + tag.substring(0, Math.min(8, tag.length())));
+        manager.connect(channel, cfg, new WifiP2pManager.ActionListener() {
+            @Override public void onSuccess() { log("connect requested"); }
+            @Override public void onFailure(int reason) { log("connect failed reason=" + reason); }
+        });
     }
 
     private void onConnectionInfo(final WifiP2pInfo info) {
         if (info == null || !info.groupFormed || info.groupOwnerAddress == null) return;
+        log("group formed owner=" + info.isGroupOwner);
         if (info.isGroupOwner) {
             startServer();
         } else if (!clientConnecting) {

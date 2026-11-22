@@ -127,7 +127,7 @@ czcionką monospace) + jego QR, akcje: Zweryfikuj kodem QR, Ponów sprawdzenie w
 - **Bezpieczeństwo**: integralność aplikacji (Oficjalna wersja ✓ / Zmodyfikowana wersja ✗ / Jeszcze nie sprawdzono), stan
   szyfrowania bazy danych, informacje o protokole Signal.
 - **Aktualizacje**: obecna wersja, najnowsza wersja, Sprawdź teraz (przycisk w kolorze akcentu, żeby był dobrze widoczny; napis zmienia się na „Sprawdzanie…” na co najmniej 0,8 s, bez linii „masz najnowszą wersję”), przełącznik Aktualizuj automatycznie (Android), postęp.
-- **O aplikacji**: nazwa aplikacji + hasło, wersja, link do GitHuba, Licencja, karty **Współtwórcy**: awatar
+- **O aplikacji**: nazwa aplikacji + hasło, wersja (5 stuknięć w ten wiersz w ciągu 2 s włącza lub wyłącza **tryb dewelopera**, który dodaje kartę **Dla deweloperów** ze stanem transportów, dziennikiem diagnostycznym i przyciskami Odśwież / Kopiuj log / Wyczyść log), link do GitHuba, Licencja, karty **Współtwórcy**: awatar
   (awatar z GitHuba online, inicjały offline), login pogrubiony, podtekst „Profil GitHub”, ikona linku zewnętrznego
   po prawej; karta = `--surface`, obramowanie 1 px, promień 14.
 

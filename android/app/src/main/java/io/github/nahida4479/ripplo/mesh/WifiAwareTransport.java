@@ -81,6 +81,7 @@ final class WifiAwareTransport extends Transport {
         manager.attach(new AttachCallback() {
             @Override
             public void onAttached(WifiAwareSession s) {
+                log("attached");
                 session = s;
                 publish();
                 subscribe();
@@ -114,6 +115,7 @@ final class WifiAwareTransport extends Transport {
             public void onServiceDiscovered(PeerHandle peer, byte[] info, List<byte[]> filter) {
                 if (info == null) return;
                 String tag = new String(info, StandardCharsets.US_ASCII);
+                log("discovered " + tag.substring(0, Math.min(8, tag.length())));
                 if (engine.nodeTag().compareTo(tag) >= 0 || engine.hasLink(tag, "wifi-aware")) return;
                 long now = System.currentTimeMillis();
                 synchronized (attempts) {
@@ -179,6 +181,7 @@ final class WifiAwareTransport extends Transport {
                 final int port = info.getPort();
                 if (addr == null || port <= 0) return;
                 connected = true;
+                log("network ready port=" + port);
                 final Network net = network;
                 Thread t = new Thread(() -> {
                     try {
@@ -195,7 +198,7 @@ final class WifiAwareTransport extends Transport {
             public void onLost(Network network) { release(key); }
 
             @Override
-            public void onUnavailable() { release(key); }
+            public void onUnavailable() { log("network unavailable"); release(key); }
         };
         synchronized (callbacks) { callbacks.put(key, cb); }
         try {

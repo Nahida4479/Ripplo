@@ -386,6 +386,30 @@ public class RipploMeshPlugin extends Plugin implements MeshEngine.Listener {
     }
 
     @PluginMethod
+    public void getDiag(PluginCall call) {
+        JSObject r = new JSObject();
+        r.put("log", Diag.dump());
+        call.resolve(r);
+    }
+
+    @PluginMethod
+    public void clearDiag(PluginCall call) {
+        Diag.clear();
+        call.resolve();
+    }
+
+    @PluginMethod
+    public void getTransports(PluginCall call) {
+        try {
+            JSObject r = new JSObject();
+            r.put("transports", new JSArray(engine.transportsJson().toString()));
+            call.resolve(r);
+        } catch (JSONException e) {
+            call.reject("failed");
+        }
+    }
+
+    @PluginMethod
     public void getNeighbors(PluginCall call) {
         try {
             JSObject r = new JSObject();

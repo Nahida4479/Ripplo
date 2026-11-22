@@ -49,6 +49,7 @@ const en = {
   bk_bad_code: 'That code does not open this backup', bk_bad_file: 'This is not a valid Ripplo backup, or it is damaged', bk_need_factor: 'This backup needs its second factor — not supported in this version yet', bk_auth_failed: 'Authentication failed', bk_failed: 'Something went wrong',
   appLock: 'App lock', appLockHint: 'Ask for fingerprint, face or screen lock when Ripplo opens, and hide it in the app switcher', unlock: 'Unlock', unlockReason: 'Unlock Ripplo', locked: 'Ripplo is locked',
   undecryptable: "Couldn't decrypt a message from {name} — ask them to resend",
+  developer: 'Developer', devOn: 'Developer mode on', devOff: 'Developer mode off', copyLog: 'Copy log', clearLog: 'Clear log', copiedLog: 'Log copied',
   about: 'About', tagline: 'Offline end-to-end encrypted mesh messenger', license: 'License', contributors: 'Contributors', githubProfile: 'GitHub profile'
 }
 
@@ -101,6 +102,7 @@ const pl = {
   bk_bad_code: 'Ten kod nie otwiera tej kopii', bk_bad_file: 'To nie jest prawidłowa kopia Ripplo albo plik jest uszkodzony', bk_need_factor: 'Ta kopia wymaga drugiego składnika — ta wersja jeszcze go nie obsługuje', bk_auth_failed: 'Uwierzytelnienie nie powiodło się', bk_failed: 'Coś poszło nie tak',
   appLock: 'Blokada aplikacji', appLockHint: 'Wymagaj odcisku palca, twarzy lub blokady ekranu przy otwarciu Ripplo i ukryj treść w przełączniku aplikacji', unlock: 'Odblokuj', unlockReason: 'Odblokuj Ripplo', locked: 'Ripplo jest zablokowane',
   undecryptable: 'Nie udało się odszyfrować wiadomości od {name} — poproś o ponowne wysłanie',
+  developer: 'Dla deweloperów', devOn: 'Tryb dewelopera włączony', devOff: 'Tryb dewelopera wyłączony', copyLog: 'Kopiuj log', clearLog: 'Wyczyść log', copiedLog: 'Skopiowano log',
   about: 'O aplikacji', tagline: 'Komunikator mesh działający bez internetu, z szyfrowaniem end-to-end', license: 'Licencja', contributors: 'Współtwórcy', githubProfile: 'Profil GitHub'
 }
 

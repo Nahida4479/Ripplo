@@ -130,6 +130,7 @@ public final class MeshEngine implements Router.Host {
         selfTag = self;
         router = new Router(this, self);
         running = true;
+        Diag.i("engine start node=" + nodeTag.substring(0, 8) + " self=" + Packet.hex(self).substring(0, 8));
         holdLocks(true);
         if (Build.VERSION.SDK_INT >= 29) transports.add(new WifiAwareTransport(ctx, this));
         transports.add(new BleTransport(ctx, this));
@@ -151,6 +152,7 @@ public final class MeshEngine implements Router.Host {
 
     private synchronized void stop(boolean clear) {
         running = false;
+        Diag.i("engine stop clear=" + clear);
         holdLocks(false);
         if (tickTask != null) tickTask.cancel(false);
         for (Transport t : transports) t.stop();
@@ -177,7 +179,10 @@ public final class MeshEngine implements Router.Host {
         tickCount++;
         for (Link l : all) {
             if (now - l.lastRx > QUIET_NANOS) {
-                if (++l.strikes >= 2) l.close();
+                if (++l.strikes >= 2) {
+                    Diag.i("quiet close " + l.medium + " node=" + (l.node == null ? "none" : l.node.substring(0, 8)));
+                    l.close();
+                }
                 continue;
             }
             l.strikes = 0;
@@ -196,7 +201,7 @@ public final class MeshEngine implements Router.Host {
     boolean addLink(Link link) {
         if (!running) { link.close(); return false; }
         synchronized (lock) { pending.add(link); }
-        android.util.Log.i("ripplo", "link add " + link.medium + " outbound=" + link.outbound);
+        Diag.i("link add " + link.medium + " outbound=" + link.outbound);
         link.start();
         link.send(Packet.make(Packet.LINK_HELLO, new byte[16], Packet.unhex(nodeTag)).encode());
         return true;
@@ -223,7 +228,7 @@ public final class MeshEngine implements Router.Host {
                 }
             }
         }
-        android.util.Log.i("ripplo", "link down " + link.medium + " node=" + (node == null ? "none" : node.substring(0, 8)) + " last=" + down);
+        Diag.i("link down " + link.medium + " node=" + (node == null ? "none" : node.substring(0, 8)) + " last=" + down);
         if (down) {
             Router r = router;
             if (r != null) r.linkDown(node);
@@ -312,7 +317,7 @@ public final class MeshEngine implements Router.Host {
                 list.add(link);
             }
         }
-        android.util.Log.i("ripplo", "hello " + tag.substring(0, 8) + " via " + link.medium + " outbound=" + link.outbound + " loser=" + loser + " replaced=" + toClose.size());
+        Diag.i("hello " + tag.substring(0, 8) + " via " + link.medium + " outbound=" + link.outbound + " loser=" + loser + " replaced=" + toClose.size());
         if (loser) { link.close(); return; }
         for (Link o : toClose) o.close();
         if (first) emitNeighbor(tag, true, link.medium, link.kbps);
@@ -397,6 +402,17 @@ public final class MeshEngine implements Router.Host {
         Packet p = new Packet(Packet.APP, 1, 0, Packet.newId(), new byte[16], payload);
         if (p.encode().length > Packet.MAX_PACKET) throw new IllegalArgumentException("size");
         return send(node, p);
+    }
+
+    public JSONArray transportsJson() {
+        JSONArray out = new JSONArray();
+        for (Transport t : new ArrayList<>(transports)) {
+            try {
+                out.put(new JSONObject().put("name", t.name()).put("running", t.running).put("unsupported", t.unsupported()));
+            } catch (JSONException ignored) {
+            }
+        }
+        return out;
     }
 
     public JSONArray neighborsJson() {

@@ -67,7 +67,7 @@ final class LanTransport extends Transport {
         info.setPort(ss.getLocalPort());
         info.setAttribute("nt", engine.nodeTag());
         regListener = new NsdManager.RegistrationListener() {
-            @Override public void onRegistrationFailed(NsdServiceInfo i, int e) { }
+            @Override public void onRegistrationFailed(NsdServiceInfo i, int e) { log("register failed " + e); }
             @Override public void onUnregistrationFailed(NsdServiceInfo i, int e) { }
             @Override public void onServiceRegistered(NsdServiceInfo i) { }
             @Override public void onServiceUnregistered(NsdServiceInfo i) { }
@@ -75,7 +75,7 @@ final class LanTransport extends Transport {
         nsd.registerService(info, NsdManager.PROTOCOL_DNS_SD, regListener);
 
         discListener = new NsdManager.DiscoveryListener() {
-            @Override public void onStartDiscoveryFailed(String s, int e) { }
+            @Override public void onStartDiscoveryFailed(String s, int e) { log("discovery failed " + e); }
             @Override public void onStopDiscoveryFailed(String s, int e) { }
             @Override public void onDiscoveryStarted(String s) { }
             @Override public void onDiscoveryStopped(String s) { }
@@ -83,6 +83,7 @@ final class LanTransport extends Transport {
             @Override
             public void onServiceFound(NsdServiceInfo i) {
                 if (serviceName.equals(i.getServiceName())) return;
+                log("found " + i.getServiceName());
                 synchronized (LanTransport.this) {
                     toResolve.add(i);
                 }
@@ -108,6 +109,7 @@ final class LanTransport extends Transport {
             nsd.resolveService(next, new NsdManager.ResolveListener() {
                 @Override
                 public void onResolveFailed(NsdServiceInfo i, int e) {
+                    log("resolve failed " + e);
                     retryResolve(i);
                     done();
                 }
@@ -175,7 +177,8 @@ final class LanTransport extends Transport {
                 Socket s = new Socket();
                 s.connect(new InetSocketAddress(p.host, p.port), 5000);
                 open(s, true);
-            } catch (Exception ignored) {
+            } catch (Exception e) {
+                log("connect failed " + p.host.getHostAddress() + " " + e);
             }
             synchronized (LanTransport.this) { connecting.remove(key); }
         }, "ripplo-lan-connect");
