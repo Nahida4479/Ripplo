@@ -45,6 +45,8 @@ const offStage = mesh.on('devStage', e => {
   stageLog.value = [{ ...e, time: stageTime(e.at) }, ...stageLog.value].slice(0, 40)
 })
 onUnmounted(() => offStage())
+const STAGE_COLOR = { started: 'var(--ok)', linked: 'var(--ok)', connected: 'var(--ok)', closed: 'var(--warn)', timeout: 'var(--warn)', failed: 'var(--danger)', rejected: 'var(--danger)' }
+const stageColor = s => STAGE_COLOR[s] || 'var(--text-2)'
 const forceSpec = ref({})
 const SPECS = ['lan', 'wifi-direct', 'wifi-aware', 'ble:1m', 'ble:coded']
 const specOf = n => forceSpec.value[n.node] || 'lan'
@@ -217,7 +219,7 @@ const initials = l => l.slice(0, 2).toUpperCase()
           <span class="grow"><span class="label">{{ t('devBleCoded') }}</span><br /><span class="hint">{{ t('devBleCodedHint', { coded: bleCaps.coded ? '✓' : '✗', ext: bleCaps.extended ? '✓' : '✗' }) }}</span></span>
         </div>
         <div class="row hint">{{ t('devStageTitle') }}</div>
-        <div v-for="(s, i) in stageLog" :key="i" class="row mono"><span class="hint devlog">{{ s.time }} {{ s.medium }} {{ s.node }} <b>{{ t('devStage_' + s.stage) }}</b> {{ s.detail }}</span></div>
+        <div v-for="(s, i) in stageLog" :key="i" class="row mono"><span class="devlog" :style="{ color: stageColor(s.stage) }">{{ s.time }} {{ s.medium }} {{ s.node }} <b>{{ t('devStage_' + s.stage) }}</b> {{ s.detail }}</span></div>
         <div v-if="!stageLog.length" class="row hint">–</div>
         <div class="row hint">{{ t('devForce') }}</div>
         <div v-for="n in state.neighbors" :key="n.node" class="row forcerow">
