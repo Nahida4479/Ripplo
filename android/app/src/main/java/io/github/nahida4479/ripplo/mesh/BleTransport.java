@@ -168,8 +168,15 @@ final class BleTransport extends Transport {
             }
         }
         if (hasHit(coded)) {
-            engine.closeLinks(node, "ble");
-            started = connectHits(coded);
+            // Only drop the working link when a connection can really be started: a hit whose address is already being dialled
+            // (by the normal scan) does not count, or the old link would be closed for nothing.
+            if (freeHit(coded)) {
+                engine.closeLinks(node, "ble");
+                started = connectHits(coded);
+            } else {
+                Diag.stage("ble", node, "rejected", "a " + (coded ? "coded" : "1m") + " connection attempt is already running, the existing link was kept; try again in 20 s");
+                return false;
+            }
         }
         Diag.i("ble force " + (coded ? "coded" : "1m") + " started=" + started);
         if (started == 0) Diag.stage("ble", node, "rejected", "no " + (coded ? "coded" : "1m") + " advertising seen from the other phone (is it on the new version, Bluetooth on, in range?)");
@@ -179,6 +186,16 @@ final class BleTransport extends Transport {
     private boolean dialInProgress() {
         synchronized (mine) {
             for (Link l : mine) if (l instanceof ClientLink && !((ClientLink) l).registered && l.alive.get()) return true;
+        }
+        return false;
+    }
+
+    private boolean freeHit(boolean coded) {
+        long now = System.currentTimeMillis();
+        for (Hit h : hits.values()) {
+            boolean isCoded = Build.VERSION.SDK_INT >= 26 && h.phy == BluetoothDevice.PHY_LE_CODED;
+            if (now - h.at > 20000 || isCoded != coded) continue;
+            synchronized (active) { if (!active.contains(h.device.getAddress())) return true; }
         }
         return false;
     }
