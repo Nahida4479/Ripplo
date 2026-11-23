@@ -108,8 +108,8 @@ jobs:
             --mode=universal \
             --ks="$RIPPLO_KEYSTORE_FILE" \
             --ks-key-alias="$RIPPLO_KEY_ALIAS" \
-            --ks-pass="env:RIPPLO_KEYSTORE_PASSWORD" \
-            --key-pass="env:RIPPLO_KEY_PASSWORD"
+            --ks-pass="pass:${RIPPLO_KEYSTORE_PASSWORD}" \
+            --key-pass="pass:${RIPPLO_KEY_PASSWORD}"
 
       - name: Checksums
         working-directory: out
