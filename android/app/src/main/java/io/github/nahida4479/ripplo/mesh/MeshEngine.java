@@ -216,6 +216,20 @@ public final class MeshEngine implements Router.Host {
         return true;
     }
 
+    /** True when the node is reachable over a normal-range medium: LAN, Wi-Fi Aware, or BLE on the 1M PHY (not Coded). */
+    boolean hasFastLink(String node) {
+        synchronized (lock) {
+            List<Link> l = byNode.get(node);
+            if (l != null) {
+                for (Link k : l) {
+                    boolean bleish = k.medium.equals("ble") || k.medium.equals("l2cap");
+                    if (k.medium.equals("lan") || k.medium.equals("wifi-aware") || (bleish && !k.note.contains("coded"))) return true;
+                }
+            }
+        }
+        return false;
+    }
+
     boolean hasLink(String node, String medium) {
         synchronized (lock) {
             List<Link> l = byNode.get(node);

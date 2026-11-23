@@ -132,6 +132,9 @@ final class WifiDirectTransport extends Transport {
         if (!tag.equals(engine.nodeTag())) engine.noteSeen(tag, "wifi-direct");
         log("peer " + tag.substring(0, Math.min(8, tag.length())) + " " + dev.deviceName + " initiator=" + (engine.nodeTag().compareTo(tag) < 0));
         if (engine.nodeTag().compareTo(tag) >= 0 || engine.hasLink(tag, "wifi-direct")) return;
+        // Long range is the fallback: no Wi-Fi Direct group (it disturbs Wi-Fi and asks the other user to accept) while the
+        // phone is reachable over LAN, Wi-Fi Aware or normal-range Bluetooth.
+        if (engine.hasFastLink(tag)) return;
         long now = System.currentTimeMillis();
         synchronized (attempts) {
             Long last = attempts.get(tag);
@@ -249,7 +252,10 @@ final class WifiDirectTransport extends Transport {
     @Override
     void tickImpl() {
         long now = System.currentTimeMillis();
-        if (manager != null && channel != null && engine.neighbors().isEmpty() && now - lastDiscover > 60000) {
+        boolean direct = false;
+        for (String n : engine.neighbors()) if (engine.hasLink(n, "wifi-direct")) direct = true;
+        // Look for far phones every 90 s (also while nearer phones are linked) unless a Wi-Fi Direct link is already up.
+        if (manager != null && channel != null && !direct && now - lastDiscover > 90000) {
             lastDiscover = now;
             discover();
         }

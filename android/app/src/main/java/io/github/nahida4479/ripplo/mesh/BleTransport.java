@@ -437,6 +437,8 @@ final class BleTransport extends Transport {
             }
             String known = addrNode.get(a);
             if (known != null && (engine.hasLink(known, "ble") || engine.hasLink(known, "l2cap"))) return;
+            // Long range is the fallback: a coded hit is not dialled while the same phone is reachable over a normal-range medium.
+            if (coded && known != null && engine.hasFastLink(known)) return;
             // One phone shows up under several addresses (1M and coded sets, rotating addresses). Dialling them all at once
             // overloads its GATT server and every attempt stalls, so only one connection attempt runs at a time.
             if (dialInProgress()) return;
