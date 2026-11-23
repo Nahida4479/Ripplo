@@ -146,6 +146,9 @@ final class BleTransport extends Transport {
             return false;
         }
         Diag.stage("ble", node, "attempt", coded ? "coded" : "1m");
+        // An explicit request replaces whatever BLE/L2CAP link this node already has, so the chosen PHY is really used.
+        engine.closeLinks(node, "ble");
+        forceNode = node;
         int started = connectHits(coded);
         if (started == 0) {
             // Android may have silently stopped delivering scan results: restart the scan and wait a little for a fresh hit.
@@ -162,13 +165,20 @@ final class BleTransport extends Transport {
         return started > 0;
     }
 
+    private volatile String forceNode;
+
     private int connectHits(boolean coded) {
         long now = System.currentTimeMillis();
         int started = 0;
+        String want = forceNode;
+        boolean mapped = false;
+        for (Hit h : hits.values()) if (want != null && want.equals(addrNode.get(h.device.getAddress()))) mapped = true;
         for (Hit h : new ArrayList<>(hits.values())) {
             boolean isCoded = Build.VERSION.SDK_INT >= 26 && h.phy == BluetoothDevice.PHY_LE_CODED;
             if (now - h.at > 60000 || isCoded != coded) continue;
             String a = h.device.getAddress();
+            // Prefer addresses known to belong to the requested node; otherwise try every fresh hit of that PHY.
+            if (mapped && !want.equals(addrNode.get(a))) continue;
             synchronized (active) {
                 if (active.contains(a)) continue;
                 active.add(a);
@@ -387,6 +397,10 @@ final class BleTransport extends Transport {
                 mtus.remove(a);
                 ServerLink l = serverLinks.remove(a);
                 if (l != null) l.close();
+                // Android may stop connectable advertising while connected. Resume it once no BLE link is left (throttled).
+                main.postDelayed(() -> {
+                    if (mine.isEmpty() && System.currentTimeMillis() - lastAdvStart > 20000) restartAdvertising();
+                }, 1500);
             }
         }
 

@@ -144,16 +144,35 @@ final class WifiDirectTransport extends Transport {
     @Override
     @SuppressWarnings("MissingPermission")
     boolean forceConnect(String node, String option) {
-        WifiP2pDevice dev = devices.get(node);
-        if (dev == null || manager == null || channel == null) {
-            log("force: peer not discovered, starting discovery");
-            Diag.stage("wifi-direct", node, "rejected", "peer not discovered, discovery started");
-            if (manager != null && channel != null) discover();
+        if (manager == null || channel == null) {
+            Diag.stage("wifi-direct", node, "rejected", "Wi-Fi Direct is not running (Wi-Fi off or no permission)");
             return false;
         }
-        Diag.stage("wifi-direct", node, "attempt", "");
+        WifiP2pDevice dev = devices.get(node);
+        if (dev == null) {
+            Diag.stage("wifi-direct", node, "scanning", "peer not discovered yet, restarting discovery (up to 12 s)");
+            discover();
+            logPeers();
+            long end = System.currentTimeMillis() + 12000;
+            while (dev == null && System.currentTimeMillis() < end && running) {
+                try { Thread.sleep(500); } catch (InterruptedException e) { break; }
+                dev = devices.get(node);
+            }
+            if (dev == null) {
+                Diag.stage("wifi-direct", node, "rejected", "peer not found over Wi-Fi Direct (other phone needs Wi-Fi on and Ripplo running)");
+                return false;
+            }
+        }
+        Diag.stage("wifi-direct", node, "attempt", dev.deviceName == null ? "" : dev.deviceName);
         requestConnect(node, dev);
         return true;
+    }
+
+    @SuppressWarnings("MissingPermission")
+    private void logPeers() {
+        try {
+            manager.requestPeers(channel, list -> Diag.stage("wifi-direct", "", "started", "p2p peers in range: " + (list == null ? 0 : list.getDeviceList().size())));
+        } catch (Exception ignored) { }
     }
 
     @SuppressWarnings("MissingPermission")
