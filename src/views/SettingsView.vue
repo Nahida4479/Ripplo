@@ -2,7 +2,7 @@
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { QrCode, ExternalLink, ShieldCheck, ShieldAlert, ShieldQuestion, TriangleAlert, Lock } from 'lucide-vue-next'
 import { state } from '../core/state.js'
-import { saveSettings, setAvatar, setName } from '../core/api.js'
+import { saveSettings, setAvatar, setName, sendDevLog, deleteDevLog } from '../core/api.js'
 import { mesh } from '../mesh/bridge.js'
 import { ui, toast } from '../components/ui.js'
 import { makeAvatar } from '../lib/avatar.js'
@@ -24,6 +24,40 @@ const integ = computed(() => ({
   ok: [ShieldCheck, 'ok', 'integrityOk'], mismatch: [ShieldAlert, 'bad', 'integrityBad']
 }[state.integrity.status] || [ShieldQuestion, '', 'integrityUnknown']))
 const kbps = n => n.kbps >= 1000 ? (n.kbps / 1000).toFixed(1) + ' Mbps' : n.kbps + ' kbps'
+// Recipient of developer logs: the ripploId of the developer's own phone (must be a contact).
+const DEV_LOG_RECIPIENT = 'H90HYSP1BQJPRGCF'
+let logTimer = null
+function startLogPress() {
+  if (!state.settings.dev) return
+  clearTimeout(logTimer)
+  logTimer = setTimeout(sendLogs, 2000)
+}
+function cancelLogPress() {
+  clearTimeout(logTimer)
+  logTimer = null
+}
+async function sendLogs() {
+  logTimer = null
+  const native = await mesh.getDiag()
+  const head = `Ripplo ${state.update.current || '?'} ${new Date().toISOString()}\n`
+  const text = head + (native ? native + '\n--- JS ---\n' : '') + diagText()
+  try {
+    const r = await sendDevLog(DEV_LOG_RECIPIENT, text)
+    toast(t(r.ok ? 'logSent' : 'logNotSent'))
+  } catch {
+    toast(t('logNotSent'))
+  }
+}
+const openId = ref(null)
+const openLog = computed(() => state.devLogs.find(x => x.id === openId.value) || null)
+const openLines = computed(() => (openLog.value ? openLog.value.text.split('\n') : []))
+function toggleLog(id) { openId.value = openId.value === id ? null : id }
+function lineColor(ln) {
+  if (/ ! |\bfailed\b|\brejected\b/.test(ln)) return 'var(--danger)'
+  if (/\bclosed\b|\btimeout\b/.test(ln)) return 'var(--warn)'
+  if (/\bstarted\b|\blinked\b|\bconnected\b|advertising/.test(ln)) return 'var(--ok)'
+  return 'var(--text-2)'
+}
 let devTaps = 0
 let devTimer = null
 function aboutTap() {
@@ -207,7 +241,7 @@ const initials = l => l.slice(0, 2).toUpperCase()
 
     <h2 class="section">{{ t('about') }}</h2>
     <div class="card">
-      <div class="row" role="button" tabindex="0" @click="aboutTap"><span class="grow"><span class="label">Ripplo</span><br /><span class="hint">{{ t('tagline') }}</span></span><span class="val">{{ state.update.current || '–' }}</span></div>
+      <div class="row" role="button" tabindex="0" @click="aboutTap" @pointerdown="startLogPress" @pointerup="cancelLogPress" @pointerleave="cancelLogPress" @pointercancel="cancelLogPress" @contextmenu.prevent><span class="grow"><span class="label">Ripplo</span><br /><span class="hint">{{ t('tagline') }}</span></span><span class="val">{{ state.update.current || '–' }}</span></div>
       <a class="row" :href="REPO" target="_blank" rel="noopener"><span class="grow label">GitHub</span><ExternalLink :size="18" /></a>
       <div class="row"><span class="grow label">{{ t('license') }}</span><span class="val">AGPL-3.0</span></div>
     </div>
@@ -221,6 +255,15 @@ const initials = l => l.slice(0, 2).toUpperCase()
         <div class="row hint">{{ t('devStageTitle') }}</div>
         <div v-for="(s, i) in stageLog" :key="i" class="row mono"><span class="devlog" :style="{ color: stageColor(s.stage) }">{{ s.time }} {{ s.medium }} {{ s.node }} <b>{{ t('devStage_' + s.stage) }}</b> {{ s.detail }}</span></div>
         <div v-if="!stageLog.length" class="row hint">–</div>
+        <div class="row hint">{{ t('devLogsTitle') }} ({{ state.devLogs.length }})</div>
+        <div v-for="l in state.devLogs" :key="l.id" class="row forcerow">
+          <span class="grow"><span class="label">{{ l.name || l.from.slice(0, 8) }}</span><br /><span class="hint">{{ new Date(l.ts).toLocaleString() }} · {{ (l.text.length / 1024).toFixed(1) }} KB</span></span>
+          <button class="btn sm" @click="toggleLog(l.id)">{{ openId === l.id ? t('devLogClose') : t('devLogOpen') }}</button>
+          <button class="btn sm ghost" @click="deleteDevLog(l.id)">{{ t('devLogDelete') }}</button>
+        </div>
+        <div v-if="openLog" class="row devlog" style="white-space: pre-wrap; display: block">
+          <div v-for="(ln, i) in openLines" :key="i" :style="{ color: lineColor(ln) }">{{ ln }}</div>
+        </div>
         <div class="row hint">{{ t('devForce') }}</div>
         <div v-for="n in state.neighbors" :key="n.node" class="row forcerow">
           <span class="grow label">{{ n.card?.name || n.node.slice(0, 8) }}</span>

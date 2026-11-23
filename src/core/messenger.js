@@ -479,6 +479,30 @@ export function createCore({ mesh, dbName = 'ripplo', state = createState(), not
   const captionOf = (v) => (typeof v === 'string' && v.length <= MAX_TEXT && v.trim() ? v : undefined)
   const groupOf = (chatId) => (state.chats.find((c) => c.id === chatId)?.type === 'group' ? chatId : undefined)
 
+  // Developer log transfer: sent as an encrypted one-to-one packet (no chat entry on either side).
+  const DLOG_BODY_MAX = 45000
+  async function packLog(text) {
+    if (typeof CompressionStream === 'undefined') return { raw: text.slice(-30000) }
+    const gz = await new Response(new Blob([utf8(text)]).stream().pipeThrough(new CompressionStream('gzip'))).arrayBuffer()
+    return { z: b64(new Uint8Array(gz)) }
+  }
+  async function unpackLog(body) {
+    if (typeof body.raw === 'string') return body.raw
+    if (typeof body.z !== 'string' || typeof DecompressionStream === 'undefined') return null
+    return new Response(new Blob([unb64(body.z)]).stream().pipeThrough(new DecompressionStream('gzip'))).text()
+  }
+  async function sendDevLog(to, text) {
+    const c = state.contacts[to]
+    if (!c || c.request) throw new RipploError('no_chat')
+    const body = { t: 'dlog', id: hex(random(16)), ts: Date.now(), ...(await packLog(text)) }
+    if (body.z && body.z.length > DLOG_BODY_MAX) throw new RipploError('too_big')
+    const r = await transmit(await buildPacket(c, body))
+    return { ok: !!r.ok, hops: r.hops }
+  }
+  function deleteDevLog(id) {
+    state.devLogs = state.devLogs.filter((x) => x.id !== id)
+  }
+
   async function sendText(chatId, text, replyTo) {
     if (typeof text !== 'string' || !text.trim()) throw new RipploError('empty')
     if (text.length > MAX_TEXT) throw new RipploError('too_long')
@@ -733,6 +757,12 @@ export function createCore({ mesh, dbName = 'ripplo', state = createState(), not
       if (unsent.size > MAX_UNSENT) unsent.delete(unsent.values().next().value)
       await db.put('kv', 'unsent', [...unsent])
       await removeMessage(chatId, localId)
+    } else if (msg.t === 'dlog') {
+      const sender = state.contacts[f]
+      if (!sender || sender.request || typeof msg.id !== 'string' || msg.id.length > 64) return
+      const text = await unpackLog(msg).catch(() => null)
+      if (typeof text !== 'string' || text.length > 400000) return
+      state.devLogs = [{ id: msg.id, from: f, name: sender.name, ts: Date.now(), text }, ...state.devLogs].slice(0, 20)
     } else if (msg.t === 'group') {
       await onGroup(f, msg)
     } else if (msg.t === 'call') {
@@ -1303,6 +1333,6 @@ export function createCore({ mesh, dbName = 'ripplo', state = createState(), not
   return {
     state, init, close, createProfile, setAvatar, setName, searchPeople, unsendMessage, startCall: async (id) => { if (!canCall(state.contacts[id])) throw new RipploError('call_no_contact'); return calls.start(id) }, acceptCall: calls.accept, hangUp: calls.hangup, setMuted: calls.setMuted, myInviteLink: newInviteLink, addContactFromLink, invite, acceptRequest, declineRequest,
     verifyNearby, verifyByQr, markVerified, safetyNumber, sendTyping, sendText, sendAttachment, retry, loadMessages,
-    markRead, createGroup, refreshPeople, deleteChat, deleteContact, saveSettings, restoreBackup,
+    markRead, createGroup, refreshPeople, deleteChat, deleteContact, saveSettings, restoreBackup, sendDevLog, deleteDevLog,
   }
 }
