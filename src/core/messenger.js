@@ -82,6 +82,8 @@ export function createCore({ mesh, dbName = 'ripplo', state = createState(), not
   const persistChat = (c) => db.put('chats', c.id, { ...c })
   const persistMsg = (m) => (m.unsent ? Promise.resolve() : db.putMsg({ ...m, att: m.att && { ...m.att, url: undefined } }))
   const tagOf = (c) => deriveIds(unb64(c.ik)).tag
+  // Node id (hex link tag) of a contact, as used by state.neighbors[].node; null if unknown.
+  const nodeOf = (id) => (state.contacts[id]?.ik ? hex(tagOf(state.contacts[id])) : null)
   const fmtDur = (ms) => {
     const s = Math.round(ms / 1000)
     return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`
@@ -1333,6 +1335,6 @@ export function createCore({ mesh, dbName = 'ripplo', state = createState(), not
   return {
     state, init, close, createProfile, setAvatar, setName, searchPeople, unsendMessage, startCall: async (id) => { if (!canCall(state.contacts[id])) throw new RipploError('call_no_contact'); return calls.start(id) }, acceptCall: calls.accept, hangUp: calls.hangup, setMuted: calls.setMuted, myInviteLink: newInviteLink, addContactFromLink, invite, acceptRequest, declineRequest,
     verifyNearby, verifyByQr, markVerified, safetyNumber, sendTyping, sendText, sendAttachment, retry, loadMessages,
-    markRead, createGroup, refreshPeople, deleteChat, deleteContact, saveSettings, restoreBackup, sendDevLog, deleteDevLog,
+    markRead, createGroup, refreshPeople, deleteChat, deleteContact, saveSettings, restoreBackup, sendDevLog, deleteDevLog, nodeOf,
   }
 }

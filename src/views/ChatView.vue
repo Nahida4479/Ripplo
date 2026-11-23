@@ -3,7 +3,7 @@ import { ref, computed, watch, nextTick, onMounted, onBeforeUnmount } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ChevronLeft, Phone, Reply, Lock, Check, CheckCheck, CloudOff, CircleAlert, Plus, Mic, Send, X, Play, Pause, ShieldAlert } from 'lucide-vue-next'
 import { state } from '../core/state.js'
-import { startCall, sendTyping, unsendMessage, loadMessages, markRead, sendText, sendAttachment, retry, verifyNearby, markVerified, MAX_TEXT, MAX_FILE } from '../core/api.js'
+import { startCall, sendTyping, unsendMessage, loadMessages, markRead, sendText, sendAttachment, retry, verifyNearby, markVerified, nodeOf, MAX_TEXT, MAX_FILE } from '../core/api.js'
 import { ui, toast } from '../components/ui.js'
 import { t, locale } from '../i18n.js'
 import Avatar from '../components/Avatar.vue'
@@ -24,7 +24,9 @@ const scroller = ref(null)
 const fileIn = ref(null)
 
 const route = computed(() => {
-  const n = state.neighbors.find(x => x.card?.id === id || (x.node && x.node === state.contacts[id]?.node))
+  // Match by card id or by the contact's node id, so a neighbour without a card yet still counts.
+  const node = nodeOf(id)
+  const n = state.neighbors.find(x => x.card?.id === id || (node && x.node === node))
   if (n) return String(n.medium).toUpperCase()
   // Not a direct neighbour, but reachable over relays: show the hop count from recent discovery.
   const p = state.people.find(x => x.id === id)
