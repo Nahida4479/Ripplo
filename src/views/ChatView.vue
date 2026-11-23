@@ -6,6 +6,7 @@ import { state } from '../core/state.js'
 import { startCall, sendTyping, unsendMessage, loadMessages, markRead, sendText, sendAttachment, retry, verifyNearby, markVerified, nodeOf, MAX_TEXT, MAX_FILE } from '../core/api.js'
 import { ui, toast } from '../components/ui.js'
 import { t, locale } from '../i18n.js'
+import { isCodedLink } from '../lib/linkLabel.js'
 import { refreshRange } from '../services/rangeRefresh.js'
 import Avatar from '../components/Avatar.vue'
 
@@ -29,7 +30,7 @@ const route = computed(() => {
   const node = nodeOf(id)
   const known = state.contacts[id]?.node
   const n = state.neighbors.find(x => x.card?.id === id || (node && x.node === node) || (known && x.node === known))
-  if (n) return String(n.medium).toUpperCase()
+  if (n) return [...new Set((n.links?.length ? n.links : [n]).map(l => (isCodedLink(l) ? 'BLE Coded' : String(l.medium).toUpperCase())))].join(' + ')
   // Not a direct neighbour, but reachable over relays: show the hop count from recent discovery.
   const p = state.people.find(x => x.id === id)
   return p && Date.now() - p.seenAt < 10 * 60e3 ? t('hops', { n: p.hops }) : null

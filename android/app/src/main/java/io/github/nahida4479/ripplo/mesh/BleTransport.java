@@ -65,6 +65,10 @@ final class BleTransport extends Transport {
     // BLE address -> node it belonged to, so a scan hit for a node we already have a link to is not dialled again.
     private final Map<String, String> addrNode = new ConcurrentHashMap<>();
     private final Map<String, Hit> hits = new ConcurrentHashMap<>();
+    // PHY note ("phy coded" / "phy 1M") per remote address, and the inbound L2CAP link of that address, so every link of a
+    // connection can show which PHY it runs on.
+    private final Map<String, String> phyNotes = new ConcurrentHashMap<>();
+    private final Map<String, StreamLink> inboundSock = new ConcurrentHashMap<>();
     private AdvertisingSetCallback codedAdvCb;
     private volatile long lastHitAt;
     private volatile long lastScanStart;
@@ -271,8 +275,14 @@ final class BleTransport extends Transport {
         StreamLink l = new StreamLink(engine, "l2cap", outbound, s.getInputStream(), s.getOutputStream(), s);
         int mtu = Build.VERSION.SDK_INT >= 23 ? s.getMaxTransmitPacketSize() : 0;
         l.chunk = mtu > 0 ? mtu : 672;
+        final String raddr = s.getRemoteDevice().getAddress();
+        if (!outbound) {
+            inboundSock.put(raddr, l);
+            String pn = phyNotes.get(raddr);
+            if (pn != null) l.note = pn;
+        }
         if (outbound) {
-            final String addr = s.getRemoteDevice().getAddress();
+            final String addr = raddr;
             // Remember which node this BLE address belongs to, so later scan hits for it are not dialled again.
             l.helloHook = tag -> addrNode.put(addr, tag);
         }
@@ -280,14 +290,15 @@ final class BleTransport extends Transport {
         return l;
     }
 
-    private void connectL2cap(final BluetoothDevice dev, final int psm) {
+    private void connectL2cap(final BluetoothDevice dev, final int psm, final String note) {
         final String addr = dev.getAddress();
         synchronized (active) { if (!l2capActive.add(addr)) return; }
         Thread t = new Thread(() -> {
             try {
                 BluetoothSocket s = dev.createInsecureL2capChannel(psm);
                 s.connect();
-                openSocket(s, true);
+                StreamLink sl = openSocket(s, true);
+                if (note != null && !note.isEmpty()) sl.note = note;
             } catch (Exception e) {
                 Diag.i("l2cap connect failed " + addr + " " + e);
             }
@@ -445,6 +456,18 @@ final class BleTransport extends Transport {
         }
 
         @Override
+        public void onPhyRead(BluetoothDevice device, int txPhy, int rxPhy, int status) {
+            String a = device.getAddress();
+            String n = "phy " + (rxPhy == BluetoothDevice.PHY_LE_CODED ? "coded" : rxPhy == BluetoothDevice.PHY_LE_2M ? "2M" : "1M");
+            phyNotes.put(a, n);
+            ServerLink sl = serverLinks.get(a);
+            if (sl != null) sl.note = n;
+            StreamLink l2 = inboundSock.get(a);
+            if (l2 != null && l2.alive.get()) l2.note = n;
+            Diag.i("ble server " + n + " " + a);
+        }
+
+        @Override
         public void onMtuChanged(BluetoothDevice device, int mtu) {
             Diag.i("ble server mtu " + mtu);
             mtus.put(device.getAddress(), mtu);
@@ -463,6 +486,9 @@ final class BleTransport extends Transport {
                 serverLinks.put(a, l);
                 mine.add(l);
                 engine.addLink(l);
+                if (Build.VERSION.SDK_INT >= 26 && server != null) {
+                    try { server.readPhy(device); } catch (Exception ignored) { }
+                }
             } else {
                 ServerLink l = serverLinks.remove(a);
                 if (l != null) l.close();
@@ -590,7 +616,7 @@ final class BleTransport extends Transport {
                 return;
             }
             Diag.stage("ble", device.getAddress(), "linked", "psm=" + psm);
-            if (psm > 0 && Build.VERSION.SDK_INT >= 29) connectL2cap(device, psm);
+            if (psm > 0 && Build.VERSION.SDK_INT >= 29) connectL2cap(device, psm, note);
         }
 
         private void psmRead(byte[] v, int status) {

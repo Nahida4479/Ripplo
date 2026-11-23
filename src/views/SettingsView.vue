@@ -9,6 +9,7 @@ import { makeAvatar } from '../lib/avatar.js'
 import { t, locale, setLocale } from '../i18n.js'
 import { theme, ACCENTS, GRADIENTS } from '../services/theme.js'
 import { checkUpdate, install } from '../services/updater.js'
+import { isCodedLink } from '../lib/linkLabel.js'
 import { contributors } from '../contributors.js'
 import Avatar from '../components/Avatar.vue'
 import BackupCard from '../components/BackupCard.vue'
@@ -26,7 +27,7 @@ const integ = computed(() => ({
 const kbps = n => n.kbps >= 1000 ? (n.kbps / 1000).toFixed(1) + ' Mbps' : n.kbps + ' kbps'
 // Recipient of developer logs: the ripploId of the developer's own phone (must be a contact).
 // BLE links show their PHY when it is known (native note: "phy coded" / "phy 1M").
-const linkLabel = l => (String(l.medium).toLowerCase() === 'ble' && /coded/.test(l.note || '') ? 'BLE Coded' : String(l.medium).toUpperCase())
+const linkLabel = l => (isCodedLink(l) ? 'BLE Coded' : String(l.medium).toUpperCase())
 const DEV_LOG_RECIPIENT = 'H90HYSP1BQJPRGCF'
 let logTimer = null
 function startLogPress() {
