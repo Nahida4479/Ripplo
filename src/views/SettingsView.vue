@@ -25,6 +25,8 @@ const integ = computed(() => ({
 }[state.integrity.status] || [ShieldQuestion, '', 'integrityUnknown']))
 const kbps = n => n.kbps >= 1000 ? (n.kbps / 1000).toFixed(1) + ' Mbps' : n.kbps + ' kbps'
 // Recipient of developer logs: the ripploId of the developer's own phone (must be a contact).
+// BLE links show their PHY when it is known (native note: "phy coded" / "phy 1M").
+const linkLabel = l => (String(l.medium).toLowerCase() === 'ble' && /coded/.test(l.note || '') ? 'BLE Coded' : String(l.medium).toUpperCase())
 const DEV_LOG_RECIPIENT = 'H90HYSP1BQJPRGCF'
 let logTimer = null
 function startLogPress() {
@@ -122,7 +124,7 @@ async function toggleNet(n) {
     'node ' + n.node,
     'card ' + (n.card ? n.card.id + ' (' + n.card.name + ')' : 'none'),
     'unsupported ' + !!n.unsupported,
-    ...links.map(l => String(l.medium) + ' ' + l.kbps + ' kbps' + (l.rttMs ? ' rtt ' + l.rttMs + ' ms' : '') + (l.outbound === undefined ? '' : l.outbound ? ' out' : ' in'))
+    ...links.map(l => linkLabel(l) + ' ' + l.kbps + ' kbps' + (l.rttMs ? ' rtt ' + l.rttMs + ' ms' : '') + (l.outbound === undefined ? '' : l.outbound ? ' out' : ' in'))
   ]
   console.info('ripplo net ' + JSON.stringify(detail.value))
 }
@@ -193,7 +195,7 @@ const initials = l => l.slice(0, 2).toUpperCase()
       <template v-for="n in state.neighbors" :key="n.node">
       <div class="row" role="button" tabindex="0" @click="toggleNet(n)" @keyup.enter="toggleNet(n)">
         <span class="grow"><span class="label">{{ n.card?.name || n.node.slice(0, 8) }}</span><br />
-          <span class="hint">{{ [...new Set((n.links?.length ? n.links : [n]).map(l => String(l.medium).toUpperCase()))].join(' + ') }} · {{ kbps(n) }}</span></span>
+          <span class="hint">{{ [...new Set((n.links?.length ? n.links : [n]).map(linkLabel))].join(' + ') }} · {{ kbps(n) }}</span></span>
         <span v-if="n.unsupported" class="chip">{{ t('updateNeeded') }}</span>
         <span v-else class="chip ok">{{ t('connected') }}</span>
       </div>
