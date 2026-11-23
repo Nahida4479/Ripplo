@@ -303,7 +303,8 @@ export function createCore({ mesh, dbName = 'ripplo', state = createState(), not
     }).catch(() => {})
     const nb = state.neighbors.find((n) => n.node === node)
     if (!nb.card && helloCards.has(node)) nb.card = helloCards.get(node)
-    sendHello(node, !nb.card)
+    // Speed updates arrive every few seconds; only a newly seen neighbour is greeted (askCard retries while the card is missing).
+    if (i < 0) sendHello(node, !nb.card)
   }
 
   function onPacket(bytes, from) {

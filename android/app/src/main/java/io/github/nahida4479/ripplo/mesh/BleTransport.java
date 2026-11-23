@@ -167,6 +167,13 @@ final class BleTransport extends Transport {
         return started > 0;
     }
 
+    private boolean dialInProgress() {
+        synchronized (mine) {
+            for (Link l : mine) if (l instanceof ClientLink && !((ClientLink) l).registered && l.alive.get()) return true;
+        }
+        return false;
+    }
+
     private boolean hasHit(boolean coded) {
         long now = System.currentTimeMillis();
         for (Hit h : hits.values()) {
@@ -392,6 +399,9 @@ final class BleTransport extends Transport {
             }
             String known = addrNode.get(a);
             if (known != null && (engine.hasLink(known, "ble") || engine.hasLink(known, "l2cap"))) return;
+            // One phone shows up under several addresses (1M and coded sets, rotating addresses). Dialling them all at once
+            // overloads its GATT server and every attempt stalls, so only one connection attempt runs at a time.
+            if (dialInProgress()) return;
             synchronized (active) {
                 if (active.contains(a) || active.size() >= MAX_CLIENTS) return;
                 Long last = attempts.get(a);
@@ -555,9 +565,9 @@ final class BleTransport extends Transport {
             Diag.stage("ble", device.getAddress(), "connecting", "");
             main.postDelayed(() -> {
                 if (registered) return;
-                Diag.stage("ble", device.getAddress(), "timeout", "no link after 30 s");
+                Diag.stage("ble", device.getAddress(), "timeout", "no link after 20 s");
                 close();
-            }, 30000);
+            }, 20000);
         }
 
         private void finish(int psm) {
