@@ -119,6 +119,9 @@ async function clearDev() {
   diagClear()
   await loadDev()
 }
+async function copyLog(l) {
+  try { await navigator.clipboard.writeText(`${l.name || l.from.slice(0, 8)} ${new Date(l.ts).toLocaleString()}\n${l.text}`); toast(t('copiedLog')) } catch { toast(t('err_bad_link')) }
+}
 async function copyDev() {
   try { await navigator.clipboard.writeText(devLog.value); toast(t('copiedLog')) } catch { toast(t('err_bad_link')) }
 }
@@ -268,6 +271,7 @@ const initials = l => l.slice(0, 2).toUpperCase()
         <div class="row hint">{{ t('devLogsTitle') }} ({{ state.devLogs.length }})</div>
         <div v-for="l in state.devLogs" :key="l.id" class="row forcerow">
           <span class="grow"><span class="label">{{ l.name || l.from.slice(0, 8) }}</span><br /><span class="hint">{{ new Date(l.ts).toLocaleString() }} · {{ (l.text.length / 1024).toFixed(1) }} KB</span></span>
+          <button class="btn sm" @click="copyLog(l)">{{ t('devLogCopy') }}</button>
           <button class="btn sm" @click="toggleLog(l.id)">{{ openId === l.id ? t('devLogClose') : t('devLogOpen') }}</button>
           <button class="btn sm ghost" @click="deleteDevLog(l.id)">{{ t('devLogDelete') }}</button>
         </div>
