@@ -292,6 +292,7 @@ public final class MeshEngine implements Router.Host {
 
     private void onHello(Link link, String tag) {
         if (link.node != null) return;
+        link.helloTag = tag;
         if (tag.equals(nodeTag)) { link.close(); return; }
         List<Link> toClose = new ArrayList<>();
         boolean loser = false;

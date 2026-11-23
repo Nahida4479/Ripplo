@@ -62,6 +62,8 @@ final class BleTransport extends Transport {
     private final Map<String, ServerLink> serverLinks = new ConcurrentHashMap<>();
     private final Map<String, Integer> mtus = new ConcurrentHashMap<>();
     private final Map<String, Long> attempts = new HashMap<>();
+    // BLE address -> node it belonged to, so a scan hit for a node we already have a link to is not dialled again.
+    private final Map<String, String> addrNode = new ConcurrentHashMap<>();
     private final Map<String, Hit> hits = new ConcurrentHashMap<>();
     private AdvertisingSetCallback codedAdvCb;
 
@@ -302,6 +304,8 @@ final class BleTransport extends Transport {
                 Hit oneM = hits.get(a + "/1");
                 if (oneM != null && now - oneM.at < 20000) return;
             }
+            String known = addrNode.get(a);
+            if (known != null && (engine.hasLink(known, "ble") || engine.hasLink(known, "l2cap"))) return;
             synchronized (active) {
                 if (active.contains(a) || active.size() >= MAX_CLIENTS) return;
                 Long last = attempts.get(a);
@@ -605,6 +609,8 @@ final class BleTransport extends Transport {
         @Override
         void closeImpl() {
             mine.remove(this);
+            String peer = node != null ? node : helloTag;
+            if (peer != null) addrNode.put(device.getAddress(), peer);
             synchronized (active) { active.remove(device.getAddress()); }
             BluetoothGatt g = gatt;
             if (g != null) {
