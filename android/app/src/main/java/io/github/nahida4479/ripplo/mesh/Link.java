@@ -15,6 +15,8 @@ abstract class Link {
     final boolean outbound;
     volatile String node;
     volatile String note = "";
+    /** Peer tag from the hello, also kept for links the engine closes as duplicates (node stays null for those). */
+    volatile String helloTag = null;
     volatile long kbps;
     volatile long rttMs;
     volatile long lastRx = System.nanoTime();

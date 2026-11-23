@@ -10,8 +10,9 @@ import Avatar from '../components/Avatar.vue'
 
 const MEDIUM = { ble: 'BLE', lan: 'LAN', wifi_direct: 'Wi-Fi Direct', 'wifi-direct': 'Wi-Fi Direct', wifidirect: 'Wi-Fi Direct', aware: 'Wi-Fi Aware', 'wifi-aware': 'Wi-Fi Aware', multipeer: 'Multipeer', l2cap: 'BLE' }
 const medium = m => MEDIUM[String(m).toLowerCase()] || m
+const linkName = l => (String(l.medium).toLowerCase() === 'ble' && /coded/.test(l.note || '') ? 'BLE Coded' : medium(l.medium))
 const chips = n => {
-  const linked = [...new Set((n.links?.length ? n.links : [n]).map(l => medium(l.medium)))]
+  const linked = [...new Set((n.links?.length ? n.links : [n]).map(linkName))]
   const seen = [...new Set((n.seen || []).map(medium))].filter(m => !linked.includes(m))
   return [...linked.map((name, i) => ({ name, active: i === 0 })), ...seen.map(name => ({ name, active: false, dim: true }))]
 }

@@ -25,7 +25,10 @@ const fileIn = ref(null)
 
 const route = computed(() => {
   const n = state.neighbors.find(x => x.card?.id === id || (x.node && x.node === state.contacts[id]?.node))
-  return n ? String(n.medium).toUpperCase() : null
+  if (n) return String(n.medium).toUpperCase()
+  // Not a direct neighbour, but reachable over relays: show the hop count from recent discovery.
+  const p = state.people.find(x => x.id === id)
+  return p && Date.now() - p.seenAt < 10 * 60e3 ? t('hops', { n: p.hops }) : null
 })
 const sub = computed(() => {
   if (isGroup.value) return t('members', { n: chat.value.members?.length || 0 })
