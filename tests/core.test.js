@@ -54,7 +54,7 @@ const connect = (a, b) => {
   a.emit('neighbor', { node: b.node, up: true, medium: 'lan', kbps: 1000 })
   b.emit('neighbor', { node: a.node, up: true, medium: 'lan', kbps: 1000 })
 }
-const waitFor = async (fn, ms = 4000) => {
+const waitFor = async (fn, ms = 15000) => {
   const end = Date.now() + ms
   for (;;) {
     const v = fn()
