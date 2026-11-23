@@ -526,6 +526,7 @@ final class BleTransport extends Transport {
             Diag.i("ble client link up " + device.getAddress() + " psm=" + psm);
             if (!engine.addLink(this)) {
                 Diag.stage("ble", device.getAddress(), "rejected", "engine did not accept the link");
+                close();
                 return;
             }
             Diag.stage("ble", device.getAddress(), "linked", "psm=" + psm);

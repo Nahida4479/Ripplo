@@ -177,6 +177,15 @@ public final class MeshEngine implements Router.Host {
         }
         long now = System.nanoTime();
         tickCount++;
+        // A link that never completed the hello (peer asleep, data dropped) would otherwise hold its address forever.
+        List<Link> stuck = new ArrayList<>();
+        synchronized (lock) {
+            for (Link l : pending) if (now - l.born > 30L * 1000000000L) stuck.add(l);
+        }
+        for (Link l : stuck) {
+            Diag.i("hello timeout close " + l.medium);
+            l.close();
+        }
         for (Link l : all) {
             if (now - l.lastRx > QUIET_NANOS) {
                 if (++l.strikes >= 2) {
