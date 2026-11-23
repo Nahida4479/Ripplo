@@ -27,7 +27,8 @@ async function syncLinks() {
 }
 onMounted(() => { syncLinks(); syncTimer = setInterval(syncLinks, 3000) })
 onUnmounted(() => clearInterval(syncTimer))
-const nearby = computed(() => state.neighbors.filter(n => n.card))
+// Everyone the Network tab shows, including neighbours whose card has not arrived yet.
+const nearby = computed(() => state.neighbors)
 const isContact = id => !!state.contacts[id] && !state.contacts[id].request
 const request = id => state.contacts[id]?.request
 const last = computed(() => state.peopleRefreshedAt
@@ -68,13 +69,14 @@ const nearbyPerson = n => ({ id: n.card.id, name: n.card.name, card: n.card.card
     <div class="card">
       <div v-if="!nearby.length" class="empty">{{ t('nobodyNearby') }}</div>
       <div v-for="n in nearby" :key="n.node" class="row">
-        <Avatar :name="n.card.name" :photo="state.contacts[n.card.id]?.avatar" :size="40" />
-        <span class="grow"><span class="label">{{ n.card.name }}</span><br />
+        <Avatar :name="n.card?.name || n.node.slice(0, 8)" :photo="n.card ? state.contacts[n.card.id]?.avatar : ''" :size="40" />
+        <span class="grow"><span class="label">{{ n.card?.name || n.node.slice(0, 8) }}</span><br />
           <span v-for="c in chips(n)" :key="c.name" class="chip" :style="{ marginRight: '4px', opacity: c.dim ? 0.55 : 1 }">{{ c.name }}<Check v-if="c.active" :size="12" color="var(--ok)" /></span> <span class="hint">{{ n.kbps }} kbps</span></span>
-        <Check v-if="isContact(n.card.id)" :size="22" color="var(--ok)" :aria-label="t('inContacts')" />
+        <span v-if="!n.card" class="hint">{{ t('waitingCard') }}</span>
+        <Check v-else-if="isContact(n.card.id)" :size="22" color="var(--ok)" :aria-label="t('inContacts')" />
         <button v-else-if="request(n.card.id) === 'in'" class="btn sm" @click="accept(n.card.id)">{{ t('accept') }}</button>
         <span v-else-if="request(n.card.id) === 'out' && !state.contacts[n.card.id].inviteFailed" class="chip">{{ t('invited') }}</span>
-        <button v-else class="btn sm" @click="add(nearbyPerson(n))">{{ request(n.card.id) ? t('retry') : t('invite') }}</button>
+        <button v-else-if="n.card" class="btn sm" @click="add(nearbyPerson(n))">{{ request(n.card.id) ? t('retry') : t('invite') }}</button>
       </div>
     </div>
 

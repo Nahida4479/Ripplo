@@ -30,7 +30,6 @@ const linkLabel = l => (String(l.medium).toLowerCase() === 'ble' && /coded/.test
 const DEV_LOG_RECIPIENT = 'H90HYSP1BQJPRGCF'
 let logTimer = null
 function startLogPress() {
-  if (!state.settings.dev) return
   clearTimeout(logTimer)
   logTimer = setTimeout(sendLogs, 2000)
 }
@@ -225,7 +224,7 @@ const initials = l => l.slice(0, 2).toUpperCase()
 
     <h2 class="section">{{ t('updates') }}</h2>
     <div class="card">
-      <div class="row"><span class="grow label">{{ t('currentVersion') }}</span><span class="val">{{ state.update.current || '–' }}</span></div>
+      <div class="row" role="button" tabindex="0" :title="t('holdToSendLogs')" @pointerdown="startLogPress" @pointerup="cancelLogPress" @pointerleave="cancelLogPress" @pointercancel="cancelLogPress" @contextmenu.prevent><span class="grow label">{{ t('currentVersion') }}</span><span class="val">{{ state.update.current || '–' }}</span></div>
       <div class="row"><span class="grow label">{{ t('latestVersion') }}</span><span class="val">{{ state.update.latest || '–' }}</span></div>
       <div v-if="state.update.error" class="row hint">{{ state.update.error }}</div>
       <div v-if="state.update.progress != null" class="row"><progress class="grow" max="1" :value="state.update.progress" /></div>
@@ -243,7 +242,7 @@ const initials = l => l.slice(0, 2).toUpperCase()
 
     <h2 class="section">{{ t('about') }}</h2>
     <div class="card">
-      <div class="row" role="button" tabindex="0" @click="aboutTap" @pointerdown="startLogPress" @pointerup="cancelLogPress" @pointerleave="cancelLogPress" @pointercancel="cancelLogPress" @contextmenu.prevent><span class="grow"><span class="label">Ripplo</span><br /><span class="hint">{{ t('tagline') }}</span></span><span class="val">{{ state.update.current || '–' }}</span></div>
+      <div class="row" role="button" tabindex="0" @click="aboutTap" @contextmenu.prevent><span class="grow"><span class="label">Ripplo</span><br /><span class="hint">{{ t('tagline') }}</span></span><span class="val">{{ state.update.current || '–' }}</span></div>
       <a class="row" :href="REPO" target="_blank" rel="noopener"><span class="grow label">GitHub</span><ExternalLink :size="18" /></a>
       <div class="row"><span class="grow label">{{ t('license') }}</span><span class="val">AGPL-3.0</span></div>
     </div>
