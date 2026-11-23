@@ -294,6 +294,10 @@ public final class MeshEngine implements Router.Host {
                 return;
             default:
                 if (link.node == null) return;
+                if (p.type == Packet.APP && p.payload.length == 2 && p.payload[0] == (byte) 0xFE) {
+                    for (Transport t : new ArrayList<>(transports)) t.onPeerRequest(p.payload[1]);
+                    return;
+                }
                 if (p.type == Packet.DATA || p.type == Packet.ACK) touchWake();
                 r.onPacket(p, link.node);
         }
@@ -429,6 +433,11 @@ public final class MeshEngine implements Router.Host {
             }
             m.put(medium, System.currentTimeMillis());
         }
+    }
+
+    /** Asks a linked neighbour to start advertising on BLE again (Android stops it while a central is connected). */
+    boolean askPeerAdvertise(String node) {
+        try { return sendApp(node, new byte[]{(byte) 0xFE, 1}); } catch (RuntimeException e) { return false; }
     }
 
     public boolean forceConnect(String node, String spec) {

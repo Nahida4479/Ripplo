@@ -24,6 +24,9 @@ abstract class Transport {
 
     void tickImpl() { }
 
+    /** A linked peer asked this phone for something (1 = start advertising again). */
+    void onPeerRequest(int kind) { }
+
     final synchronized void start() {
         if (running) return;
         try {

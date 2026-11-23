@@ -146,23 +146,43 @@ final class BleTransport extends Transport {
             return false;
         }
         Diag.stage("ble", node, "attempt", coded ? "coded" : "1m");
-        // An explicit request replaces whatever BLE/L2CAP link this node already has, so the chosen PHY is really used.
-        engine.closeLinks(node, "ble");
         forceNode = node;
-        int started = connectHits(coded);
-        if (started == 0) {
-            // Android may have silently stopped delivering scan results: restart the scan and wait a little for a fresh hit.
-            Diag.stage("ble", node, "scanning", "restarting scan, waiting for a " + (coded ? "coded" : "1m") + " hit");
+        // Do not drop a working link until there is something to replace it with.
+        int started = 0;
+        if (!hasHit(coded)) {
+            boolean asked = engine.askPeerAdvertise(node);
+            Diag.stage("ble", node, "scanning", (asked ? "asked the other phone to advertise, " : "") + "restarting scan, waiting for a " + (coded ? "coded" : "1m") + " hit");
             restartScan();
-            long end = System.currentTimeMillis() + 10000;
-            while (started == 0 && System.currentTimeMillis() < end && running) {
+            long end = System.currentTimeMillis() + 12000;
+            while (!hasHit(coded) && System.currentTimeMillis() < end && running) {
                 try { Thread.sleep(500); } catch (InterruptedException e) { break; }
-                started = connectHits(coded);
             }
         }
+        if (hasHit(coded)) {
+            engine.closeLinks(node, "ble");
+            started = connectHits(coded);
+        }
         Diag.i("ble force " + (coded ? "coded" : "1m") + " started=" + started);
-        if (started == 0) Diag.stage("ble", node, "rejected", "no " + (coded ? "coded" : "1m") + " hit in the last 60 s");
+        if (started == 0) Diag.stage("ble", node, "rejected", "no " + (coded ? "coded" : "1m") + " advertising seen from the other phone (is it on the new version, Bluetooth on, in range?)");
         return started > 0;
+    }
+
+    private boolean hasHit(boolean coded) {
+        long now = System.currentTimeMillis();
+        for (Hit h : hits.values()) {
+            boolean isCoded = Build.VERSION.SDK_INT >= 26 && h.phy == BluetoothDevice.PHY_LE_CODED;
+            if (now - h.at <= 20000 && isCoded == coded) return true;
+        }
+        return false;
+    }
+
+    @Override
+    void onPeerRequest(int kind) {
+        if (kind == 1) {
+            Diag.i("peer asked us to advertise");
+            // Wait a moment so the link the peer is about to close does not take the advertising down again.
+            main.postDelayed(this::restartAdvertising, 2500);
+        }
     }
 
     private volatile String forceNode;
