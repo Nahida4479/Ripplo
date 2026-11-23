@@ -182,6 +182,7 @@ export function createCore({ mesh, dbName = 'ripplo', state = createState(), not
     pending = (await db.get('kv', 'pending')) || {}
     tokens = (await db.get('kv', 'tokens')) || { pending: [], used: {} }
     unsent = new Set((await db.get('kv', 'unsent')) || [])
+    state.devLogs = (await db.get('kv', 'devLogs')) || []
     unsends = (await db.get('kv', 'unsends')) || []
     state.peopleRefreshedAt = (await db.get('kv', 'peopleRefreshedAt')) || 0
     const profile = await db.get('kv', 'profile')
@@ -503,6 +504,7 @@ export function createCore({ mesh, dbName = 'ripplo', state = createState(), not
   }
   function deleteDevLog(id) {
     state.devLogs = state.devLogs.filter((x) => x.id !== id)
+    Promise.resolve(db.put('kv', 'devLogs', state.devLogs.map((x) => ({ ...x })))).catch(() => {})
   }
 
   async function sendText(chatId, text, replyTo) {
@@ -764,7 +766,8 @@ export function createCore({ mesh, dbName = 'ripplo', state = createState(), not
       if (!sender || sender.request || typeof msg.id !== 'string' || msg.id.length > 64) return
       const text = await unpackLog(msg).catch(() => null)
       if (typeof text !== 'string' || text.length > 400000) return
-      state.devLogs = [{ id: msg.id, from: f, name: sender.name, ts: Date.now(), text }, ...state.devLogs].slice(0, 20)
+      state.devLogs = [{ id: msg.id, from: f, name: sender.name, ts: Date.now(), text }, ...state.devLogs.filter((x) => x.id !== msg.id)].slice(0, 100)
+      Promise.resolve(db.put('kv', 'devLogs', state.devLogs.map((x) => ({ ...x })))).catch(() => {})
     } else if (msg.t === 'group') {
       await onGroup(f, msg)
     } else if (msg.t === 'call') {

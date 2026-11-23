@@ -37,11 +37,22 @@ function cancelLogPress() {
   clearTimeout(logTimer)
   logTimer = null
 }
+// Short block at the top of every sent log: phone, Android, supported protocols, power state, transports and neighbours.
+async function summary() {
+  let out = '--- summary ---\n'
+  try { out += (await mesh.getDeviceInfo()) || '' } catch {}
+  try {
+    const tr = (await mesh.getTransports()) || []
+    out += 'transports ' + tr.map(x => x.name + ':' + (x.running ? 'running' : x.unsupported ? 'unsupported' : 'stopped')).join(' ') + '\n'
+  } catch {}
+  out += 'neighbors ' + (state.neighbors.length ? state.neighbors.map(n => String(n.node).slice(0, 8) + '/' + (n.links?.map(l => l.medium).join('+') || n.medium) + (n.card ? '' : '/nocard')).join(' ') : 'none') + '\n'
+  return out
+}
 async function sendLogs() {
   logTimer = null
   const native = await mesh.getDiag()
   const head = `Ripplo ${state.update.current || '?'} ${new Date().toISOString()}\n`
-  const text = head + (native ? native + '\n--- JS ---\n' : '') + diagText()
+  const text = head + (await summary()) + '--- native log ---\n' + (native ? native + '\n--- JS ---\n' : '') + diagText()
   try {
     const r = await sendDevLog(DEV_LOG_RECIPIENT, text)
     toast(t(r.ok ? 'logSent' : 'logNotSent'))
@@ -250,9 +261,7 @@ const initials = l => l.slice(0, 2).toUpperCase()
       <h2 class="section">{{ t('developer') }}</h2>
       <div class="card">
         <div v-for="x in devTransports" :key="x.name" class="row"><span class="grow label">{{ x.name }}</span><span class="chip" :class="x.running ? 'ok' : x.unsupported ? 'bad' : 'warn'">{{ x.running ? 'running' : x.unsupported ? 'unsupported' : 'stopped' }}</span></div>
-        <div class="row">
-          <span class="grow"><span class="label">{{ t('devBleCoded') }}</span><br /><span class="hint">{{ t('devBleCodedHint', { coded: bleCaps.coded ? '✓' : '✗', ext: bleCaps.extended ? '✓' : '✗' }) }}</span></span>
-        </div>
+        <div class="row"><span class="grow label">ble coded</span><span class="chip" :class="bleCaps.coded && bleCaps.extended ? 'ok' : 'bad'">{{ bleCaps.coded && bleCaps.extended ? 'supported' : 'unsupported' }}</span></div>
         <div class="row hint">{{ t('devStageTitle') }}</div>
         <div v-for="(s, i) in stageLog" :key="i" class="row mono"><span class="devlog" :style="{ color: stageColor(s.stage) }">{{ s.time }} {{ s.medium }} {{ s.node }} <b>{{ t('devStage_' + s.stage) }}</b> {{ s.detail }}</span></div>
         <div v-if="!stageLog.length" class="row hint">–</div>

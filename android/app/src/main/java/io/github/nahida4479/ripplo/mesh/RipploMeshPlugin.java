@@ -414,6 +414,47 @@ public class RipploMeshPlugin extends Plugin implements MeshEngine.Listener {
     }
 
     @PluginMethod
+    public void getDeviceInfo(PluginCall call) {
+        Context c = getContext();
+        StringBuilder b = new StringBuilder();
+        b.append("device ").append(Build.MANUFACTURER).append(' ').append(Build.BRAND).append(' ').append(Build.MODEL).append(" (").append(Build.DEVICE).append(")\n");
+        b.append("android ").append(Build.VERSION.RELEASE).append(" sdk ").append(Build.VERSION.SDK_INT);
+        if (Build.VERSION.SDK_INT >= 23) b.append(" patch ").append(Build.VERSION.SECURITY_PATCH);
+        b.append('\n');
+        android.content.pm.PackageManager pm = c.getPackageManager();
+        try {
+            android.bluetooth.BluetoothManager bm = (android.bluetooth.BluetoothManager) c.getSystemService(Context.BLUETOOTH_SERVICE);
+            android.bluetooth.BluetoothAdapter a = bm == null ? null : bm.getAdapter();
+            b.append("ble ").append(pm.hasSystemFeature(android.content.pm.PackageManager.FEATURE_BLUETOOTH_LE))
+                    .append(" bt-on ").append(a != null && a.isEnabled());
+            if (a != null && Build.VERSION.SDK_INT >= 26) {
+                b.append(" coded ").append(a.isLeCodedPhySupported()).append(" ext-adv ").append(a.isLeExtendedAdvertisingSupported())
+                        .append(" 2m ").append(a.isLe2MPhySupported()).append(" periodic ").append(a.isLePeriodicAdvertisingSupported());
+            }
+            b.append(" l2cap ").append(Build.VERSION.SDK_INT >= 29).append('\n');
+        } catch (RuntimeException e) { b.append("ble info error ").append(e).append('\n'); }
+        b.append("wifi-aware ").append(pm.hasSystemFeature("android.hardware.wifi.aware"))
+                .append(" wifi-direct ").append(pm.hasSystemFeature("android.hardware.wifi.direct"))
+                .append(" wifi ").append(pm.hasSystemFeature("android.hardware.wifi")).append('\n');
+        try {
+            android.os.PowerManager pw = (android.os.PowerManager) c.getSystemService(Context.POWER_SERVICE);
+            b.append("battery-optimization-ignored ").append(Build.VERSION.SDK_INT >= 23 && pw.isIgnoringBatteryOptimizations(c.getPackageName()))
+                    .append(" power-save ").append(pw.isPowerSaveMode())
+                    .append(" idle ").append(Build.VERSION.SDK_INT >= 23 && pw.isDeviceIdleMode());
+            if (Build.VERSION.SDK_INT >= 28) {
+                android.app.ActivityManager am = (android.app.ActivityManager) c.getSystemService(Context.ACTIVITY_SERVICE);
+                b.append(" bg-restricted ").append(am.isBackgroundRestricted());
+                android.app.usage.UsageStatsManager us = (android.app.usage.UsageStatsManager) c.getSystemService(Context.USAGE_STATS_SERVICE);
+                if (us != null) b.append(" standby-bucket ").append(us.getAppStandbyBucket());
+            }
+            b.append('\n');
+        } catch (RuntimeException e) { b.append("power info error ").append(e).append('\n'); }
+        JSObject r = new JSObject();
+        r.put("text", b.toString());
+        call.resolve(r);
+    }
+
+    @PluginMethod
     public void getBleCaps(PluginCall call) {
         boolean coded = false;
         boolean ext = false;

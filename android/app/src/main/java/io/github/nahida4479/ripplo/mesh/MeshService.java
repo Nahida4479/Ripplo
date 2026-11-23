@@ -24,12 +24,15 @@ public class MeshService extends Service {
         try {
             ServiceCompat.startForeground(this, Notifier.ID_RELAY, Notifier.relay(this), ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE);
         } catch (RuntimeException e) {
+            Diag.w("service foreground start refused: " + e);
             stopSelf();
             return START_NOT_STICKY;
         }
         active = true;
+        Diag.i("service started engineRunning=" + MeshEngine.get(this).isRunning());
         MeshEngine engine = MeshEngine.get(this);
         if (!engine.isRunning() && !engine.resumeFromPrefs()) {
+            Diag.w("service stopped: engine could not resume (no saved identity or background off)");
             stopSelf();
             return START_NOT_STICKY;
         }
@@ -47,6 +50,7 @@ public class MeshService extends Service {
 
     @Override
     public void onDestroy() {
+        Diag.w("service destroyed");
         active = false;
         super.onDestroy();
     }
