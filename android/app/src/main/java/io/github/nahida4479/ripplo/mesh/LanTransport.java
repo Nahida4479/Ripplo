@@ -217,7 +217,7 @@ final class LanTransport extends Transport {
                 if (force) Diag.stage("lan", p.tag, "connecting", key);
                 s.connect(new InetSocketAddress(p.host, p.port), 5000);
                 open(s, true);
-                if (force) Diag.stage("lan", p.tag, "connected", key);
+                if (force) Diag.stage("lan", p.tag, "linked", "link ready " + key);
                 p.fails = 0;
             } catch (Exception e) {
                 if (force) Diag.stage("lan", p.tag, "failed", e.getClass().getSimpleName() + " " + e.getMessage());

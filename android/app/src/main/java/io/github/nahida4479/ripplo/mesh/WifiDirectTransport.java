@@ -77,8 +77,14 @@ final class WifiDirectTransport extends Transport {
     @SuppressWarnings("MissingPermission")
     private void discover() {
         manager.discoverPeers(channel, new WifiP2pManager.ActionListener() {
-            @Override public void onSuccess() { log("discover ok"); }
-            @Override public void onFailure(int reason) { log("discover failed reason=" + reason); }
+            @Override public void onSuccess() {
+                log("discover ok");
+                Diag.stage("wifi-direct", "", "started", "discovery running");
+            }
+            @Override public void onFailure(int reason) {
+                log("discover failed reason=" + reason);
+                Diag.stage("wifi-direct", "", "failed", "discovery reason=" + reason);
+            }
         });
         manager.discoverServices(channel, null);
     }

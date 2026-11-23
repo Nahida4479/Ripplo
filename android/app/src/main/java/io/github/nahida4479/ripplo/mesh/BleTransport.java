@@ -244,11 +244,16 @@ final class BleTransport extends Transport {
                     .build();
             codedAdvCb = new AdvertisingSetCallback() {
                 @Override
-                public void onAdvertisingSetStarted(AdvertisingSet set, int txPower, int status) { Diag.i("ble coded advertising status=" + status); }
+                public void onAdvertisingSetStarted(AdvertisingSet set, int txPower, int status) {
+                    Diag.i("ble coded advertising status=" + status);
+                    if (status == AdvertisingSetCallback.ADVERTISE_SUCCESS) Diag.stage("ble", "", "started", "advertising coded");
+                    else Diag.stage("ble", "", "failed", "coded advertise status=" + status);
+                }
             };
             advertiser.startAdvertisingSet(p, d, null, null, null, codedAdvCb);
         } catch (Exception e) {
             Diag.w("ble coded advertise failed " + e);
+            Diag.stage("ble", "", "failed", "coded advertise: " + e.getClass().getSimpleName());
         }
     }
 
@@ -260,19 +265,29 @@ final class BleTransport extends Transport {
         if (codedOn()) sb.setLegacy(false).setPhy(ScanSettings.PHY_LE_ALL_SUPPORTED);
         ScanSettings s = sb.build();
         scanner.startScan(Collections.singletonList(f), s, scanCb);
+        Diag.stage("ble", "", "started", codedOn() ? "scanning 1M + coded" : "scanning 1M");
     }
 
     private final AdvertiseCallback advCb = new AdvertiseCallback() {
         @Override
-        public void onStartSuccess(AdvertiseSettings settingsInEffect) { Diag.i("ble advertising"); }
+        public void onStartSuccess(AdvertiseSettings settingsInEffect) {
+            Diag.i("ble advertising");
+            Diag.stage("ble", "", "started", "advertising 1M");
+        }
 
         @Override
-        public void onStartFailure(int errorCode) { Diag.w("ble advertise failed " + errorCode); }
+        public void onStartFailure(int errorCode) {
+            Diag.w("ble advertise failed " + errorCode);
+            Diag.stage("ble", "", "failed", "advertise errorCode=" + errorCode);
+        }
     };
 
     private final ScanCallback scanCb = new ScanCallback() {
         @Override
-        public void onScanFailed(int errorCode) { Diag.w("ble scan failed " + errorCode); }
+        public void onScanFailed(int errorCode) {
+            Diag.w("ble scan failed " + errorCode);
+            Diag.stage("ble", "", "failed", "scan errorCode=" + errorCode);
+        }
 
         @Override
         public void onScanResult(int callbackType, ScanResult result) {
