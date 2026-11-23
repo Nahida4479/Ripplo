@@ -89,7 +89,7 @@ const bleCaps = ref({ coded: false, extended: false })
 const stageLog = ref([])
 const stageTime = at => new Date(at).toLocaleTimeString([], { hour12: false })
 const offStage = mesh.on('devStage', e => {
-  stageLog.value = [{ ...e, time: stageTime(e.at) }, ...stageLog.value].slice(0, 40)
+  stageLog.value = [{ ...e, time: stageTime(e.at) }, ...stageLog.value].slice(0, 100)
 })
 onUnmounted(() => offStage())
 const STAGE_COLOR = { started: 'var(--ok)', linked: 'var(--ok)', connected: 'var(--ok)', closed: 'var(--warn)', timeout: 'var(--warn)', failed: 'var(--danger)', rejected: 'var(--danger)' }
@@ -267,7 +267,9 @@ const initials = l => l.slice(0, 2).toUpperCase()
         <div v-for="x in devTransports" :key="x.name" class="row"><span class="grow label">{{ x.name }}</span><span class="chip" :class="x.running ? 'ok' : x.unsupported ? 'bad' : 'warn'">{{ x.running ? 'running' : x.unsupported ? 'unsupported' : 'stopped' }}</span></div>
         <div class="row"><span class="grow label">ble coded</span><span class="chip" :class="bleCaps.coded && bleCaps.extended ? 'ok' : 'bad'">{{ bleCaps.coded && bleCaps.extended ? 'supported' : 'unsupported' }}</span></div>
         <div class="row hint">{{ t('devStageTitle') }}</div>
-        <div v-for="(s, i) in stageLog" :key="i" class="row mono"><span class="devlog" :style="{ color: stageColor(s.stage) }">{{ s.time }} {{ s.medium }} {{ s.node }} <b>{{ t('devStage_' + s.stage) }}</b> {{ s.detail }}</span></div>
+        <div v-if="stageLog.length" class="stagebox">
+          <div v-for="(s, i) in stageLog" :key="i" class="row mono"><span class="devlog" :style="{ color: stageColor(s.stage) }">{{ s.time }} {{ s.medium }} {{ s.node }} <b>{{ t('devStage_' + s.stage) }}</b> {{ s.detail }}</span></div>
+        </div>
         <div v-if="!stageLog.length" class="row hint">–</div>
         <div class="row hint">{{ t('devLogsTitle') }} ({{ state.devLogs.length }})</div>
         <div v-for="l in state.devLogs" :key="l.id" class="row forcerow">
@@ -317,6 +319,7 @@ const initials = l => l.slice(0, 2).toUpperCase()
 .netinfo .hint { white-space: pre-wrap; overflow-wrap: anywhere; user-select: text; }
 .forcerow { flex-wrap: wrap; }
 .forcerow select { width: auto; flex: 1; min-width: 120px; }
+.stagebox { max-height: 340px; overflow-y: auto; overscroll-behavior: contain; }
 .devlog { max-height: 280px; overflow: auto; font-size: 11px; display: block; width: 100%; }
 .contrib { display: flex; align-items: center; gap: 12px; }
 .contrib img, .ini { width: 44px; height: 44px; border-radius: 50%; flex: none; }
