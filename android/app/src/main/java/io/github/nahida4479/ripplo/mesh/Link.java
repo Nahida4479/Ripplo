@@ -17,6 +17,8 @@ abstract class Link {
     volatile String note = "";
     /** Peer tag from the hello, also kept for links the engine closes as duplicates (node stays null for those). */
     volatile String helloTag = null;
+    /** Called once with the peer tag when its hello arrives. */
+    volatile java.util.function.Consumer<String> helloHook;
     volatile long kbps;
     volatile long rttMs;
     volatile long lastRx = System.nanoTime();

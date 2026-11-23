@@ -62,31 +62,66 @@ final class WifiDirectTransport extends Transport {
         Map<String, String> txt = new HashMap<>();
         txt.put("nt", engine.nodeTag());
         localService = WifiP2pDnsSdServiceInfo.newInstance("ripplo-" + engine.nodeTag().substring(0, 8), "_ripplo._tcp", txt);
-        manager.addLocalService(channel, localService, null);
-
         manager.setDnsSdResponseListeners(channel, (name, type, dev) -> { },
                 (domain, record, dev) -> {
                     String tag = record == null ? null : record.get("nt");
                     if (tag != null) onPeer(tag, dev);
                 });
         request = WifiP2pDnsSdServiceRequest.newInstance();
-        manager.addServiceRequest(channel, request, null);
-        discover();
+        // Steps run one after another: the system answers BUSY (reason 2) when a call starts while the previous one is still running.
+        manager.clearLocalServices(channel, null);
+        manager.clearServiceRequests(channel, null);
+        step(() -> { if (manager != null) manager.addLocalService(channel, localService, stepListener("add local service")); });
+    }
+
+    private int busyRetries;
+
+    private void step(Runnable r) { new android.os.Handler(Looper.getMainLooper()).postDelayed(r, 400); }
+
+    private WifiP2pManager.ActionListener stepListener(final String what) {
+        return new WifiP2pManager.ActionListener() {
+            @Override public void onSuccess() {
+                Diag.stage("wifi-direct", "", "started", what + " ok");
+                if (what.equals("add local service")) step(() -> { if (manager != null) manager.addServiceRequest(channel, request, stepListener("add service request")); });
+                else if (what.equals("add service request")) step(() -> discover());
+            }
+            @Override public void onFailure(int reason) {
+                Diag.stage("wifi-direct", "", "failed", what + " reason=" + reason + reasonText(reason));
+                // Keep going: the other steps may still work, and the periodic discovery retries.
+                if (what.equals("add local service")) step(() -> { if (manager != null) manager.addServiceRequest(channel, request, stepListener("add service request")); });
+                else step(() -> discover());
+            }
+        };
+    }
+
+    private static String reasonText(int r) {
+        return r == 2 ? " (busy)" : r == 1 ? " (not supported)" : r == 0 ? " (internal error)" : r == 3 ? " (no service requests)" : "";
     }
 
     @SuppressWarnings("MissingPermission")
     private void discover() {
-        manager.discoverPeers(channel, new WifiP2pManager.ActionListener() {
+        final WifiP2pManager m = manager;
+        if (m == null || channel == null) return;
+        lastDiscover = System.currentTimeMillis();
+        m.discoverPeers(channel, new WifiP2pManager.ActionListener() {
             @Override public void onSuccess() {
+                busyRetries = 0;
                 log("discover ok");
                 Diag.stage("wifi-direct", "", "started", "discovery running");
+                step(() -> { if (manager != null) manager.discoverServices(channel, new WifiP2pManager.ActionListener() {
+                    @Override public void onSuccess() { Diag.stage("wifi-direct", "", "started", "service discovery running"); }
+                    @Override public void onFailure(int reason) { Diag.stage("wifi-direct", "", "failed", "service discovery reason=" + reason + reasonText(reason)); }
+                }); });
             }
             @Override public void onFailure(int reason) {
                 log("discover failed reason=" + reason);
-                Diag.stage("wifi-direct", "", "failed", "discovery reason=" + reason);
+                Diag.stage("wifi-direct", "", "failed", "discovery reason=" + reason + reasonText(reason));
+                if (reason == WifiP2pManager.BUSY && ++busyRetries <= 5) {
+                    try { m.stopPeerDiscovery(channel, null); } catch (Exception ignored) { }
+                    new android.os.Handler(Looper.getMainLooper()).postDelayed(() -> discover(), 3000L * busyRetries);
+                }
             }
         });
-        manager.discoverServices(channel, null);
     }
 
     @SuppressWarnings("MissingPermission")

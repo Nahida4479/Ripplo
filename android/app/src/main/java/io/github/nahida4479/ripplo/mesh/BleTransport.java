@@ -186,7 +186,8 @@ final class BleTransport extends Transport {
         long now = System.currentTimeMillis();
         // Android stops connectable advertising once a central connects and does not resume it, and it can
         // silently stop scan delivery. Without this the phone stops being seen until Bluetooth is toggled.
-        if (server != null && serverLinks.isEmpty() && now - lastAdvStart > 120000) restartAdvertising();
+        // A restart gives this phone a new random address, which makes peers dial it again, so only do it when nobody is linked.
+        if (server != null && serverLinks.isEmpty() && engine.neighbors().isEmpty() && now - lastAdvStart > 120000) restartAdvertising();
         if (now - lastScanStart > 300000 || (now - lastHit() > 90000 && now - lastScanStart > 30000)) restartScan();
     }
 
@@ -224,11 +225,17 @@ final class BleTransport extends Transport {
         t.start();
     }
 
-    private void openSocket(BluetoothSocket s, boolean outbound) throws IOException {
+    private StreamLink openSocket(BluetoothSocket s, boolean outbound) throws IOException {
         StreamLink l = new StreamLink(engine, "l2cap", outbound, s.getInputStream(), s.getOutputStream(), s);
         int mtu = Build.VERSION.SDK_INT >= 23 ? s.getMaxTransmitPacketSize() : 0;
         l.chunk = mtu > 0 ? mtu : 672;
+        if (outbound) {
+            final String addr = s.getRemoteDevice().getAddress();
+            // Remember which node this BLE address belongs to, so later scan hits for it are not dialled again.
+            l.helloHook = tag -> addrNode.put(addr, tag);
+        }
         l.open();
+        return l;
     }
 
     private void connectL2cap(final BluetoothDevice dev, final int psm) {
@@ -380,7 +387,6 @@ final class BleTransport extends Transport {
                 mtus.remove(a);
                 ServerLink l = serverLinks.remove(a);
                 if (l != null) l.close();
-                main.postDelayed(BleTransport.this::restartAdvertising, 1000);
             }
         }
 

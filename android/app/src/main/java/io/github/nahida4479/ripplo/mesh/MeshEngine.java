@@ -302,6 +302,8 @@ public final class MeshEngine implements Router.Host {
     private void onHello(Link link, String tag) {
         if (link.node != null) return;
         link.helloTag = tag;
+        java.util.function.Consumer<String> hook = link.helloHook;
+        if (hook != null) hook.accept(tag);
         if (tag.equals(nodeTag)) { link.close(); return; }
         List<Link> toClose = new ArrayList<>();
         boolean loser = false;
