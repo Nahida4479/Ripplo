@@ -27,7 +27,8 @@ const fileIn = ref(null)
 const route = computed(() => {
   // Match by card id or by the contact's node id, so a neighbour without a card yet still counts.
   const node = nodeOf(id)
-  const n = state.neighbors.find(x => x.card?.id === id || (node && x.node === node))
+  const known = state.contacts[id]?.node
+  const n = state.neighbors.find(x => x.card?.id === id || (node && x.node === node) || (known && x.node === known))
   if (n) return String(n.medium).toUpperCase()
   // Not a direct neighbour, but reachable over relays: show the hop count from recent discovery.
   const p = state.people.find(x => x.id === id)

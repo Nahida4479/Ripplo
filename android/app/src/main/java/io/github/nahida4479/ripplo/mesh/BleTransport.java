@@ -66,6 +66,10 @@ final class BleTransport extends Transport {
     private final Map<String, String> addrNode = new ConcurrentHashMap<>();
     private final Map<String, Hit> hits = new ConcurrentHashMap<>();
     private AdvertisingSetCallback codedAdvCb;
+    private volatile long lastHitAt;
+    private volatile long lastScanStart;
+    private volatile long lastAdvStart;
+    private int tickN;
 
     private static final class Hit {
         final BluetoothDevice device;
@@ -142,6 +146,23 @@ final class BleTransport extends Transport {
             return false;
         }
         Diag.stage("ble", node, "attempt", coded ? "coded" : "1m");
+        int started = connectHits(coded);
+        if (started == 0) {
+            // Android may have silently stopped delivering scan results: restart the scan and wait a little for a fresh hit.
+            Diag.stage("ble", node, "scanning", "restarting scan, waiting for a " + (coded ? "coded" : "1m") + " hit");
+            restartScan();
+            long end = System.currentTimeMillis() + 10000;
+            while (started == 0 && System.currentTimeMillis() < end && running) {
+                try { Thread.sleep(500); } catch (InterruptedException e) { break; }
+                started = connectHits(coded);
+            }
+        }
+        Diag.i("ble force " + (coded ? "coded" : "1m") + " started=" + started);
+        if (started == 0) Diag.stage("ble", node, "rejected", "no " + (coded ? "coded" : "1m") + " hit in the last 60 s");
+        return started > 0;
+    }
+
+    private int connectHits(boolean coded) {
         long now = System.currentTimeMillis();
         int started = 0;
         for (Hit h : new ArrayList<>(hits.values())) {
@@ -155,9 +176,34 @@ final class BleTransport extends Transport {
             new ClientLink(h.device, mask(coded)).connect();
             started++;
         }
-        Diag.i("ble force " + (coded ? "coded" : "1m") + " started=" + started);
-        if (started == 0) Diag.stage("ble", node, "rejected", "no " + (coded ? "coded" : "1m") + " hit in the last 60 s");
-        return started > 0;
+        return started;
+    }
+
+    @Override
+    void tickImpl() {
+        if (adapter == null || !adapter.isEnabled()) return;
+        tickN++;
+        long now = System.currentTimeMillis();
+        // Android stops connectable advertising once a central connects and does not resume it, and it can
+        // silently stop scan delivery. Without this the phone stops being seen until Bluetooth is toggled.
+        if (server != null && serverLinks.isEmpty() && now - lastAdvStart > 120000) restartAdvertising();
+        if (now - lastScanStart > 300000 || (now - lastHit() > 90000 && now - lastScanStart > 30000)) restartScan();
+    }
+
+    private long lastHit() { return lastHitAt == 0 ? lastScanStart : lastHitAt; }
+
+    private void restartAdvertising() {
+        if (!running || server == null) return;
+        try { if (advertiser != null) advertiser.stopAdvertising(advCb); } catch (Exception ignored) { }
+        try { if (advertiser != null && codedAdvCb != null) advertiser.stopAdvertisingSet(codedAdvCb); } catch (Exception ignored) { }
+        codedAdvCb = null;
+        try { startAdvertise(); } catch (Exception e) { Diag.w("ble re-advertise failed " + e); }
+    }
+
+    private void restartScan() {
+        if (!running || adapter == null) return;
+        try { if (scanner != null) scanner.stopScan(scanCb); } catch (Exception ignored) { }
+        try { startScan(); } catch (Exception e) { Diag.w("ble re-scan failed " + e); }
     }
 
     private void startL2capServer() throws IOException {
@@ -217,6 +263,7 @@ final class BleTransport extends Transport {
     }
 
     private void startAdvertise() {
+        lastAdvStart = System.currentTimeMillis();
         advertiser = adapter.getBluetoothLeAdvertiser();
         if (advertiser == null) return;
         AdvertiseSettings s = new AdvertiseSettings.Builder()
@@ -260,6 +307,7 @@ final class BleTransport extends Transport {
     }
 
     private void startScan() {
+        lastScanStart = System.currentTimeMillis();
         scanner = adapter.getBluetoothLeScanner();
         if (scanner == null) return;
         ScanFilter f = new ScanFilter.Builder().setServiceUuid(new ParcelUuid(SERVICE)).build();
@@ -299,6 +347,7 @@ final class BleTransport extends Transport {
             boolean coded = Build.VERSION.SDK_INT >= 26 && phy == BluetoothDevice.PHY_LE_CODED;
             Diag.i("ble scan hit " + a + (coded ? " coded" : ""));
             long now = System.currentTimeMillis();
+            lastHitAt = now;
             hits.put(a + (coded ? "/c" : "/1"), new Hit(d, phy, now));
             if (coded) {
                 Hit oneM = hits.get(a + "/1");
@@ -331,6 +380,7 @@ final class BleTransport extends Transport {
                 mtus.remove(a);
                 ServerLink l = serverLinks.remove(a);
                 if (l != null) l.close();
+                main.postDelayed(BleTransport.this::restartAdvertising, 1000);
             }
         }
 
