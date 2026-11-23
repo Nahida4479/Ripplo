@@ -6,6 +6,7 @@ import { state } from '../core/state.js'
 import { startCall, sendTyping, unsendMessage, loadMessages, markRead, sendText, sendAttachment, retry, verifyNearby, markVerified, nodeOf, MAX_TEXT, MAX_FILE } from '../core/api.js'
 import { ui, toast } from '../components/ui.js'
 import { t, locale } from '../i18n.js'
+import { refreshRange } from '../services/rangeRefresh.js'
 import Avatar from '../components/Avatar.vue'
 
 const id = useRoute().params.id
@@ -32,6 +33,8 @@ const route = computed(() => {
   const p = state.people.find(x => x.id === id)
   return p && Date.now() - p.seenAt < 10 * 60e3 ? t('hops', { n: p.hops }) : null
 })
+// Refresh the range shown in the header as soon as the chat opens (rate-limited in rangeRefresh.js).
+onMounted(() => { refreshRange() })
 const sub = computed(() => {
   if (isGroup.value) return t('members', { n: chat.value.members?.length || 0 })
   const ok = contact.value && contact.value.verification !== 'none'
