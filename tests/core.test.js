@@ -543,7 +543,7 @@ describe('people search and the 20 person cap', () => {
     expect(hops).toEqual([...hops].sort((x, y) => x - y))
   }, 20000)
 
-  it('finds a person by exact name or id, case-insensitively, and never sends the name in clear', async () => {
+  it('finds a person by exact username only (not by id), case-insensitively, and never sends the name in clear', async () => {
     const a = await user('Alice'), b = await user('Bob Builder'), c = await user('Carol')
     const sent = []
     const send = a.mesh.send
@@ -553,6 +553,8 @@ describe('people search and the 20 person cap', () => {
     expect(a.state.peopleQuery).toBe('bob   BUILDER')
     expect(sent.join('')).not.toMatch(/bob/i)
     await a.core.searchPeople(c.id.replace(/(.{4})/g, '$1-').slice(0, -1))
+    expect(a.state.people).toHaveLength(0)
+    await a.core.searchPeople('carol')
     expect(a.state.people.map((p) => p.id)).toEqual([c.id])
     await a.core.searchPeople('Bo')
     expect(a.state.people).toHaveLength(0)
