@@ -45,6 +45,8 @@ const q = ref('')
 const find = () => searchPeople(q.value)
 const clear = () => { q.value = ''; searchPeople('') }
 const accept = async id => { try { await acceptRequest(id) } catch (e) { toast(e.message) } }
+// Name shown for a nearby phone: its card, else a saved contact that last used this node, else a neutral label (never the raw code).
+const nameOf = n => n.card?.name || Object.values(state.contacts).find(c => c.node && c.node === n.node && !c.request)?.name || t('unknownPerson')
 const nearbyPerson = n => ({ id: n.card.id, name: n.card.name, card: n.card.card, hops: 0 })
 </script>
 <template>
@@ -70,8 +72,8 @@ const nearbyPerson = n => ({ id: n.card.id, name: n.card.name, card: n.card.card
     <div class="card">
       <div v-if="!nearby.length" class="empty">{{ t('nobodyNearby') }}</div>
       <div v-for="n in nearby" :key="n.node" class="row">
-        <Avatar :name="n.card?.name || n.node.slice(0, 8)" :photo="n.card ? state.contacts[n.card.id]?.avatar : ''" :size="40" />
-        <span class="grow"><span class="label">{{ n.card?.name || n.node.slice(0, 8) }}</span><br />
+        <Avatar :name="nameOf(n)" :photo="n.card ? state.contacts[n.card.id]?.avatar : ''" :size="40" />
+        <span class="grow"><span class="label">{{ nameOf(n) }}</span><br />
           <span v-for="c in chips(n)" :key="c.name" class="chip" :style="{ marginRight: '4px', opacity: c.dim ? 0.55 : 1 }">{{ c.name }}<Check v-if="c.active" :size="12" color="var(--ok)" /></span> <span class="hint">{{ n.kbps }} kbps</span></span>
         <span v-if="!n.card" class="hint">{{ t('waitingCard') }}</span>
         <Check v-else-if="isContact(n.card.id)" :size="22" color="var(--ok)" :aria-label="t('inContacts')" />

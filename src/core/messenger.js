@@ -1194,11 +1194,9 @@ export function createCore({ mesh, dbName = 'ripplo', state = createState(), not
   }
 
   const normName = (s) => String(s).normalize('NFKC').toLowerCase().replace(/\s+/g, ' ').trim()
-  const normId = (s) => String(s).toUpperCase().replace(/[^0-9A-Z]/g, '')
-  const idLike = (s) => ID_RE.test(normId(s))
   const findHash = (norm) => b64url(sha256(utf8('ripplo-find-v1\0' + norm)).subarray(0, 8))
-  const findKey = (text) => findHash(idLike(text) ? normId(text) : normName(text))
-  const matchesQuery = (text, name, id) => (idLike(text) ? normId(id) === normId(text) : normName(name) === normName(text))
+  const findKey = (text) => findHash(normName(text))
+  const matchesQuery = (text, name) => normName(name) === normName(text)
 
   function discoverRound({ payload, timeout, quiet }) {
     return new Promise((resolve) => {
@@ -1274,7 +1272,7 @@ export function createCore({ mesh, dbName = 'ripplo', state = createState(), not
     let v
     try { v = checkCard(p.payload) } catch { return }
     if (v.id === me.id) return
-    if (searchText && !matchesQuery(searchText, v.name, v.id)) return
+    if (searchText && !matchesQuery(searchText, v.name)) return
     markConflicts(v.name, v.id)
     const person = { id: v.id, name: v.name, card: b64(v.card), hops: p.hops, seenAt: Date.now(), isContact: !!state.contacts[v.id] }
     const limit = searchText ? MAX_SEARCH : MAX_SCAN
@@ -1301,7 +1299,7 @@ export function createCore({ mesh, dbName = 'ripplo', state = createState(), not
     const d = (p.hops || 0) + 1
     if (Number.isFinite(q.h) && d > q.h) return
     if (Number.isFinite(q.lo) && d <= q.lo) return
-    if (q.q !== undefined && ![findHash(normName(me.name)), findHash(normId(me.id))].includes(q.q)) return
+    if (q.q !== undefined && q.q !== findHash(normName(me.name))) return
     mesh.send(encodePacket({ type: TYPE.REPLY, dest: p.id, payload: me.card })).catch(() => {})
   }
 
