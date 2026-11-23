@@ -152,10 +152,15 @@ final class BleTransport extends Transport {
         if (!hasHit(coded)) {
             boolean asked = engine.askPeerAdvertise(node);
             Diag.stage("ble", node, "scanning", (asked ? "asked the other phone to advertise, " : "") + "restarting scan, waiting for a " + (coded ? "coded" : "1m") + " hit");
+            boostCoded = coded;
             restartScan();
-            long end = System.currentTimeMillis() + 12000;
+            long end = System.currentTimeMillis() + 15000;
             while (!hasHit(coded) && System.currentTimeMillis() < end && running) {
                 try { Thread.sleep(500); } catch (InterruptedException e) { break; }
+            }
+            if (coded) {
+                // Back to the normal scan (1M + coded) shortly after, so connections are not delayed by the narrow scan.
+                main.postDelayed(() -> { boostCoded = false; restartScan(); }, 3000);
             }
         }
         if (hasHit(coded)) {
@@ -350,13 +355,18 @@ final class BleTransport extends Transport {
         }
     }
 
+    private volatile boolean boostCoded;
+
     private void startScan() {
         lastScanStart = System.currentTimeMillis();
         scanner = adapter.getBluetoothLeScanner();
         if (scanner == null) return;
         ScanFilter f = new ScanFilter.Builder().setServiceUuid(new ParcelUuid(SERVICE)).build();
-        ScanSettings.Builder sb = new ScanSettings.Builder().setScanMode(ScanSettings.SCAN_MODE_BALANCED);
-        if (codedOn()) sb.setLegacy(false).setPhy(ScanSettings.PHY_LE_ALL_SUPPORTED);
+        // While a coded connection is forced, scan only the Coded PHY at full duty: scanning every PHY at balanced duty
+        // can miss the slow coded advertising for a long time.
+        boolean boost = boostCoded && codedOn();
+        ScanSettings.Builder sb = new ScanSettings.Builder().setScanMode(boost ? ScanSettings.SCAN_MODE_LOW_LATENCY : ScanSettings.SCAN_MODE_BALANCED);
+        if (codedOn()) sb.setLegacy(false).setPhy(boost ? BluetoothDevice.PHY_LE_CODED : ScanSettings.PHY_LE_ALL_SUPPORTED);
         ScanSettings s = sb.build();
         scanner.startScan(Collections.singletonList(f), s, scanCb);
         Diag.stage("ble", "", "started", codedOn() ? "scanning 1M + coded" : "scanning 1M");
