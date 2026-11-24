@@ -1,0 +1,482 @@
+package io.github.nahida4479.ripplo.mesh
+
+import android.content.Context
+import android.content.Intent
+import android.content.SharedPreferences
+import android.net.wifi.WifiManager
+import android.os.Build
+import android.os.PowerManager
+import java.nio.ByteBuffer
+import java.security.SecureRandom
+import java.util.concurrent.ExecutorService
+import java.util.concurrent.Executors
+import java.util.concurrent.ScheduledExecutorService
+import java.util.concurrent.ScheduledFuture
+import java.util.concurrent.TimeUnit
+import org.json.JSONArray
+import org.json.JSONException
+import org.json.JSONObject
+
+internal class MeshEngine private constructor(internal val ctx: Context) : Router.Host {
+    interface Listener {
+        fun onPacket(packet: ByteArray, from: String)
+        fun onNeighbor(node: String, up: Boolean, medium: String, kbps: Long)
+    }
+
+    internal val rx: ExecutorService = Executors.newSingleThreadExecutor { r -> daemon(r, "ripplo-rx") }
+    private val sched: ScheduledExecutorService = Executors.newScheduledThreadPool(2) { r -> daemon(r, "ripplo-sched") }
+    private val prefs: SharedPreferences = ctx.getSharedPreferences("ripplo_mesh", Context.MODE_PRIVATE)
+    private val inbox = Inbox(ctx)
+    private val nodeTag: String = Packet.hex(Packet.newId())
+    private val wake: PowerManager.WakeLock
+    private val wifiLock: WifiManager.WifiLock
+    private val multicastLock: WifiManager.MulticastLock
+    private var tickCount = 0
+    private val lock = Any()
+    private val byNode = HashMap<String, MutableList<Link>>()
+    private val pending = HashSet<Link>()
+    private val transports = ArrayList<Transport>()
+    private val seen = HashMap<String, MutableMap<String, Long>>()
+    @Volatile private var router: Router? = null
+    @Volatile private var running = false
+    @Volatile private var selfTag: ByteArray? = null
+    private var tickTask: ScheduledFuture<*>? = null
+    @Volatile private var listener: Listener? = null
+    @Volatile private var jsAttached = false
+
+    init {
+        val pm = ctx.getSystemService(Context.POWER_SERVICE) as PowerManager
+        wake = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "ripplo:mesh")
+        wake.setReferenceCounted(false)
+        val wm = ctx.applicationContext.getSystemService(Context.WIFI_SERVICE) as WifiManager
+        wifiLock = wm.createWifiLock(WifiManager.WIFI_MODE_FULL_HIGH_PERF, "ripplo:wifi")
+        wifiLock.setReferenceCounted(false)
+        multicastLock = wm.createMulticastLock("ripplo:mdns")
+        multicastLock.setReferenceCounted(false)
+    }
+
+    private fun holdLocks(hold: Boolean) {
+        try {
+            if (hold) {
+                wake.acquire()
+                wifiLock.acquire()
+                multicastLock.acquire()
+            } else {
+                if (wake.isHeld) wake.release()
+                if (wifiLock.isHeld) wifiLock.release()
+                if (multicastLock.isHeld) multicastLock.release()
+            }
+        } catch (ignored: RuntimeException) {
+        }
+    }
+
+    fun nodeTag(): String = nodeTag
+
+    fun isRunning(): Boolean = running
+
+    fun background(): Boolean = prefs.getBoolean("background", true)
+
+    fun setListener(l: Listener?) {
+        listener = l
+    }
+
+    fun setJsAttached(v: Boolean) {
+        jsAttached = v
+    }
+
+    @Synchronized
+    fun start(self: ByteArray, background: Boolean, launchService: Boolean) {
+        prefs.edit().putString("selfTag", Packet.hex(self)).putBoolean("background", background).apply()
+        if (running && self.contentEquals(selfTag)) {
+            if (launchService) MeshService.launch(ctx)
+            return
+        }
+        if (running) stop(false)
+        selfTag = self
+        router = Router(this, self)
+        running = true
+        Diag.i("engine start node=" + nodeTag.substring(0, 8) + " self=" + Packet.hex(self).substring(0, 8))
+        holdLocks(true)
+        if (Build.VERSION.SDK_INT >= 29) transports.add(WifiAwareTransport(ctx, this))
+        transports.add(BleTransport(ctx, this))
+        transports.add(LanTransport(ctx, this))
+        transports.add(WifiDirectTransport(ctx, this))
+        for (t in transports) sched.execute { t.start() }
+        tickTask = sched.scheduleWithFixedDelay({ tick() }, TICK_SECONDS, TICK_SECONDS, TimeUnit.SECONDS)
+        if (launchService) MeshService.launch(ctx)
+    }
+
+    @Synchronized
+    fun resumeFromPrefs(): Boolean {
+        val s = prefs.getString("selfTag", null)
+        if (s == null || s.length != 32 || !background()) return false
+        start(Packet.unhex(s), true, false)
+        return true
+    }
+
+    fun stop() {
+        stop(true)
+    }
+
+    @Synchronized
+    private fun stop(clear: Boolean) {
+        running = false
+        Diag.i("engine stop clear=$clear")
+        holdLocks(false)
+        tickTask?.cancel(false)
+        for (t in transports) t.stop()
+        transports.clear()
+        val all = ArrayList<Link>()
+        synchronized(lock) {
+            for (l in byNode.values) all.addAll(l)
+            all.addAll(pending)
+        }
+        for (l in all) l.close()
+        router = null
+        if (clear) {
+            prefs.edit().remove("selfTag").apply()
+            ctx.stopService(Intent(ctx, MeshService::class.java))
+        }
+    }
+
+    private fun tick() {
+        val all = ArrayList<Link>()
+        synchronized(lock) {
+            for (l in byNode.values) all.addAll(l)
+        }
+        val now = System.nanoTime()
+        tickCount++
+        val stuck = ArrayList<Link>()
+        synchronized(lock) {
+            for (l in pending) if (now - l.born > 30L * 1000000000L) stuck.add(l)
+        }
+        for (l in stuck) {
+            Diag.i("hello timeout close " + l.medium)
+            l.close()
+        }
+        for (l in all) {
+            if (now - l.lastRx > QUIET_NANOS) {
+                if (++l.strikes >= 2) {
+                    val node = l.node
+                    Diag.i("quiet close " + l.medium + " node=" + (node?.substring(0, 8) ?: "none"))
+                    l.close()
+                }
+                continue
+            }
+            l.strikes = 0
+            val asked = l.pingStartNanos
+            val due = asked == 0L || now - asked > QUIET_NANOS
+            if (due && (l.medium != "ble" || tickCount % 3 == 0)) sendPing(l)
+        }
+        for (t in transports.toList()) t.tick()
+    }
+
+    private fun touchWake() {
+        if (wake.isHeld) return
+        try {
+            wake.acquire(30000)
+        } catch (ignored: RuntimeException) {
+        }
+    }
+
+    internal fun addLink(link: Link): Boolean {
+        if (!running) {
+            link.close()
+            return false
+        }
+        synchronized(lock) { pending.add(link) }
+        Diag.i("link add " + link.medium + " outbound=" + link.outbound)
+        link.start()
+        link.send(Packet.make(Packet.LINK_HELLO, ByteArray(16), Packet.unhex(nodeTag)).encode())
+        return true
+    }
+
+    internal fun hasFastLink(node: String): Boolean = synchronized(lock) {
+        byNode[node]?.any { k ->
+            val bleish = k.medium == "ble" || k.medium == "l2cap"
+            k.medium == "lan" || k.medium == "wifi-aware" || (bleish && !k.note.contains("coded"))
+        } ?: false
+    }
+
+    internal fun hasLink(node: String, medium: String): Boolean = synchronized(lock) {
+        byNode[node]?.any { it.medium == medium } ?: false
+    }
+
+    internal fun linkDown(link: Link) {
+        var down = false
+        val node = link.node
+        synchronized(lock) {
+            pending.remove(link)
+            if (node != null) {
+                val l = byNode[node]
+                if (l != null && l.remove(link) && l.isEmpty()) {
+                    byNode.remove(node)
+                    down = true
+                }
+            }
+        }
+        Diag.i("link down " + link.medium + " node=" + (node?.substring(0, 8) ?: "none") + " last=" + down)
+        if (node != null) Diag.stage(link.medium, node, "closed", "link down, last=$down")
+        if (down && node != null) {
+            router?.linkDown(node)
+            emitNeighbor(node, false, link.medium, link.kbps)
+        }
+    }
+
+    private fun emitNeighbor(node: String, up: Boolean, medium: String, kbps: Long) {
+        listener?.onNeighbor(node, up, medium, kbps)
+    }
+
+    private fun sortedLinks(node: String): List<Link> {
+        val out = synchronized(lock) { byNode[node]?.let { ArrayList(it) } ?: ArrayList<Link>() }
+        out.sortByDescending { it.kbps }
+        return out
+    }
+
+    internal fun onFrame(link: Link, frame: ByteArray) {
+        val r = router
+        if (r == null || !link.alive.get()) return
+        val now = System.currentTimeMillis()
+        if (now - link.windowStart >= 1000) {
+            link.windowStart = now
+            link.windowCount = 0
+        }
+        if (++link.windowCount > 200) return
+        val p = try {
+            Packet.decode(frame)
+        } catch (e: IllegalArgumentException) {
+            if (frame.size < Packet.HEADER || frame[0].toInt() == 1) link.close()
+            return
+        }
+        when (p.type) {
+            Packet.LINK_HELLO -> {
+                if (p.payload.size < 16) {
+                    link.close()
+                    return
+                }
+                onHello(link, Packet.hex(p.payload.copyOf(16)))
+            }
+            Packet.PING -> {
+                if (link.node != null && p.payload.size >= 16) {
+                    link.send(Packet.make(Packet.PONG, ByteArray(16), p.payload.copyOf(16)).encode())
+                }
+            }
+            Packet.PONG -> onPong(link, p)
+            else -> {
+                val from = link.node ?: return
+                if (p.type == Packet.APP && p.payload.size == 2 && p.payload[0] == 0xFE.toByte()) {
+                    for (t in transports.toList()) t.onPeerRequest(p.payload[1].toInt())
+                    return
+                }
+                if (p.type == Packet.DATA || p.type == Packet.ACK) touchWake()
+                r.onPacket(p, from)
+            }
+        }
+    }
+
+    private fun onHello(link: Link, tag: String) {
+        if (link.node != null) return
+        link.helloTag = tag
+        link.helloHook?.accept(tag)
+        if (tag == nodeTag) {
+            link.close()
+            return
+        }
+        val toClose = ArrayList<Link>()
+        var loser = false
+        val first: Boolean
+        synchronized(lock) {
+            pending.remove(link)
+            val list = byNode.getOrPut(tag) { ArrayList() }
+            first = list.isEmpty()
+            val initNew = if (link.outbound) nodeTag else tag
+            for (o in list) {
+                if (o.medium != link.medium) continue
+                val initOld = if (o.outbound) nodeTag else tag
+                if (initNew < initOld) {
+                    toClose.add(o)
+                } else {
+                    loser = true
+                }
+            }
+            if (loser) {
+                if (list.isEmpty()) byNode.remove(tag)
+            } else {
+                link.node = tag
+                list.add(link)
+            }
+        }
+        Diag.i("hello " + tag.substring(0, 8) + " via " + link.medium + " outbound=" + link.outbound + " loser=" + loser + " replaced=" + toClose.size)
+        if (loser) {
+            link.close()
+            return
+        }
+        for (o in toClose) o.close()
+        if (first) emitNeighbor(tag, true, link.medium, link.kbps)
+        sendPing(link)
+    }
+
+    private fun sendPing(link: Link) {
+        if (link.node == null || !link.alive.get()) return
+        val filler = if (link.medium == "ble") 2048 else 16384
+        val b = ByteBuffer.allocate(16 + filler)
+        val nonce = SecureRandom().nextLong()
+        b.putLong(nonce).putLong(System.currentTimeMillis())
+        val p = Packet.make(Packet.PING, ByteArray(16), b.array())
+        link.pingNonce = nonce
+        link.pingBits = (Packet.HEADER + b.capacity() + 4) * 8
+        link.pingStartNanos = System.nanoTime()
+        link.send(p.encode())
+    }
+
+    private fun onPong(link: Link, p: Packet) {
+        val node = link.node
+        if (node == null || p.payload.size < 8 || link.pingStartNanos == 0L) return
+        if (ByteBuffer.wrap(p.payload).long != link.pingNonce) return
+        val ms = maxOf(1L, (System.nanoTime() - link.pingStartNanos) / 1000000L)
+        link.pingStartNanos = 0
+        link.rttMs = ms
+        link.kbps = maxOf(1L, link.pingBits / ms)
+        val sorted = sortedLinks(node)
+        if (sorted.isNotEmpty()) emitNeighbor(node, true, sorted[0].medium, sorted[0].kbps)
+    }
+
+    override fun send(to: String, p: Packet): Boolean {
+        val bytes = p.encode()
+        if (p.type == Packet.DATA || p.type == Packet.ACK) touchWake()
+        val links = sortedLinks(to)
+        val now = System.nanoTime()
+        for (l in links) if (!l.stale(now) && l.send(bytes)) return true
+        for (l in links) if (l.stale(now) && l.send(bytes)) return true
+        return false
+    }
+
+    override fun neighbors(): List<String> = synchronized(lock) { ArrayList(byNode.keys) }
+
+    override fun deliver(p: Packet, from: String) {
+        val l = listener
+        if (l != null && jsAttached) l.onPacket(p.encode(), from)
+    }
+
+    override fun persist(p: Packet, from: String): Boolean {
+        if (jsAttached && listener != null) return true
+        if (p.payload.isNotEmpty() && p.payload[0].toInt() == 1) {
+            if (!inbox.hasRoom()) return false
+            val r = Opener.process(ctx, p.payload)
+            if (r != null) return inbox.addOpened(r.sealed, r.callId)
+        }
+        if (!inbox.add(p.encode(), from)) return false
+        if (p.payload.isNotEmpty() && p.payload[0].toInt() == 1) Notifier.newMessage(ctx)
+        return true
+    }
+
+    fun drainInbox(): List<Inbox.Item> = inbox.drain()
+
+    fun dropCall(callId: String?) {
+        inbox.removeCall(callId)
+    }
+
+    fun requeue(it: Inbox.Item) {
+        inbox.requeue(it)
+    }
+
+    fun sendFromJs(bytes: ByteArray): Int {
+        val r = router ?: throw IllegalStateException("not started")
+        val p = Packet.decode(bytes)
+        if (p.type != Packet.DATA && p.type != Packet.DISCOVER && p.type != Packet.REPLY) throw IllegalArgumentException("type")
+        val n = r.onPacket(p, Router.SELF)
+        return if (p.type == Packet.REPLY) neighbors().size else n
+    }
+
+    fun sendApp(node: String, payload: ByteArray): Boolean {
+        val p = Packet(Packet.APP, 1, 0, Packet.newId(), ByteArray(16), payload)
+        if (p.encode().size > Packet.MAX_PACKET) throw IllegalArgumentException("size")
+        return send(node, p)
+    }
+
+    internal fun noteSeen(node: String?, medium: String) {
+        if (node.isNullOrEmpty()) return
+        synchronized(lock) {
+            seen.getOrPut(node) { HashMap() }[medium] = System.currentTimeMillis()
+        }
+    }
+
+    internal fun askPeerAdvertise(node: String): Boolean = try {
+        sendApp(node, byteArrayOf(0xFE.toByte(), 1))
+    } catch (e: RuntimeException) {
+        false
+    }
+
+    fun forceConnect(node: String, spec: String): Boolean {
+        val p = spec.split(":", limit = 2)
+        Diag.i("force connect " + p[0] + " node=" + node.take(8))
+        for (t in transports.toList()) {
+            if (t.name() == p[0]) return t.forceConnect(node, if (p.size > 1) p[1] else "")
+        }
+        return false
+    }
+
+    fun closeLinks(node: String, medium: String) {
+        val out = synchronized(lock) {
+            byNode[node]?.filter { k -> k.medium == medium || (medium == "ble" && k.medium == "l2cap") } ?: emptyList()
+        }
+        for (k in out) k.close()
+    }
+
+    fun transportsJson(): JSONArray {
+        val out = JSONArray()
+        for (t in transports.toList()) {
+            try {
+                out.put(JSONObject().put("name", t.name()).put("running", t.running).put("unsupported", t.unsupported()))
+            } catch (ignored: JSONException) {
+            }
+        }
+        return out
+    }
+
+    fun neighborsJson(): JSONArray {
+        val out = JSONArray()
+        for (node in neighbors()) {
+            val links = sortedLinks(node)
+            if (links.isEmpty()) continue
+            try {
+                val o = JSONObject()
+                o.put("node", node)
+                o.put("medium", links[0].medium)
+                o.put("kbps", links[0].kbps)
+                o.put("rttMs", links[0].rttMs)
+                val ls = JSONArray()
+                for (l in links) ls.put(JSONObject().put("medium", l.medium).put("kbps", l.kbps).put("rttMs", l.rttMs).put("outbound", l.outbound).put("note", l.note))
+                o.put("links", ls)
+                val sn = JSONArray()
+                val now = System.currentTimeMillis()
+                synchronized(lock) {
+                    seen[node]?.forEach { (k, v) -> if (now - v < 120000L) sn.put(k) }
+                }
+                o.put("seen", sn)
+                out.put(o)
+            } catch (ignored: JSONException) {
+            }
+        }
+        return out
+    }
+
+    companion object {
+        private const val QUIET_NANOS = 30L * 1000000000L
+        private const val TICK_SECONDS = 5L
+        private var instance: MeshEngine? = null
+
+        @JvmStatic
+        @Synchronized
+        fun get(ctx: Context): MeshEngine =
+            instance ?: MeshEngine(ctx.applicationContext).also { instance = it }
+
+        internal fun nominalKbps(medium: String): Long = when (medium) {
+            "lan", "wifi-aware", "wifi-direct" -> 20000
+            "l2cap" -> 300
+            else -> 50
+        }
+
+        private fun daemon(r: Runnable, name: String): Thread = Thread(r, name).apply { isDaemon = true }
+    }
+}
