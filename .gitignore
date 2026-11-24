@@ -9,3 +9,4 @@ dist/
 .env*
 keystore.properties
 .claude/
+*.aab
