@@ -20,6 +20,7 @@ export function createState() {
     lockedCall: false,
     update: { current: '', checkedAt: 0, promptedAt: 0, installing: false, checking: false, latest: null, available: false, url: null, apkUrl: null, sha256: null, progress: null, error: null },
     integrity: { status: 'unknown', checkedAt: 0 },
+    fromPlay: false,
     settings: { autoUpdate: true, backgroundRelay: true },
     devLogs: [],
   })

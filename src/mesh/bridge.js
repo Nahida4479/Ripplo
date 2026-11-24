@@ -40,6 +40,7 @@ function nativeMesh() {
     takeOpen: async () => { try { return (await P.takeOpen()).open || null } catch { return null } },
     getDbKey: async () => ({ key: unb64((await P.getDbKey()).key), insecure: false }),
     selfHash: async () => (await P.selfHash()).sha256,
+    fromPlay: async () => { try { return !!(await P.fromPlay()).play } catch { return false } },
     installUpdate: (url, sha256, prompt) => P.installUpdate({ url, sha256, prompt }),
     requestBatteryExemption: () => P.requestBatteryExemption(),
     setAutoUpdate: (enabled) => P.setAutoUpdate({ enabled }),
@@ -153,6 +154,7 @@ function webMesh() {
       return { key: unb64(k), insecure: true }
     },
     selfHash: async () => null,
+    fromPlay: async () => false,
     authAvailable: async () => ({ biometric: false, deviceCredential: false }),
     authenticate: async () => ({ ok: true }),
     setSecure: async () => ({}),

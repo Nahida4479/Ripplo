@@ -431,6 +431,7 @@ Binary values are base64 (standard) strings; node tags are lowercase hex.
 | `drainInbox` | → `{ packets: [{ packet, from }] }` — packets received while JS was not attached |
 | `getDbKey` | → `{ key }` 32 bytes, created once, stored with Keystore / Keychain |
 | `selfHash` | → `{ sha256 }` hex of the installed APK (Android only) |
+| `fromPlay` | → `{ play }` true when the installer package is `com.android.vending` (Android). Then JS skips update checks and the integrity check, turns `setAutoUpdate` off and Settings → Updates shows only the current version (§10) |
 | `installUpdate` | `{ url, sha256, prompt? }` → `{ status }` — download, verify SHA-256 + signing cert, install. Rejects `install_permission` (before downloading) when "install unknown apps" is not allowed for Ripplo; with `prompt` it opens that settings screen |
 | `requestBatteryExemption` | – (Android) |
 | `startRing` / `stopRing` | – (Android) — ring and vibrate an incoming call following the system sound settings (§13) |
@@ -484,6 +485,7 @@ and shows a content-free notification *"New message"* for `0x01` payloads.
   posts a notification "Ripplo X is available. Open the app to update." (once per version). If the system
   asks for confirmation (`STATUS_PENDING_USER_ACTION`) with no UI around, `InstallReceiver` posts
   "Update ready. Tap to install." whose tap opens the system confirmation.
+- Google Play build (`./gradlew bundlePlay`, CI job `play`): `src/play/AndroidManifest.xml` removes `REQUEST_INSTALL_PACKAGES`. When `fromPlay` is true the app never contacts GitHub for updates or integrity and hides everything in Updates except the current version; Play delivers updates.
 - In the app: on start and on resume (at most every 10 min) JS checks for a release; when one is newer it
   shows a dialog "Update X available. Update now? / Later" (at most once per 6 h), regardless of the
   automatic-update setting. Android installs from the dialog; other platforms open the release page.

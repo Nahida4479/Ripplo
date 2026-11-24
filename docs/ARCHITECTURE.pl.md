@@ -428,6 +428,7 @@ Wartości binarne to ciągi base64 (standardowego); tagi węzłów to małe lite
 | `drainInbox` | → `{ packets: [{ packet, from }] }` — packets received while JS was not attached |
 | `getDbKey` | → `{ key }` 32 bytes, created once, stored with Keystore / Keychain |
 | `selfHash` | → `{ sha256 }` hex of the installed APK (Android only) |
+| `fromPlay` | → `{ play }` true, gdy pakiet instalujący to `com.android.vending` (Android). Wtedy JS pomija sprawdzanie aktualizacji i integralności, wyłącza `setAutoUpdate`, a Ustawienia → Aktualizacje pokazują tylko obecną wersję (§10) |
 | `installUpdate` | `{ url, sha256, prompt? }` → `{ status }` — pobranie, weryfikacja SHA-256 i certyfikatu, instalacja. Odrzuca `install_permission` (przed pobraniem), gdy Ripplo nie ma zgody „instaluj nieznane aplikacje”; z `prompt` otwiera ten ekran ustawień |
 | `requestBatteryExemption` | – (Android) |
 | `startRing` / `stopRing` | – (Android) — dzwoni i wibruje przy połączeniu przychodzącym zgodnie z systemowymi ustawieniami dźwięku (§13) |
@@ -479,6 +480,7 @@ i pokazuje pozbawione treści powiadomienie *„Nowa wiadomość”* dla payload
   Otwórz aplikację, aby zaktualizować.” (raz na wersję). Jeśli system prosi o potwierdzenie
   (`STATUS_PENDING_USER_ACTION`), a nie ma UI, `InstallReceiver` pokazuje „Aktualizacja gotowa. Dotknij, aby
   zainstalować.”, którego dotknięcie otwiera systemowe potwierdzenie.
+- Wersja Google Play (`./gradlew bundlePlay`, job CI `play`): `src/play/AndroidManifest.xml` usuwa `REQUEST_INSTALL_PACKAGES`. Gdy `fromPlay` jest true, aplikacja nie łączy się z GitHubem po aktualizacje ani integralność i ukrywa w Aktualizacjach wszystko poza obecną wersją; aktualizacje dostarcza Play.
 - W aplikacji: przy starcie i wznowieniu (najwyżej co 10 min) JS sprawdza wydanie; gdy jest nowsze, pokazuje okno
   „Dostępna aktualizacja X. Zaktualizować teraz? / Później” (najwyżej raz na 6 h), niezależnie od ustawienia
   automatycznej aktualizacji. Android instaluje z okna; pozostałe platformy otwierają stronę wydania.

@@ -52,6 +52,11 @@ android {
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }
+        play {
+            initWith release
+            matchingFallbacks = ['release']
+            if (ripploKeystore) signingConfig signingConfigs.release
+        }
     }
 }
 

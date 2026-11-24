@@ -96,7 +96,14 @@ export async function checkIntegrity() {
   }
 }
 
-export function startUpdater() {
+export async function startUpdater() {
+  if (native && await mesh.fromPlay()) {
+    state.fromPlay = true
+    state.integrity.status = 'unsupported'
+    version()
+    mesh.setAutoUpdate(false).catch(() => {})
+    return
+  }
   const run = () => { checkUpdate(); checkIntegrity() }
   run()
   setInterval(run, 6 * 3600e3)

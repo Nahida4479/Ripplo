@@ -533,6 +533,20 @@ class RipploMeshPlugin : Plugin(), MeshEngine.Listener {
     }
 
     @PluginMethod
+    fun fromPlay(call: PluginCall) {
+        val pm = context.packageManager
+        val installer = try {
+            if (Build.VERSION.SDK_INT >= 30) pm.getInstallSourceInfo(context.packageName).installingPackageName
+            else @Suppress("DEPRECATION") pm.getInstallerPackageName(context.packageName)
+        } catch (e: Exception) {
+            null
+        }
+        val r = JSObject()
+        r.put("play", installer == "com.android.vending")
+        call.resolve(r)
+    }
+
+    @PluginMethod
     fun selfHash(call: PluginCall) {
         try {
             FileInputStream(context.applicationInfo.sourceDir).use { input ->

@@ -240,16 +240,16 @@ const initials = l => l.slice(0, 2).toUpperCase()
     <h2 class="section">{{ t('updates') }}</h2>
     <div class="card">
       <div class="row" role="button" tabindex="0" :title="t('holdToSendLogs')" @pointerdown="startLogPress" @pointerup="cancelLogPress" @pointerleave="cancelLogPress" @pointercancel="cancelLogPress" @contextmenu.prevent><span class="grow label">{{ t('currentVersion') }}</span><span class="val">{{ state.update.current || '–' }}</span></div>
-      <div class="row"><span class="grow label">{{ t('latestVersion') }}</span><span class="val">{{ state.update.latest || '–' }}</span></div>
-      <div v-if="state.update.error" class="row hint">{{ state.update.error }}</div>
-      <div v-if="state.update.progress != null" class="row"><progress class="grow" max="1" :value="state.update.progress" /></div>
-      <div class="row">
+      <div v-if="!state.fromPlay" class="row"><span class="grow label">{{ t('latestVersion') }}</span><span class="val">{{ state.update.latest || '–' }}</span></div>
+      <div v-if="!state.fromPlay && state.update.error" class="row hint">{{ state.update.error }}</div>
+      <div v-if="!state.fromPlay && state.update.progress != null" class="row"><progress class="grow" max="1" :value="state.update.progress" /></div>
+      <div v-if="!state.fromPlay" class="row">
         <button class="btn sm" :disabled="state.update.checking" @click="checkUpdate(true)">{{ t(state.update.checking ? 'checking' : 'checkNow') }}</button>
         <span class="grow" />
         <button v-if="state.update.available && android && state.update.apkUrl" class="btn sm" :disabled="state.update.installing || state.update.checking" @click="install()">{{ t('install') }}</button>
         <a v-else-if="state.update.available" class="btn sm" :href="state.update.url" target="_blank" rel="noopener">{{ t('openRelease') }}</a>
       </div>
-      <div v-if="android" class="row">
+      <div v-if="android && !state.fromPlay" class="row">
         <span class="grow label">{{ t('autoUpdate') }}</span>
         <button class="switch" role="switch" :aria-checked="state.settings.autoUpdate" :aria-label="t('autoUpdate')" @click="saveSettings({ autoUpdate: !state.settings.autoUpdate })" />
       </div>
