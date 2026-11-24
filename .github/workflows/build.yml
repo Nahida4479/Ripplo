@@ -3,6 +3,7 @@ name: Build
 on:
   push:
     tags: ['v*']
+    branches: [flutter]
   workflow_dispatch:
 
 permissions:
@@ -13,19 +14,19 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-      - uses: actions/setup-node@v7
-        with:
-          node-version: 22
-          cache: npm
       - uses: actions/setup-java@v6
         with:
           distribution: temurin
           java-version: 21
           cache: gradle
-      - run: npm ci
-      - run: npm test
-      - run: npm run build
-      - run: npx cap sync android
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: 3.50.1
+          cache: true
+      - run: flutter pub get
+      - run: flutter analyze
+      - run: flutter test
 
       - name: Compute version
         id: ver
@@ -37,8 +38,8 @@ jobs:
             name="${BASH_REMATCH[1]}.${BASH_REMATCH[2]}.${BASH_REMATCH[3]}"
             code=$(( BASH_REMATCH[1] * 10000 + BASH_REMATCH[2] * 100 + BASH_REMATCH[3] ))
           else
-            tag="v$(node -p "require('./package.json').version")-dev${GITHUB_RUN_NUMBER}"
-            name="$(node -p "require('./package.json').version")"
+            name="$(grep '^version:' pubspec.yaml | cut -d' ' -f2 | cut -d+ -f1)"
+            tag="v${name}-dev${GITHUB_RUN_NUMBER}"
             code="$GITHUB_RUN_NUMBER"
           fi
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
@@ -74,19 +75,18 @@ jobs:
       - name: Signal crypto unit tests
         working-directory: android
         run: |
-          for i in 1 2 3; do ./gradlew testReleaseUnitTest && exit 0; sleep $((i * 30)); done
+          for i in 1 2 3; do ./gradlew testFullReleaseUnitTest && exit 0; sleep $((i * 30)); done
           exit 1
 
-      - name: Assemble release APK
-        working-directory: android
+      - name: Build release APK
         env:
           VER_NAME: ${{ steps.ver.outputs.name }}
           VER_CODE: ${{ steps.ver.outputs.code }}
         run: |
           set -euo pipefail
-          ./gradlew assembleRelease \
-            -PversionName="$VER_NAME" \
-            -PversionCode="$VER_CODE"
+          flutter build apk --release --flavor full \
+            --build-name "$VER_NAME" \
+            --build-number "$VER_CODE"
 
       - name: Verify signature and collect
         env:
@@ -94,7 +94,7 @@ jobs:
         run: |
           set -euo pipefail
           mkdir out
-          src=$(ls android/app/build/outputs/apk/release/*.apk | head -n1)
+          src=build/app/outputs/flutter-apk/app-full-release.apk
           cp "$src" "out/Ripplo-$tag.apk"
           if [[ -n "${RIPPLO_KEYSTORE_FILE:-}" ]]; then
             bt="$ANDROID_HOME/build-tools/$(ls "$ANDROID_HOME/build-tools" | sort -V | tail -n1)"
@@ -103,21 +103,29 @@ jobs:
           fi
 
       - uses: actions/upload-artifact@v7
+        if: github.ref_type == 'tag' || github.event_name == 'workflow_dispatch'
         with:
           name: android
           path: out/*
 
+      - uses: actions/upload-artifact@v7
+        if: github.ref_type == 'branch' && github.event_name == 'push'
+        with:
+          name: android-test
+          path: out/*
+          retention-days: 14
+
   ios:
+    if: github.ref_type == 'tag' || github.event_name == 'workflow_dispatch'
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v7
-      - uses: actions/setup-node@v7
+      - uses: subosito/flutter-action@v2
         with:
-          node-version: 22
-          cache: npm
-      - run: npm ci
-      - run: npm run build
-      - run: npx cap sync ios
+          channel: stable
+          flutter-version: 3.50.1
+          cache: true
+      - run: flutter pub get
 
       - name: Compute version
         id: ver
@@ -129,7 +137,7 @@ jobs:
             name="${BASH_REMATCH[1]}.${BASH_REMATCH[2]}.${BASH_REMATCH[3]}"
             code=$(( BASH_REMATCH[1] * 10000 + BASH_REMATCH[2] * 100 + BASH_REMATCH[3] ))
           else
-            name="$(node -p "require('./package.json').version")"
+            name="$(grep '^version:' pubspec.yaml | cut -d' ' -f2 | cut -d+ -f1)"
             tag="v${name}-dev${GITHUB_RUN_NUMBER}"
             code="$GITHUB_RUN_NUMBER"
           fi
@@ -137,17 +145,15 @@ jobs:
           echo "name=$name" >> "$GITHUB_OUTPUT"
           echo "code=$code" >> "$GITHUB_OUTPUT"
 
-      - name: Archive (unsigned)
+      - name: Build unsigned iOS app
         env:
           VER_NAME: ${{ steps.ver.outputs.name }}
           VER_CODE: ${{ steps.ver.outputs.code }}
         run: |
           set -euo pipefail
-          xcodebuild -project ios/App/App.xcodeproj -scheme App -configuration Release \
-            -sdk iphoneos -archivePath "$RUNNER_TEMP/App.xcarchive" archive \
-            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO \
-            MARKETING_VERSION="$VER_NAME" \
-            CURRENT_PROJECT_VERSION="$VER_CODE"
+          flutter build ios --release --no-codesign \
+            --build-name "$VER_NAME" \
+            --build-number "$VER_CODE"
 
       - name: Build unsigned IPA
         env:
@@ -155,7 +161,7 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p out "$RUNNER_TEMP/ipa/Payload"
-          cp -R "$RUNNER_TEMP/App.xcarchive/Products/Applications/App.app" "$RUNNER_TEMP/ipa/Payload/"
+          cp -R build/ios/iphoneos/Runner.app "$RUNNER_TEMP/ipa/Payload/"
           (cd "$RUNNER_TEMP/ipa" && zip -qry "$GITHUB_WORKSPACE/out/Ripplo-${tag}-beta-unsigned-for_developers.ipa" Payload)
 
       - uses: actions/upload-artifact@v7
@@ -164,21 +170,21 @@ jobs:
           path: out/*
 
   play:
+    if: github.ref_type == 'tag' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-      - uses: actions/setup-node@v7
-        with:
-          node-version: 22
-          cache: npm
       - uses: actions/setup-java@v6
         with:
           distribution: temurin
           java-version: 21
           cache: gradle
-      - run: npm ci
-      - run: npm run build
-      - run: npx cap sync android
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: 3.50.1
+          cache: true
+      - run: flutter pub get
 
       - name: Compute version
         id: ver
@@ -190,7 +196,7 @@ jobs:
             name="${BASH_REMATCH[1]}.${BASH_REMATCH[2]}.${BASH_REMATCH[3]}"
             code=$(( BASH_REMATCH[1] * 10000 + BASH_REMATCH[2] * 100 + BASH_REMATCH[3] ))
           else
-            name="$(node -p "require('./package.json').version")"
+            name="$(grep '^version:' pubspec.yaml | cut -d' ' -f2 | cut -d+ -f1)"
             tag="v${name}-dev${GITHUB_RUN_NUMBER}"
             code="$GITHUB_RUN_NUMBER"
           fi
@@ -221,14 +227,13 @@ jobs:
           echo "::add-mask::$KEY_PASS"
 
       - name: Build signed Play AAB
-        working-directory: android
         env:
           VER_NAME: ${{ steps.ver.outputs.name }}
           VER_CODE: ${{ steps.ver.outputs.code }}
         run: |
           set -euo pipefail
           for i in 1 2 3; do
-            ./gradlew bundlePlay -PversionName="$VER_NAME" -PversionCode="$VER_CODE" && exit 0
+            flutter build appbundle --release --flavor play --build-name "$VER_NAME" --build-number "$VER_CODE" && exit 0
             sleep $((i * 30))
           done
           exit 1
@@ -239,7 +244,7 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p out
-          src=$(ls android/app/build/outputs/bundle/play/*.aab | head -n1)
+          src=build/app/outputs/bundle/playRelease/app-play-release.aab
           jarsigner -verify "$src"
           unzip -p "$src" base/manifest/AndroidManifest.xml > "$RUNNER_TEMP/m.pb"
           if grep -aq REQUEST_INSTALL_PACKAGES "$RUNNER_TEMP/m.pb"; then

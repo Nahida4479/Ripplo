@@ -20,17 +20,17 @@ import android.provider.DocumentsContract
 import android.provider.Settings
 import android.util.Base64
 import android.view.WindowManager
-import androidx.activity.result.ActivityResult
+import androidx.core.app.ActivityCompat
 import androidx.core.app.NotificationManagerCompat
-import com.getcapacitor.JSArray
-import com.getcapacitor.JSObject
-import com.getcapacitor.Plugin
-import com.getcapacitor.PluginCall
-import com.getcapacitor.PluginMethod
-import com.getcapacitor.annotation.ActivityCallback
-import com.getcapacitor.annotation.CapacitorPlugin
-import com.getcapacitor.annotation.Permission
-import com.getcapacitor.annotation.PermissionCallback
+import androidx.fragment.app.FragmentActivity
+import io.flutter.embedding.engine.plugins.FlutterPlugin
+import io.flutter.embedding.engine.plugins.activity.ActivityAware
+import io.flutter.embedding.engine.plugins.activity.ActivityPluginBinding
+import io.flutter.plugin.common.EventChannel
+import io.flutter.plugin.common.JSONMethodCodec
+import io.flutter.plugin.common.MethodCall
+import io.flutter.plugin.common.MethodChannel
+import io.flutter.plugin.common.PluginRegistry
 import java.io.BufferedInputStream
 import java.io.BufferedOutputStream
 import java.io.File
@@ -42,77 +42,231 @@ import java.security.MessageDigest
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
-import java.util.concurrent.Executors
+import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.ExecutorService
+import java.util.concurrent.Executors
+import org.json.JSONArray
 import org.json.JSONException
 import org.json.JSONObject
 
-@CapacitorPlugin(
-    name = "RipploMesh",
-    permissions = [
-        Permission(
-            alias = "bluetooth",
-            strings = [
-                Manifest.permission.BLUETOOTH_SCAN,
-                Manifest.permission.BLUETOOTH_ADVERTISE,
-                Manifest.permission.BLUETOOTH_CONNECT,
-            ],
-        ),
-        Permission(
-            alias = "bluetoothLegacy",
-            strings = [
-                Manifest.permission.BLUETOOTH,
-                Manifest.permission.BLUETOOTH_ADMIN,
-                Manifest.permission.ACCESS_FINE_LOCATION,
-            ],
-        ),
-        Permission(alias = "wifi", strings = [Manifest.permission.NEARBY_WIFI_DEVICES]),
-        Permission(alias = "wifiLegacy", strings = [Manifest.permission.ACCESS_FINE_LOCATION]),
-        Permission(alias = "notifications", strings = [Manifest.permission.POST_NOTIFICATIONS]),
-        Permission(alias = "microphone", strings = [Manifest.permission.RECORD_AUDIO]),
-    ],
-)
-class RipploMeshPlugin : Plugin(), MeshEngine.Listener {
+class RipploMeshPlugin :
+    FlutterPlugin,
+    ActivityAware,
+    MethodChannel.MethodCallHandler,
+    EventChannel.StreamHandler,
+    PluginRegistry.ActivityResultListener,
+    PluginRegistry.RequestPermissionsResultListener,
+    PluginRegistry.NewIntentListener,
+    MeshEngine.Listener {
     @Volatile
-    private var pendingShare: JSObject? = null
+    private var pendingShare: JSONObject? = null
 
     @Volatile
-    private var pendingOpen: JSObject? = null
-    private val shareExec = Executors.newSingleThreadExecutor()
-    private val drainExec = Executors.newSingleThreadExecutor()
+    private var pendingOpen: JSONObject? = null
 
     private fun interface SignalOp {
-        fun run(core: SignalCore): JSObject
+        fun run(core: SignalCore): JSONObject
     }
 
-    private val signalExec = Executors.newSingleThreadExecutor()
-    private val storeExec = Executors.newSingleThreadExecutor()
-    private val backupExec = Executors.newSingleThreadExecutor()
     private var backupEngine: BackupEngine? = null
     private lateinit var engine: MeshEngine
+    private lateinit var context: Context
+
+    @Volatile
     private var drained = false
 
-    override fun load() {
+    @Volatile
+    private var activity: Activity? = null
+    private var binding: ActivityPluginBinding? = null
+    private var methods: MethodChannel? = null
+    private var events: EventChannel? = null
+    private var callAudio: CallAudio? = null
+
+    @Volatile
+    private var sink: EventChannel.EventSink? = null
+    private val pending = ConcurrentHashMap<Int, Call>()
+
+    private val handlers: Map<String, (Call) -> Unit> = mapOf(
+        "start" to ::start,
+        "stop" to ::stop,
+        "send" to ::send,
+        "sendApp" to ::sendApp,
+        "getNeighbors" to ::getNeighbors,
+        "drainInbox" to ::drainInbox,
+        "getDbKey" to ::getDbKey,
+        "selfHash" to ::selfHash,
+        "installUpdate" to ::installUpdate,
+        "setAutoUpdate" to ::setAutoUpdate,
+        "requestBatteryExemption" to ::requestBatteryExemption,
+        "keepAwake" to ::keepAwake,
+        "endLockedCall" to ::endLockedCall,
+        "requestFullScreen" to ::requestFullScreen,
+        "startRing" to ::startRing,
+        "stopRing" to ::stopRing,
+        "takeOpen" to ::takeOpen,
+        "takeShare" to ::takeShare,
+        "isLocked" to ::isLocked,
+        "fromPlay" to ::fromPlay,
+        "getDeviceInfo" to ::getDeviceInfo,
+        "getBleCaps" to ::getBleCaps,
+        "getDiag" to ::getDiag,
+        "clearDiag" to ::clearDiag,
+        "usbLog" to ::usbLog,
+        "getTransports" to ::getTransports,
+        "devConnect" to ::devConnect,
+        "devDisconnect" to ::devDisconnect,
+        "checkPermissions" to ::checkPermissions,
+        "requestPermissions" to ::requestPermissions,
+        "dbPut" to ::dbPut,
+        "dbPutMany" to ::dbPutMany,
+        "dbGet" to ::dbGet,
+        "dbDel" to ::dbDel,
+        "dbKeys" to ::dbKeys,
+        "dbAll" to ::dbAll,
+        "dbByIdx" to ::dbByIdx,
+        "dbCount" to ::dbCount,
+        "authAvailable" to ::authAvailable,
+        "authenticate" to ::authenticate,
+        "setSecure" to ::setSecure,
+        "backupStatus" to ::backupStatus,
+        "backupEnable" to ::backupEnable,
+        "backupShowCode" to ::backupShowCode,
+        "backupDisable" to ::backupDisable,
+        "backupChooseFolder" to ::backupChooseFolder,
+        "backupCreate" to ::backupCreate,
+        "backupRestore" to ::backupRestore,
+        "signalInit" to ::signalInit,
+        "signalAddContact" to ::signalAddContact,
+        "signalSeal" to ::signalSeal,
+        "signalOpen" to ::signalOpen,
+        "signalProof" to ::signalProof,
+        "signalSafetyNumber" to ::signalSafetyNumber,
+        "signalForget" to ::signalForget,
+        "notify" to ::notifyUser,
+    )
+
+    override fun onAttachedToEngine(binding: FlutterPlugin.FlutterPluginBinding) {
+        context = binding.applicationContext
+        live = this
         engine = MeshEngine.get(context)
         engine.setListener(this)
         Diag.sink = Diag.StageSink { medium, node, stage, detail ->
-            val act = activity ?: return@StageSink
-            val o = JSObject()
+            if (activity == null) return@StageSink
+            val o = JSONObject()
             o.put("medium", medium)
             o.put("node", node)
             o.put("stage", stage)
             o.put("detail", detail)
             o.put("at", System.currentTimeMillis())
-            act.runOnUiThread { notifyListeners("devStage", o) }
+            emit("devStage", o)
         }
-        readShare(activity?.intent)
-        readOpen(activity?.intent)
+        val m = MethodChannel(binding.binaryMessenger, "ripplo/mesh", JSONMethodCodec.INSTANCE)
+        m.setMethodCallHandler(this)
+        methods = m
+        val e = EventChannel(binding.binaryMessenger, "ripplo/mesh/events", JSONMethodCodec.INSTANCE)
+        e.setStreamHandler(this)
+        events = e
+        val ca = CallAudio(context, binding.binaryMessenger)
+        ca.attach()
+        callAudio = ca
     }
 
-    override fun handleOnNewIntent(intent: Intent?) {
-        super.handleOnNewIntent(intent)
+    override fun onDetachedFromEngine(binding: FlutterPlugin.FlutterPluginBinding) {
+        methods?.setMethodCallHandler(null)
+        methods = null
+        events?.setStreamHandler(null)
+        events = null
+        sink = null
+        callAudio?.detach()
+        callAudio = null
+        if (live !== this) return
+        live = null
+        Diag.sink = null
+        Ringer.stop()
+        engine.setJsAttached(false)
+        engine.setListener(null)
+        if (!engine.background()) engine.stop()
+    }
+
+    override fun onAttachedToActivity(binding: ActivityPluginBinding) {
+        bind(binding)
+        readShare(binding.activity.intent)
+        readOpen(binding.activity.intent)
+    }
+
+    override fun onReattachedToActivityForConfigChanges(binding: ActivityPluginBinding) {
+        bind(binding)
+    }
+
+    override fun onDetachedFromActivityForConfigChanges() {
+        unbind()
+    }
+
+    override fun onDetachedFromActivity() {
+        unbind()
+    }
+
+    private fun bind(b: ActivityPluginBinding) {
+        binding = b
+        activity = b.activity
+        b.addActivityResultListener(this)
+        b.addRequestPermissionsResultListener(this)
+        b.addOnNewIntentListener(this)
+    }
+
+    private fun unbind() {
+        val b = binding
+        if (b != null) {
+            b.removeActivityResultListener(this)
+            b.removeRequestPermissionsResultListener(this)
+            b.removeOnNewIntentListener(this)
+        }
+        binding = null
+        activity = null
+    }
+
+    override fun onListen(arguments: Any?, events: EventChannel.EventSink?) {
+        sink = events
+        if (pendingOpen != null) emit("open", JSONObject())
+        if (pendingShare != null) emit("share", JSONObject())
+    }
+
+    override fun onCancel(arguments: Any?) {
+        sink = null
+    }
+
+    private fun emit(event: String, data: JSONObject) {
+        Call.post {
+            val s = sink
+            if (s != null) s.success(JSONObject().put("event", event).put("data", data))
+        }
+    }
+
+    override fun onMethodCall(call: MethodCall, result: MethodChannel.Result) {
+        val h = handlers[call.method]
+        if (h == null) {
+            result.notImplemented()
+            return
+        }
+        val args = when (val a = call.arguments) {
+            is JSONObject -> a
+            is Map<*, *> -> JSONObject(a)
+            else -> JSONObject()
+        }
+        val c = Call(args, result)
+        callExec.execute {
+            try {
+                h(c)
+            } catch (e: Exception) {
+                c.reject(e.message ?: "failed")
+            }
+        }
+    }
+
+    override fun onNewIntent(intent: Intent): Boolean {
         readShare(intent)
         readOpen(intent)
+        return false
     }
 
     private fun readOpen(intent: Intent?) {
@@ -122,26 +276,25 @@ class RipploMeshPlugin : Plugin(), MeshEngine.Listener {
         intent.removeExtra(Notifier.EXTRA_CHAT)
         intent.removeExtra(Notifier.EXTRA_ANSWER)
         if (chat == null || !CHAT_ID.matches(chat)) return
-        val o = JSObject()
+        val o = JSONObject()
         o.put("chatId", chat)
         val callId = Opener.redeem(token)
         if (callId != null) o.put("answer", callId)
         pendingOpen = o
-        notifyListeners("open", JSObject())
+        emit("open", JSONObject())
     }
 
-    @PluginMethod
-    fun takeOpen(call: PluginCall) {
+    private fun takeOpen(call: Call) {
         val s = pendingOpen
         pendingOpen = null
-        val r = JSObject()
+        val r = JSONObject()
         if (s != null) r.put("open", s)
         call.resolve(r)
     }
 
-    private fun openedJson(item: Inbox.Item, key: ByteArray): JSObject? =
+    private fun openedJson(item: Inbox.Item, key: ByteArray): JSONObject? =
         try {
-            JSObject(String(Shared.open(key, item.packet, "inbox"), Charsets.UTF_8))
+            JSONObject(String(Shared.open(key, item.packet, "inbox"), Charsets.UTF_8))
         } catch (e: Exception) {
             null
         }
@@ -159,7 +312,7 @@ class RipploMeshPlugin : Plugin(), MeshEngine.Listener {
         intent.action = Intent.ACTION_MAIN
         shareExec.execute {
             try {
-                val o = JSObject()
+                val o = JSONObject()
                 if (stream != null) {
                     val authority = stream.authority
                     if (stream.scheme != "content" || authority == null || authority.startsWith(context.packageName)) return@execute
@@ -196,28 +349,28 @@ class RipploMeshPlugin : Plugin(), MeshEngine.Listener {
                     return@execute
                 }
                 pendingShare = o
-                notifyListeners("share", JSObject())
+                emit("share", JSONObject())
             } catch (ignored: Exception) {
             }
         }
     }
 
-    @PluginMethod
-    fun takeShare(call: PluginCall) {
+    private fun takeShare(call: Call) {
         val s = pendingShare
         pendingShare = null
-        val r = JSObject()
+        val r = JSONObject()
         if (s != null) r.put("share", s)
         call.resolve(r)
     }
 
-    override fun handleOnPause() {
+    fun onHostPause() {
         foreground = false
-        engine.setJsAttached(false)
+        if (::engine.isInitialized) engine.setJsAttached(false)
     }
 
-    override fun handleOnResume() {
+    fun onHostResume() {
         foreground = true
+        if (!::engine.isInitialized) return
         Notifier.cancelUpdated(context)
         Ringer.stop()
         Notifier.cancelCall(context)
@@ -247,22 +400,20 @@ class RipploMeshPlugin : Plugin(), MeshEngine.Listener {
             when {
                 !item.opened() -> onPacket(item.packet, item.from)
                 key == null -> engine.requeue(item)
-                else -> openedJson(item, key)?.let { notifyListeners("opened", it) }
+                else -> openedJson(item, key)?.let { emit("opened", it) }
             }
         }
     }
 
-    @PluginMethod
-    fun isLocked(call: PluginCall) {
+    private fun isLocked(call: Call) {
         val km = context.getSystemService(Context.KEYGUARD_SERVICE) as KeyguardManager?
-        val r = JSObject()
+        val r = JSONObject()
         r.put("locked", km != null && km.isKeyguardLocked)
         call.resolve(r)
     }
 
-    @PluginMethod
-    fun keepAwake(call: PluginCall) {
-        val on = call.getBoolean("on", false)!!
+    private fun keepAwake(call: Call) {
+        val on = call.getBoolean("on", false)
         val a = activity
         a?.runOnUiThread {
             if (on) a.window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
@@ -271,8 +422,7 @@ class RipploMeshPlugin : Plugin(), MeshEngine.Listener {
         call.resolve()
     }
 
-    @PluginMethod
-    fun endLockedCall(call: PluginCall) {
+    private fun endLockedCall(call: Call) {
         val a = activity
         a?.runOnUiThread {
             if (Build.VERSION.SDK_INT >= 27) a.setShowWhenLocked(false)
@@ -281,62 +431,51 @@ class RipploMeshPlugin : Plugin(), MeshEngine.Listener {
         call.resolve()
     }
 
-    @PluginMethod
-    fun requestFullScreen(call: PluginCall) {
+    private fun requestFullScreen(call: Call) {
         if (Build.VERSION.SDK_INT >= 34) {
             try {
-                activity.startActivity(Intent(Settings.ACTION_MANAGE_APP_USE_FULL_SCREEN_INTENT, Uri.parse("package:" + context.packageName)))
+                activity?.startActivity(Intent(Settings.ACTION_MANAGE_APP_USE_FULL_SCREEN_INTENT, Uri.parse("package:" + context.packageName)))
             } catch (ignored: RuntimeException) {
             }
         }
         call.resolve()
     }
 
-    @PluginMethod
-    fun startRing(call: PluginCall) {
+    private fun startRing(call: Call) {
         Ringer.start(context)
         call.resolve()
     }
 
-    @PluginMethod
-    fun stopRing(call: PluginCall) {
+    private fun stopRing(call: Call) {
         Ringer.stop()
         call.resolve()
     }
 
-    override fun handleOnDestroy() {
-        Ringer.stop()
-        engine.setJsAttached(false)
-        engine.setListener(null)
-        if (!engine.background()) engine.stop()
-    }
-
     override fun onPacket(packet: ByteArray, from: String) {
-        val o = JSObject()
+        val o = JSONObject()
         o.put("packet", enc(packet))
         o.put("from", from)
-        notifyListeners("packet", o)
+        emit("packet", o)
     }
 
     override fun onNeighbor(node: String, up: Boolean, medium: String, kbps: Long) {
-        val o = JSObject()
+        val o = JSONObject()
         o.put("node", node)
         o.put("up", up)
         o.put("medium", medium)
         o.put("kbps", kbps)
-        notifyListeners("neighbor", o)
+        emit("neighbor", o)
     }
 
-    @PluginMethod
-    fun start(call: PluginCall) {
+    private fun start(call: Call) {
         try {
-            val self = b64(call.getString("selfTag", "")!!)
+            val self = b64(call.getString("selfTag", ""))
             if (self.size != 16) {
                 call.reject("bad selfTag")
                 return
             }
-            engine.start(self, call.getBoolean("background", true)!!, true)
-            val r = JSObject()
+            engine.start(self, call.getBoolean("background", true), true)
+            val r = JSONObject()
             r.put("nodeTag", engine.nodeTag())
             call.resolve(r)
         } catch (e: RuntimeException) {
@@ -344,17 +483,15 @@ class RipploMeshPlugin : Plugin(), MeshEngine.Listener {
         }
     }
 
-    @PluginMethod
-    fun stop(call: PluginCall) {
+    private fun stop(call: Call) {
         engine.stop()
         call.resolve()
     }
 
-    @PluginMethod
-    fun send(call: PluginCall) {
+    private fun send(call: Call) {
         try {
-            val n = engine.sendFromJs(b64(call.getString("packet", "")!!))
-            val r = JSObject()
+            val n = engine.sendFromJs(b64(call.getString("packet", "")))
+            val r = JSONObject()
             r.put("neighbors", n)
             call.resolve(r)
         } catch (e: RuntimeException) {
@@ -362,11 +499,10 @@ class RipploMeshPlugin : Plugin(), MeshEngine.Listener {
         }
     }
 
-    @PluginMethod
-    fun sendApp(call: PluginCall) {
+    private fun sendApp(call: Call) {
         try {
-            val node = call.getString("node", "")!!
-            if (!engine.sendApp(node, b64(call.getString("payload", "")!!))) {
+            val node = call.getString("node", "")
+            if (!engine.sendApp(node, b64(call.getString("payload", "")))) {
                 call.reject("no link")
                 return
             }
@@ -376,25 +512,22 @@ class RipploMeshPlugin : Plugin(), MeshEngine.Listener {
         }
     }
 
-    @PluginMethod
-    fun devConnect(call: PluginCall) {
-        val node = call.getString("node", "")!!
-        val spec = call.getString("spec", "")!!
-        val r = JSObject()
+    private fun devConnect(call: Call) {
+        val node = call.getString("node", "")
+        val spec = call.getString("spec", "")
+        val r = JSONObject()
         r.put("started", node.isNotEmpty() && spec.isNotEmpty() && engine.forceConnect(node, spec))
         call.resolve(r)
     }
 
-    @PluginMethod
-    fun devDisconnect(call: PluginCall) {
-        val node = call.getString("node", "")!!
-        val medium = call.getString("medium", "")!!
+    private fun devDisconnect(call: Call) {
+        val node = call.getString("node", "")
+        val medium = call.getString("medium", "")
         if (node.isNotEmpty() && medium.isNotEmpty()) engine.closeLinks(node, medium)
         call.resolve()
     }
 
-    @PluginMethod
-    fun getDeviceInfo(call: PluginCall) {
+    private fun getDeviceInfo(call: Call) {
         val c = context
         val pm = c.packageManager
         val text = buildString {
@@ -435,13 +568,12 @@ class RipploMeshPlugin : Plugin(), MeshEngine.Listener {
                 append("power info error ").append(e).append('\n')
             }
         }
-        val r = JSObject()
+        val r = JSONObject()
         r.put("text", text)
         call.resolve(r)
     }
 
-    @PluginMethod
-    fun getBleCaps(call: PluginCall) {
+    private fun getBleCaps(call: Call) {
         var coded = false
         var ext = false
         try {
@@ -453,15 +585,14 @@ class RipploMeshPlugin : Plugin(), MeshEngine.Listener {
             }
         } catch (ignored: RuntimeException) {
         }
-        val r = JSObject()
+        val r = JSONObject()
         r.put("coded", coded)
         r.put("extended", ext)
         call.resolve(r)
     }
 
-    @PluginMethod
-    fun getDiag(call: PluginCall) {
-        val r = JSObject()
+    private fun getDiag(call: Call) {
+        val r = JSONObject()
         r.put("log", Diag.dump())
         call.resolve(r)
     }
@@ -472,9 +603,8 @@ class RipploMeshPlugin : Plugin(), MeshEngine.Listener {
         return usb && Settings.Global.getInt(context.contentResolver, Settings.Global.ADB_ENABLED, 0) == 1
     }
 
-    @PluginMethod
-    fun usbLog(call: PluginCall) {
-        val r = JSObject()
+    private fun usbLog(call: Call) {
+        val r = JSONObject()
         val ok = usbAttached()
         if (ok) {
             val text = call.getString("text") ?: ""
@@ -484,42 +614,38 @@ class RipploMeshPlugin : Plugin(), MeshEngine.Listener {
         call.resolve(r)
     }
 
-    @PluginMethod
-    fun clearDiag(call: PluginCall) {
+    private fun clearDiag(call: Call) {
         Diag.clear()
         call.resolve()
     }
 
-    @PluginMethod
-    fun getTransports(call: PluginCall) {
+    private fun getTransports(call: Call) {
         try {
-            val r = JSObject()
-            r.put("transports", JSArray(engine.transportsJson().toString()))
+            val r = JSONObject()
+            r.put("transports", JSONArray(engine.transportsJson().toString()))
             call.resolve(r)
         } catch (e: JSONException) {
             call.reject("failed")
         }
     }
 
-    @PluginMethod
-    fun getNeighbors(call: PluginCall) {
+    private fun getNeighbors(call: Call) {
         try {
-            val r = JSObject()
-            r.put("neighbors", JSArray(engine.neighborsJson().toString()))
+            val r = JSONObject()
+            r.put("neighbors", JSONArray(engine.neighborsJson().toString()))
             call.resolve(r)
         } catch (e: JSONException) {
             call.reject("failed")
         }
     }
 
-    @PluginMethod
-    fun drainInbox(call: PluginCall) {
+    private fun drainInbox(call: Call) {
         drained = true
         engine.setJsAttached(true)
-        val arr = JSArray()
+        val arr = JSONArray()
         val key = keyOrNull()
         for (item in engine.drainInbox()) {
-            val o = JSObject()
+            val o = JSONObject()
             if (item.opened()) {
                 if (key == null) {
                     engine.requeue(item)
@@ -533,16 +659,15 @@ class RipploMeshPlugin : Plugin(), MeshEngine.Listener {
             }
             arr.put(o)
         }
-        val r = JSObject()
+        val r = JSONObject()
         r.put("packets", arr)
         call.resolve(r)
         lateDrain()
     }
 
-    @PluginMethod
-    fun getDbKey(call: PluginCall) {
+    private fun getDbKey(call: Call) {
         try {
-            val r = JSObject()
+            val r = JSONObject()
             r.put("key", enc(Shared.dbKey(context)))
             call.resolve(r)
         } catch (e: Exception) {
@@ -550,8 +675,7 @@ class RipploMeshPlugin : Plugin(), MeshEngine.Listener {
         }
     }
 
-    @PluginMethod
-    fun fromPlay(call: PluginCall) {
+    private fun fromPlay(call: Call) {
         val pm = context.packageManager
         val installer = try {
             if (Build.VERSION.SDK_INT >= 30) pm.getInstallSourceInfo(context.packageName).installingPackageName
@@ -559,13 +683,12 @@ class RipploMeshPlugin : Plugin(), MeshEngine.Listener {
         } catch (e: Exception) {
             null
         }
-        val r = JSObject()
+        val r = JSONObject()
         r.put("play", installer == "com.android.vending")
         call.resolve(r)
     }
 
-    @PluginMethod
-    fun selfHash(call: PluginCall) {
+    private fun selfHash(call: Call) {
         try {
             FileInputStream(context.applicationInfo.sourceDir).use { input ->
                 val md = MessageDigest.getInstance("SHA-256")
@@ -575,7 +698,7 @@ class RipploMeshPlugin : Plugin(), MeshEngine.Listener {
                     if (n <= 0) break
                     md.update(buf, 0, n)
                 }
-                val r = JSObject()
+                val r = JSONObject()
                 r.put("sha256", Packet.hex(md.digest()))
                 call.resolve(r)
             }
@@ -584,7 +707,7 @@ class RipploMeshPlugin : Plugin(), MeshEngine.Listener {
         }
     }
 
-    private fun signal(call: PluginCall, op: SignalOp) {
+    private fun signal(call: Call, op: SignalOp) {
         signalExec.execute {
             try {
                 call.resolve(op.run(Shared.signal(context)))
@@ -594,9 +717,9 @@ class RipploMeshPlugin : Plugin(), MeshEngine.Listener {
                     else -> SignalCore.BAD_MESSAGE
                 }
                 if (e is SignalCore.Failed) {
-                    val d = JSObject()
+                    val d = JSONObject()
                     d.put("tag", SignalCore.hex(e.tag))
-                    call.reject(code, code, null, d)
+                    call.reject(code, code, d)
                 } else {
                     call.reject(code, code)
                 }
@@ -604,39 +727,35 @@ class RipploMeshPlugin : Plugin(), MeshEngine.Listener {
         }
     }
 
-    @PluginMethod
-    fun signalInit(call: PluginCall) {
+    private fun signalInit(call: Call) {
         signal(call) { c ->
-            val r = JSObject()
+            val r = JSONObject()
             r.put("bundle", enc(c.init()))
             r.put("ik", enc(c.identityKey()))
             r
         }
     }
 
-    @PluginMethod
-    fun signalAddContact(call: PluginCall) {
+    private fun signalAddContact(call: Call) {
         signal(call) { c ->
-            val r = JSObject()
+            val r = JSONObject()
             r.put("tag", SignalCore.hex(c.addContact(arg(call, "bundle"))))
             r
         }
     }
 
-    @PluginMethod
-    fun signalSeal(call: PluginCall) {
+    private fun signalSeal(call: Call) {
         signal(call) { c ->
-            val r = JSObject()
+            val r = JSONObject()
             r.put("payload", enc(c.seal(SignalCore.unhex(call.getString("tag")), arg(call, "plaintext"))))
             r
         }
     }
 
-    @PluginMethod
-    fun signalOpen(call: PluginCall) {
+    private fun signalOpen(call: Call) {
         signal(call) { c ->
             val o = c.open(arg(call, "payload"))
-            val r = JSObject()
+            val r = JSONObject()
             r.put("tag", SignalCore.hex(o.tag))
             r.put("ik", enc(o.ik))
             r.put("plaintext", enc(o.plaintext))
@@ -644,29 +763,26 @@ class RipploMeshPlugin : Plugin(), MeshEngine.Listener {
         }
     }
 
-    @PluginMethod
-    fun signalProof(call: PluginCall) {
+    private fun signalProof(call: Call) {
         signal(call) { c ->
-            val r = JSObject()
+            val r = JSONObject()
             r.put("mac", enc(c.proof(arg(call, "ik"), arg(call, "n"), arg(call, "challengerTag"), arg(call, "proverTag"))))
             r
         }
     }
 
-    @PluginMethod
-    fun signalSafetyNumber(call: PluginCall) {
+    private fun signalSafetyNumber(call: Call) {
         signal(call) { c ->
-            val r = JSObject()
+            val r = JSONObject()
             r.put("digits", c.safetyNumber(arg(call, "ik")))
             r
         }
     }
 
-    @PluginMethod
-    fun signalForget(call: PluginCall) {
+    private fun signalForget(call: Call) {
         signal(call) { c ->
             c.forget(SignalCore.unhex(call.getString("tag")))
-            JSObject()
+            JSONObject()
         }
     }
 
@@ -675,7 +791,7 @@ class RipploMeshPlugin : Plugin(), MeshEngine.Listener {
     @Synchronized
     private fun backup(): BackupEngine = backupEngine ?: BackupEngine(context).also { backupEngine = it }
 
-    private fun run(ex: ExecutorService, call: PluginCall, op: () -> JSObject?) {
+    private fun run(ex: ExecutorService, call: Call, op: () -> JSONObject?) {
         ex.execute {
             try {
                 val r = op()
@@ -687,16 +803,14 @@ class RipploMeshPlugin : Plugin(), MeshEngine.Listener {
         }
     }
 
-    @PluginMethod
-    fun dbPut(call: PluginCall) {
+    private fun dbPut(call: Call) {
         run(storeExec, call) {
             db().put(need(call, "store"), need(call, "key"), call.getString("idx"), Base64.decode(need(call, "value"), Base64.NO_WRAP))
             null
         }
     }
 
-    @PluginMethod
-    fun dbPutMany(call: PluginCall) {
+    private fun dbPutMany(call: Call) {
         run(storeExec, call) {
             val arr = call.getArray("rows") ?: throw IllegalArgumentException("bad_args")
             val rows = ArrayList<Array<String?>>()
@@ -704,96 +818,95 @@ class RipploMeshPlugin : Plugin(), MeshEngine.Listener {
                 val o = arr.getJSONObject(i)
                 rows.add(arrayOf(o.getString("store"), o.getString("key"), if (o.isNull("idx")) null else o.getString("idx"), o.getString("value")))
             }
-            val r = JSObject()
+            val r = JSONObject()
             r.put("count", db().putMany(rows))
             r
         }
     }
 
-    @PluginMethod
-    fun dbGet(call: PluginCall) {
+    private fun dbGet(call: Call) {
         run(storeExec, call) {
             val v = db().get(need(call, "store"), need(call, "key"))
-            val r = JSObject()
+            val r = JSONObject()
             r.put("value", v ?: JSONObject.NULL)
             r
         }
     }
 
-    @PluginMethod
-    fun dbDel(call: PluginCall) {
+    private fun dbDel(call: Call) {
         run(storeExec, call) {
             db().del(need(call, "store"), need(call, "key"))
             null
         }
     }
 
-    @PluginMethod
-    fun dbKeys(call: PluginCall) {
+    private fun dbKeys(call: Call) {
         run(storeExec, call) {
-            val keys = JSArray()
+            val keys = JSONArray()
             for (k in db().keys(need(call, "store"), call.getString("prefix"))) keys.put(k)
-            val r = JSObject()
+            val r = JSONObject()
             r.put("keys", keys)
             r
         }
     }
 
-    @PluginMethod
-    fun dbAll(call: PluginCall) {
+    private fun dbAll(call: Call) {
         run(storeExec, call) { rowsResult(db().all(need(call, "store"))) }
     }
 
-    @PluginMethod
-    fun dbByIdx(call: PluginCall) {
+    private fun dbByIdx(call: Call) {
         run(storeExec, call) { rowsResult(db().byIdx(need(call, "store"), need(call, "idx"))) }
     }
 
-    @PluginMethod
-    fun dbCount(call: PluginCall) {
+    private fun dbCount(call: Call) {
         run(storeExec, call) {
-            val r = JSObject()
+            val r = JSONObject()
             r.put("count", db().count())
             r
         }
     }
 
-    @PluginMethod
-    fun authAvailable(call: PluginCall) {
-        val r = JSObject()
+    private fun authAvailable(call: Call) {
+        val r = JSONObject()
         r.put("biometric", AppLock.biometric(context))
         r.put("deviceCredential", AppLock.deviceCredential(context))
         call.resolve(r)
     }
 
     private fun authenticateThen(reason: String, next: AppLock.Result) {
-        val a = activity
+        val a = activity as? FragmentActivity
+        if (a == null) {
+            next.done(false)
+            return
+        }
         a.runOnUiThread { AppLock.authenticate(a, reason, next) }
     }
 
-    @PluginMethod
-    fun authenticate(call: PluginCall) {
-        authenticateThen(call.getString("reason", "Ripplo")!!) { ok ->
-            val r = JSObject()
+    private fun authenticate(call: Call) {
+        authenticateThen(call.getString("reason", "Ripplo")) { ok ->
+            val r = JSONObject()
             r.put("ok", ok)
             call.resolve(r)
         }
     }
 
-    @PluginMethod
-    fun setSecure(call: PluginCall) {
-        val on = call.getBoolean("on", false)!! == true
-        activity.runOnUiThread {
-            if (on) activity.window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
-            else activity.window.clearFlags(WindowManager.LayoutParams.FLAG_SECURE)
+    private fun setSecure(call: Call) {
+        val on = call.getBoolean("on", false)
+        val a = activity
+        if (a == null) {
+            call.reject("failed")
+            return
+        }
+        a.runOnUiThread {
+            if (on) a.window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
+            else a.window.clearFlags(WindowManager.LayoutParams.FLAG_SECURE)
             call.resolve()
         }
     }
 
-    @PluginMethod
-    fun backupStatus(call: PluginCall) {
+    private fun backupStatus(call: Call) {
         val sp = backup().prefs()
-        val r = JSObject()
+        val r = JSONObject()
         r.put("enabled", backup().enabled())
         r.put("lastAt", sp.getLong("lastAt", 0L))
         val f = sp.getString("folderName", null)
@@ -801,17 +914,15 @@ class RipploMeshPlugin : Plugin(), MeshEngine.Listener {
         call.resolve(r)
     }
 
-    @PluginMethod
-    fun backupEnable(call: PluginCall) {
+    private fun backupEnable(call: Call) {
         run(backupExec, call) {
-            val r = JSObject()
+            val r = JSONObject()
             r.put("code", backup().enable())
             r
         }
     }
 
-    @PluginMethod
-    fun backupShowCode(call: PluginCall) {
+    private fun backupShowCode(call: Call) {
         authenticateThen("Ripplo") { ok ->
             if (!ok) {
                 call.reject("auth_failed", "auth_failed")
@@ -819,15 +930,14 @@ class RipploMeshPlugin : Plugin(), MeshEngine.Listener {
             }
             run(backupExec, call) {
                 val s = backup().secrets() ?: throw IllegalStateException("not_enabled")
-                val r = JSObject()
+                val r = JSONObject()
                 r.put("code", s.code)
                 r
             }
         }
     }
 
-    @PluginMethod
-    fun backupDisable(call: PluginCall) {
+    private fun backupDisable(call: Call) {
         authenticateThen("Ripplo") { ok ->
             if (!ok) {
                 call.reject("auth_failed", "auth_failed")
@@ -863,19 +973,51 @@ class RipploMeshPlugin : Plugin(), MeshEngine.Listener {
         return null
     }
 
-    @PluginMethod
-    fun backupChooseFolder(call: PluginCall) {
+    @Suppress("DEPRECATION")
+    private fun launch(call: Call, intent: Intent, code: Int) {
+        val a = activity
+        if (a == null) {
+            call.reject("failed", "failed")
+            return
+        }
+        pending.put(code, call)?.reject("cancelled", "cancelled")
+        Call.post {
+            try {
+                a.startActivityForResult(intent, code)
+            } catch (e: RuntimeException) {
+                pending.remove(code)?.reject("failed", "failed")
+            }
+        }
+    }
+
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?): Boolean {
+        if (requestCode != REQ_FOLDER && requestCode != REQ_CREATE && requestCode != REQ_RESTORE) return false
+        val call = pending.remove(requestCode) ?: return false
+        when (requestCode) {
+            REQ_FOLDER -> folderPicked(call, resultCode, data)
+            REQ_CREATE -> createPicked(call, resultCode, data)
+            else -> restorePicked(call, resultCode, data)
+        }
+        return true
+    }
+
+    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray): Boolean {
+        if (requestCode != REQ_PERMS) return false
+        val call = pending.remove(REQ_PERMS) ?: return false
+        call.resolve(states())
+        return true
+    }
+
+    private fun backupChooseFolder(call: Call) {
         val i = Intent(Intent.ACTION_OPEN_DOCUMENT_TREE).addFlags(
             Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION or Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION,
         )
-        startActivityForResult(call, i, "folderPicked")
+        launch(call, i, REQ_FOLDER)
     }
 
-    @ActivityCallback
-    private fun folderPicked(call: PluginCall?, result: ActivityResult) {
-        if (call == null) return
-        val tree = result.data?.data
-        if (result.resultCode != Activity.RESULT_OK || tree == null) {
+    private fun folderPicked(call: Call, resultCode: Int, data: Intent?) {
+        val tree = data?.data
+        if (resultCode != Activity.RESULT_OK || tree == null) {
             call.reject("cancelled", "cancelled")
             return
         }
@@ -890,7 +1032,7 @@ class RipploMeshPlugin : Plugin(), MeshEngine.Listener {
             val name = displayName(DocumentsContract.buildDocumentUriUsingTree(tree, DocumentsContract.getTreeDocumentId(tree)))
                 ?: tree.lastPathSegment
             sp.edit().putString("folder", tree.toString()).putString("folderName", name).commit()
-            val r = JSObject()
+            val r = JSONObject()
             r.put("folder", name)
             call.resolve(r)
         } catch (e: RuntimeException) {
@@ -912,35 +1054,34 @@ class RipploMeshPlugin : Plugin(), MeshEngine.Listener {
         }
     }
 
-    private fun writeBackup(raw: OutputStream, call: PluginCall): Long {
+    private fun writeBackup(raw: OutputStream, call: Call): Long {
         val s = backup().secrets() ?: throw IllegalStateException("not_enabled")
         val out = Counting(BufferedOutputStream(raw, 65536))
-        backup().write(out, call.getObject("meta", JSObject()).toString(), Shared.dbKey(context), s, Shared.signalStore(context), db())
+        backup().write(out, call.getObject("meta", JSONObject()).toString(), Shared.dbKey(context), s, Shared.signalStore(context), db())
         backup().prefs().edit().putLong("lastAt", System.currentTimeMillis()).commit()
         return out.n
     }
 
-    private fun created(name: String, size: Long): JSObject {
-        val r = JSObject()
+    private fun created(name: String, size: Long): JSONObject {
+        val r = JSONObject()
         r.put("ok", true)
         r.put("name", name)
         r.put("size", size)
         return r
     }
 
-    @PluginMethod
-    fun backupCreate(call: PluginCall) {
+    private fun backupCreate(call: Call) {
         if (!backup().enabled()) {
             call.reject("not_enabled", "not_enabled")
             return
         }
-        val mode = call.getString("mode", "pick")!!
+        val mode = call.getString("mode", "pick")
         val sp = backup().prefs()
         val folder = sp.getString("folder", null)
         if (mode == "pick" || (mode == "now" && folder == null)) {
             val i = Intent(Intent.ACTION_CREATE_DOCUMENT).addCategory(Intent.CATEGORY_OPENABLE)
                 .setType("application/octet-stream").putExtra(Intent.EXTRA_TITLE, backupName())
-            startActivityForResult(call, i, "createPicked")
+            launch(call, i, REQ_CREATE)
             return
         }
         if (folder == null) {
@@ -948,7 +1089,7 @@ class RipploMeshPlugin : Plugin(), MeshEngine.Listener {
             return
         }
         if (mode == "auto" && System.currentTimeMillis() - sp.getLong("lastAt", 0L) < 24L * 3600 * 1000) {
-            val r = JSObject()
+            val r = JSONObject()
             r.put("skipped", true)
             call.resolve(r)
             return
@@ -956,7 +1097,7 @@ class RipploMeshPlugin : Plugin(), MeshEngine.Listener {
         run(backupExec, call) { writeToFolder(folder, call) }
     }
 
-    private fun writeToFolder(folder: String, call: PluginCall): JSObject {
+    private fun writeToFolder(folder: String, call: Call): JSONObject {
         val cr = context.contentResolver
         val tree = Uri.parse(folder)
         val treeId = DocumentsContract.getTreeDocumentId(tree)
@@ -1014,11 +1155,9 @@ class RipploMeshPlugin : Plugin(), MeshEngine.Listener {
         }
     }
 
-    @ActivityCallback
-    private fun createPicked(call: PluginCall?, result: ActivityResult) {
-        if (call == null) return
-        val uri = result.data?.data
-        if (result.resultCode != Activity.RESULT_OK || uri == null) {
+    private fun createPicked(call: Call, resultCode: Int, data: Intent?) {
+        val uri = data?.data
+        if (resultCode != Activity.RESULT_OK || uri == null) {
             call.reject("cancelled", "cancelled")
             return
         }
@@ -1040,21 +1179,18 @@ class RipploMeshPlugin : Plugin(), MeshEngine.Listener {
         }
     }
 
-    @PluginMethod
-    fun backupRestore(call: PluginCall) {
+    private fun backupRestore(call: Call) {
         if (call.getString("code") == null) {
             call.reject("bad_code", "bad_code")
             return
         }
         val i = Intent(Intent.ACTION_OPEN_DOCUMENT).addCategory(Intent.CATEGORY_OPENABLE).setType("*/*")
-        startActivityForResult(call, i, "restorePicked")
+        launch(call, i, REQ_RESTORE)
     }
 
-    @ActivityCallback
-    private fun restorePicked(call: PluginCall?, result: ActivityResult) {
-        if (call == null) return
-        val uri = result.data?.data
-        if (result.resultCode != Activity.RESULT_OK || uri == null) {
+    private fun restorePicked(call: Call, resultCode: Int, data: Intent?) {
+        val uri = data?.data
+        if (resultCode != Activity.RESULT_OK || uri == null) {
             call.reject("cancelled", "cancelled")
             return
         }
@@ -1062,16 +1198,16 @@ class RipploMeshPlugin : Plugin(), MeshEngine.Listener {
             val be = backup()
             val st = context.contentResolver.openInputStream(uri).use { raw ->
                 if (raw == null) throw BackupFormat.BackupException(BackupFormat.BAD_FILE)
-                be.stage(BufferedInputStream(raw, 65536), call.getString("code", "")!!)
+                be.stage(BufferedInputStream(raw, 65536), call.getString("code", ""))
             }
             try {
                 val meta = try {
-                    JSObject(st.meta)
+                    JSONObject(st.meta)
                 } catch (e: JSONException) {
                     throw BackupFormat.BackupException(BackupFormat.BAD_FILE)
                 }
                 applyRestore(st)
-                val r = JSObject()
+                val r = JSONObject()
                 r.put("meta", meta)
                 r
             } finally {
@@ -1116,8 +1252,7 @@ class RipploMeshPlugin : Plugin(), MeshEngine.Listener {
         Shared.reset()
     }
 
-    @PluginMethod
-    fun requestBatteryExemption(call: PluginCall) {
+    private fun requestBatteryExemption(call: Call) {
         val ctx = context
         val pm = ctx.getSystemService(Context.POWER_SERVICE) as PowerManager
         if (pm.isIgnoringBatteryOptimizations(ctx.packageName)) {
@@ -1125,10 +1260,10 @@ class RipploMeshPlugin : Plugin(), MeshEngine.Listener {
             return
         }
         try {
-            activity.startActivity(Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS, Uri.parse("package:" + ctx.packageName)))
+            activity?.startActivity(Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS, Uri.parse("package:" + ctx.packageName)))
         } catch (e: RuntimeException) {
             try {
-                activity.startActivity(Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS))
+                activity?.startActivity(Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS))
             } catch (ignored: RuntimeException) {
             }
         }
@@ -1143,7 +1278,7 @@ class RipploMeshPlugin : Plugin(), MeshEngine.Listener {
         return if (sp.getBoolean(alias, false)) "denied" else "prompt"
     }
 
-    private fun states(): JSObject {
+    private fun states(): JSONObject {
         val bt = if (Build.VERSION.SDK_INT >= 31) {
             granted(Manifest.permission.BLUETOOTH_SCAN) && granted(Manifest.permission.BLUETOOTH_ADVERTISE) &&
                 granted(Manifest.permission.BLUETOOTH_CONNECT)
@@ -1160,7 +1295,7 @@ class RipploMeshPlugin : Plugin(), MeshEngine.Listener {
         } else {
             NotificationManagerCompat.from(context).areNotificationsEnabled()
         }
-        val o = JSObject()
+        val o = JSONObject()
         o.put("bluetooth", state(bt, "bluetooth"))
         o.put("wifi", state(wifi, "wifi"))
         o.put("notifications", state(notif, "notifications"))
@@ -1174,13 +1309,29 @@ class RipploMeshPlugin : Plugin(), MeshEngine.Listener {
         return o
     }
 
-    @PluginMethod
-    override fun checkPermissions(call: PluginCall) {
+    private fun checkPermissions(call: Call) {
         call.resolve(states())
     }
 
-    @PluginMethod
-    override fun requestPermissions(call: PluginCall) {
+    private fun permissionStrings(alias: String): Array<String> = when (alias) {
+        "bluetooth" -> arrayOf(
+            Manifest.permission.BLUETOOTH_SCAN,
+            Manifest.permission.BLUETOOTH_ADVERTISE,
+            Manifest.permission.BLUETOOTH_CONNECT,
+        )
+        "bluetoothLegacy" -> arrayOf(
+            Manifest.permission.BLUETOOTH,
+            Manifest.permission.BLUETOOTH_ADMIN,
+            Manifest.permission.ACCESS_FINE_LOCATION,
+        )
+        "wifi" -> arrayOf(Manifest.permission.NEARBY_WIFI_DEVICES)
+        "wifiLegacy" -> arrayOf(Manifest.permission.ACCESS_FINE_LOCATION)
+        "notifications" -> arrayOf(Manifest.permission.POST_NOTIFICATIONS)
+        "microphone" -> arrayOf(Manifest.permission.RECORD_AUDIO)
+        else -> emptyArray()
+    }
+
+    private fun requestPermissions(call: Call) {
         val s = states()
         val aliases = ArrayList<String>()
         val ed = context.getSharedPreferences("ripplo_perm", Context.MODE_PRIVATE).edit()
@@ -1205,34 +1356,35 @@ class RipploMeshPlugin : Plugin(), MeshEngine.Listener {
             call.resolve(s)
             return
         }
-        requestPermissionForAliases(aliases.toTypedArray(), call, "permissionsDone")
+        val a = activity
+        if (a == null) {
+            call.resolve(s)
+            return
+        }
+        val perms = LinkedHashSet<String>()
+        for (alias in aliases) perms.addAll(permissionStrings(alias))
+        pending.put(REQ_PERMS, call)?.resolve(s)
+        Call.post { ActivityCompat.requestPermissions(a, perms.toTypedArray(), REQ_PERMS) }
     }
 
-    @PermissionCallback
-    private fun permissionsDone(call: PluginCall) {
-        call.resolve(states())
-    }
-
-    @PluginMethod
-    fun setAutoUpdate(call: PluginCall) {
-        val on = call.getBoolean("enabled", true)!!
+    private fun setAutoUpdate(call: Call) {
+        val on = call.getBoolean("enabled", true)
         context.getSharedPreferences(UpdateEngine.PREFS, Context.MODE_PRIVATE).edit().putBoolean("auto", on).apply()
         if (on) UpdateJobService.schedule(context) else UpdateJobService.cancel(context)
         call.resolve()
     }
 
-    @PluginMethod
-    fun installUpdate(call: PluginCall) {
-        val url = call.getString("url", "")!!
-        val sha = call.getString("sha256", "")!!.lowercase(Locale.getDefault())
+    private fun installUpdate(call: Call) {
+        val url = call.getString("url", "")
+        val sha = call.getString("sha256", "").lowercase(Locale.getDefault())
         if (!url.startsWith("https://") || !sha.matches(Regex("[0-9a-f]{64}"))) {
             call.reject("bad arguments")
             return
         }
         if (!UpdateEngine.canInstall(context)) {
-            if (call.getBoolean("prompt", false)!!) {
+            if (call.getBoolean("prompt", false)) {
                 try {
-                    activity.startActivity(Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, Uri.parse("package:" + context.packageName)))
+                    activity?.startActivity(Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, Uri.parse("package:" + context.packageName)))
                 } catch (ignored: RuntimeException) {
                 }
             }
@@ -1246,9 +1398,9 @@ class RipploMeshPlugin : Plugin(), MeshEngine.Listener {
         val t = Thread({
             try {
                 UpdateEngine.apply(context, url, sha, { p ->
-                    val o = JSObject()
+                    val o = JSONObject()
                     o.put("progress", p)
-                    notifyListeners("updateProgress", o)
+                    emit("updateProgress", o)
                 }, call)
             } catch (e: Exception) {
                 call.reject(e.message ?: "update failed")
@@ -1260,12 +1412,30 @@ class RipploMeshPlugin : Plugin(), MeshEngine.Listener {
         t.start()
     }
 
+    private fun notifyUser(call: Call) {
+        Notifier.message(context, call.getString("chatId", ""), call.getString("title"), call.getString("body"))
+        call.resolve()
+    }
+
     companion object {
         @Volatile
-        internal var installCall: PluginCall? = null
+        internal var installCall: Call? = null
 
         @Volatile
         internal var foreground = false
+
+        @Volatile
+        private var live: RipploMeshPlugin? = null
+        private val shareExec = Executors.newSingleThreadExecutor()
+        private val drainExec = Executors.newSingleThreadExecutor()
+        private val callExec = Executors.newSingleThreadExecutor()
+        private val signalExec = Executors.newSingleThreadExecutor()
+        private val storeExec = Executors.newSingleThreadExecutor()
+        private val backupExec = Executors.newSingleThreadExecutor()
+        private const val REQ_FOLDER = 7101
+        private const val REQ_CREATE = 7102
+        private const val REQ_RESTORE = 7103
+        private const val REQ_PERMS = 7104
         private val CHAT_ID = Regex("^[0-9A-HJKMNP-TV-Z]{16}$|^[A-Za-z0-9_-]{6,32}$")
         private const val BACKUP_FILE = "Ripplo-backup.rbk"
 
@@ -1276,23 +1446,23 @@ class RipploMeshPlugin : Plugin(), MeshEngine.Listener {
 
         private fun enc(b: ByteArray): String = Base64.encodeToString(b, Base64.NO_WRAP)
 
-        private fun arg(call: PluginCall, name: String): ByteArray {
+        private fun arg(call: Call, name: String): ByteArray {
             val v = call.getString(name) ?: throw IllegalArgumentException("bad_message")
             return b64(v)
         }
 
-        private fun need(call: PluginCall, name: String): String =
+        private fun need(call: Call, name: String): String =
             call.getString(name) ?: throw IllegalArgumentException("bad_args")
 
-        private fun rowsResult(rows: List<NativeStore.Row>): JSObject {
-            val arr = JSArray()
+        private fun rowsResult(rows: List<NativeStore.Row>): JSONObject {
+            val arr = JSONArray()
             for (row in rows) {
-                val o = JSObject()
+                val o = JSONObject()
                 o.put("key", row.key)
                 o.put("value", row.value)
                 arr.put(o)
             }
-            val r = JSObject()
+            val r = JSONObject()
             r.put("rows", arr)
             return r
         }
@@ -1311,7 +1481,7 @@ class RipploMeshPlugin : Plugin(), MeshEngine.Listener {
             installCall = null
             if (c == null) return
             if (ok) {
-                val r = JSObject()
+                val r = JSONObject()
                 r.put("status", "success")
                 c.resolve(r)
             } else {

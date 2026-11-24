@@ -8,7 +8,6 @@ import android.content.pm.PackageInstaller
 import android.content.pm.PackageManager
 import android.content.pm.Signature
 import android.os.Build
-import com.getcapacitor.PluginCall
 import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.FileInputStream
@@ -111,7 +110,7 @@ internal object UpdateEngine {
         return null
     }
 
-    fun apply(ctx: Context, url: String?, sha: String?, progress: Progress?, call: PluginCall?) {
+    fun apply(ctx: Context, url: String?, sha: String?, progress: Progress?, call: Call?) {
         val apk = File(ctx.cacheDir, "update.apk")
         try {
             download(url, apk, sha, progress)
@@ -181,7 +180,7 @@ internal object UpdateEngine {
         if (certs(archive) != certs(installed)) throw Exception("signature mismatch")
     }
 
-    private fun install(ctx: Context, apk: File, call: PluginCall?) {
+    private fun install(ctx: Context, apk: File, call: Call?) {
         val pi = ctx.packageManager.packageInstaller
         val params = PackageInstaller.SessionParams(PackageInstaller.SessionParams.MODE_FULL_INSTALL)
         params.setAppPackageName(ctx.packageName)
