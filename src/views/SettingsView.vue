@@ -54,6 +54,7 @@ async function sendLogs() {
   const native = await mesh.getDiag()
   const head = `Ripplo ${state.update.current || '?'} ${new Date().toISOString()}\n`
   const text = head + (await summary()) + '--- native log ---\n' + (native ? native + '\n--- JS ---\n' : '') + diagText()
+  if (await mesh.usbLog(text)) { toast(t('logSent')); return }
   try {
     const r = await sendDevLog(DEV_LOG_RECIPIENT, text)
     toast(t(r.ok ? 'logSent' : 'logNotSent'))

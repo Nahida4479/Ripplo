@@ -466,6 +466,24 @@ class RipploMeshPlugin : Plugin(), MeshEngine.Listener {
         call.resolve(r)
     }
 
+    private fun usbAttached(): Boolean {
+        val b = context.registerReceiver(null, android.content.IntentFilter(Intent.ACTION_BATTERY_CHANGED))
+        val usb = b != null && (b.getIntExtra(android.os.BatteryManager.EXTRA_PLUGGED, 0) and android.os.BatteryManager.BATTERY_PLUGGED_USB) != 0
+        return usb && Settings.Global.getInt(context.contentResolver, Settings.Global.ADB_ENABLED, 0) == 1
+    }
+
+    @PluginMethod
+    fun usbLog(call: PluginCall) {
+        val r = JSObject()
+        val ok = usbAttached()
+        if (ok) {
+            val text = call.getString("text") ?: ""
+            for (chunk in text.chunked(3000)) android.util.Log.i("ripplo", chunk)
+        }
+        r.put("usb", ok)
+        call.resolve(r)
+    }
+
     @PluginMethod
     fun clearDiag(call: PluginCall) {
         Diag.clear()

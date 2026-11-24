@@ -12,7 +12,7 @@ import { createAudio, audioSupported } from './callAudio.js'
 import { createState } from './state.js'
 import { notify } from '../services/notifications.js'
 import { t } from '../i18n.js'
-import { diagLog } from './diag.js'
+import { diagLog, setDiagSink } from './diag.js'
 
 export const MAX_TEXT = 1000
 export const MAX_FILE = 20 * 1024 * 1024
@@ -49,6 +49,7 @@ const safeMime = (m) => {
 
 export function createCore({ mesh, dbName = 'ripplo', state = createState(), notifier = notify, timing = {}, audio = { supported: audioSupported, create: createAudio } }) {
   const T = { ...DEFAULT_TIMING, ...timing }
+  if (mesh.usbLog) setDiagSink(mesh.usbLog)
   let db = null
   let own = null
   let me = null
