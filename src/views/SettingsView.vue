@@ -28,7 +28,7 @@ const kbps = n => n.kbps >= 1000 ? (n.kbps / 1000).toFixed(1) + ' Mbps' : n.kbps
 // Recipient of developer logs: the ripploId of the developer's own phone (must be a contact).
 // BLE links show their PHY when it is known (native note: "phy coded" / "phy 1M").
 const linkLabel = l => (isCodedLink(l) ? 'BLE Coded' : String(l.medium).toUpperCase())
-const DEV_LOG_RECIPIENT = 'H90HYSP1BQJPRGCF'
+const DEV_LOG_RECIPIENT = '8277SCA2VX64NHHB'
 let logTimer = null
 function startLogPress() {
   clearTimeout(logTimer)
