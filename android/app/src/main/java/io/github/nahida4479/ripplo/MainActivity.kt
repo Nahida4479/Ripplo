@@ -14,7 +14,7 @@ class MainActivity : BridgeActivity() {
         super.onCreate(savedInstanceState)
     }
 
-    override fun onNewIntent(intent: Intent?) {
+    override fun onNewIntent(intent: Intent) {
         showOverLock(intent)
         super.onNewIntent(intent)
     }

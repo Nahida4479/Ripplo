@@ -262,7 +262,7 @@ class RipploMeshPlugin : Plugin(), MeshEngine.Listener {
 
     @PluginMethod
     fun keepAwake(call: PluginCall) {
-        val on = call.getBoolean("on", false)
+        val on = call.getBoolean("on", false)!!
         val a = activity
         a?.runOnUiThread {
             if (on) a.window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
@@ -330,12 +330,12 @@ class RipploMeshPlugin : Plugin(), MeshEngine.Listener {
     @PluginMethod
     fun start(call: PluginCall) {
         try {
-            val self = b64(call.getString("selfTag", ""))
+            val self = b64(call.getString("selfTag", "")!!)
             if (self.size != 16) {
                 call.reject("bad selfTag")
                 return
             }
-            engine.start(self, call.getBoolean("background", true), true)
+            engine.start(self, call.getBoolean("background", true)!!, true)
             val r = JSObject()
             r.put("nodeTag", engine.nodeTag())
             call.resolve(r)
@@ -353,7 +353,7 @@ class RipploMeshPlugin : Plugin(), MeshEngine.Listener {
     @PluginMethod
     fun send(call: PluginCall) {
         try {
-            val n = engine.sendFromJs(b64(call.getString("packet", "")))
+            val n = engine.sendFromJs(b64(call.getString("packet", "")!!))
             val r = JSObject()
             r.put("neighbors", n)
             call.resolve(r)
@@ -365,8 +365,8 @@ class RipploMeshPlugin : Plugin(), MeshEngine.Listener {
     @PluginMethod
     fun sendApp(call: PluginCall) {
         try {
-            val node = call.getString("node", "")
-            if (!engine.sendApp(node, b64(call.getString("payload", "")))) {
+            val node = call.getString("node", "")!!
+            if (!engine.sendApp(node, b64(call.getString("payload", "")!!))) {
                 call.reject("no link")
                 return
             }
@@ -378,8 +378,8 @@ class RipploMeshPlugin : Plugin(), MeshEngine.Listener {
 
     @PluginMethod
     fun devConnect(call: PluginCall) {
-        val node = call.getString("node", "")
-        val spec = call.getString("spec", "")
+        val node = call.getString("node", "")!!
+        val spec = call.getString("spec", "")!!
         val r = JSObject()
         r.put("started", node.isNotEmpty() && spec.isNotEmpty() && engine.forceConnect(node, spec))
         call.resolve(r)
@@ -387,8 +387,8 @@ class RipploMeshPlugin : Plugin(), MeshEngine.Listener {
 
     @PluginMethod
     fun devDisconnect(call: PluginCall) {
-        val node = call.getString("node", "")
-        val medium = call.getString("medium", "")
+        val node = call.getString("node", "")!!
+        val medium = call.getString("medium", "")!!
         if (node.isNotEmpty() && medium.isNotEmpty()) engine.closeLinks(node, medium)
         call.resolve()
     }
@@ -741,7 +741,7 @@ class RipploMeshPlugin : Plugin(), MeshEngine.Listener {
 
     @PluginMethod
     fun authenticate(call: PluginCall) {
-        authenticateThen(call.getString("reason", "Ripplo")) { ok ->
+        authenticateThen(call.getString("reason", "Ripplo")!!) { ok ->
             val r = JSObject()
             r.put("ok", ok)
             call.resolve(r)
@@ -750,7 +750,7 @@ class RipploMeshPlugin : Plugin(), MeshEngine.Listener {
 
     @PluginMethod
     fun setSecure(call: PluginCall) {
-        val on = call.getBoolean("on", false) == true
+        val on = call.getBoolean("on", false)!! == true
         activity.runOnUiThread {
             if (on) activity.window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
             else activity.window.clearFlags(WindowManager.LayoutParams.FLAG_SECURE)
@@ -902,7 +902,7 @@ class RipploMeshPlugin : Plugin(), MeshEngine.Listener {
             call.reject("not_enabled", "not_enabled")
             return
         }
-        val mode = call.getString("mode", "pick")
+        val mode = call.getString("mode", "pick")!!
         val sp = backup().prefs()
         val folder = sp.getString("folder", null)
         if (mode == "pick" || (mode == "now" && folder == null)) {
@@ -1030,7 +1030,7 @@ class RipploMeshPlugin : Plugin(), MeshEngine.Listener {
             val be = backup()
             val st = context.contentResolver.openInputStream(uri).use { raw ->
                 if (raw == null) throw BackupFormat.BackupException(BackupFormat.BAD_FILE)
-                be.stage(BufferedInputStream(raw, 65536), call.getString("code", ""))
+                be.stage(BufferedInputStream(raw, 65536), call.getString("code", "")!!)
             }
             try {
                 val meta = try {
@@ -1183,7 +1183,7 @@ class RipploMeshPlugin : Plugin(), MeshEngine.Listener {
 
     @PluginMethod
     fun setAutoUpdate(call: PluginCall) {
-        val on = call.getBoolean("enabled", true)
+        val on = call.getBoolean("enabled", true)!!
         context.getSharedPreferences(UpdateEngine.PREFS, Context.MODE_PRIVATE).edit().putBoolean("auto", on).apply()
         if (on) UpdateJobService.schedule(context) else UpdateJobService.cancel(context)
         call.resolve()
@@ -1191,14 +1191,14 @@ class RipploMeshPlugin : Plugin(), MeshEngine.Listener {
 
     @PluginMethod
     fun installUpdate(call: PluginCall) {
-        val url = call.getString("url", "")
-        val sha = call.getString("sha256", "").lowercase(Locale.getDefault())
+        val url = call.getString("url", "")!!
+        val sha = call.getString("sha256", "")!!.lowercase(Locale.getDefault())
         if (!url.startsWith("https://") || !sha.matches(Regex("[0-9a-f]{64}"))) {
             call.reject("bad arguments")
             return
         }
         if (!UpdateEngine.canInstall(context)) {
-            if (call.getBoolean("prompt", false)) {
+            if (call.getBoolean("prompt", false)!!) {
                 try {
                     activity.startActivity(Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, Uri.parse("package:" + context.packageName)))
                 } catch (ignored: RuntimeException) {
