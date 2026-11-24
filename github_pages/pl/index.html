@@ -7,7 +7,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Ripplo</title>
 <meta name="description" content="Ripplo to darmowy, otwartoźródłowy komunikator niewymagający dostępu do internetu. Komunikuj się w sytuacji kryzysowej ze znajomymi bez dostępu do internetu, karty SIM i konta. Pakiety przeskakują między pobliskimi telefonami, zaszyfrowane z użyciem protokołu Signal.">
-<meta name="keywords" content="komunikator offline, komunikator siatkowy, czat bez internetu, komunikator Bluetooth, aplikacja do czatu offline, aplikacja sieci mesh, komunikacja poza zasięgiem, szyfrowany komunikator, wiadomości bez internetu, Android, iPhone, Ripplo">
+<meta name="keywords" content="komunikator offline, komunikator siatkowy, czat bez internetu, komunikator Bluetooth, aplikacja do czatu offline, aplikacja sieci mesh, komunikacja poza zasięgiem, szyfrowany komunikator, wiadomości bez internetu, Android, Ripplo">
 <meta name="author" content="Ripplo">
 <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1">
 <meta name="theme-color" content="#0b0b0c">
@@ -52,7 +52,7 @@
       "description": "Darmowy, otwartoźródłowy komunikator offline. Działa bez internetu, karty SIM i konta. Wiadomości przeskakują między pobliskimi telefonami przez Bluetooth, Wi-Fi Direct, Wi-Fi Aware, LAN i Apple Multipeer, chronione szyfrowaniem end-to-end (protokołem Signal z postkwantową ochroną PQXDH).",
       "applicationCategory": "CommunicationApplication",
       "applicationSubCategory": "Komunikator mesh",
-      "operatingSystem": "Android, iOS",
+      "operatingSystem": "Android",
       "url": "https://nahida4479.github.io/Ripplo/pl/",
       "image": "https://nahida4479.github.io/Ripplo/og-image.png",
       "downloadUrl": "https://github.com/Nahida4479/Ripplo/releases/latest",
@@ -97,7 +97,7 @@
         {
           "@type": "Question",
           "name": "Jakich technologii Ripplo używa do łączenia telefonów?",
-          "acceptedAnswer": { "@type": "Answer", "text": "Bluetooth Low Energy (BLE, z szybkim kanałem L2CAP), LAN przez tę samą sieć Wi-Fi lub hotspot, Wi-Fi Direct i Wi-Fi Aware na Androidzie oraz Apple Multipeer Connectivity na iPhone'ie. Aplikacja zawsze wykorzystuje najszybciej działające połączenie." }
+          "acceptedAnswer": { "@type": "Answer", "text": "Bluetooth Low Energy (BLE, z szybkim kanałem L2CAP), LAN przez tę samą sieć Wi-Fi lub hotspot, Wi-Fi Direct i Wi-Fi Aware na Androidzie oraz Apple Multipeer Connectivity (planowane w wersji na iPhone'a). Aplikacja zawsze wykorzystuje najszybciej działające połączenie." }
         },
         {
           "@type": "Question",
@@ -107,7 +107,7 @@
         {
           "@type": "Question",
           "name": "Jakie telefony obsługuje Ripplo?",
-          "acceptedAnswer": { "@type": "Answer", "text": "Androida i iPhone'a. Telefony te mogą ze sobą rozmawiać przez Bluetooth i LAN. Aplikacja na Androida zawiera podpisany plik APK. Wersja na iPhone'a to obecnie niepodpisany plik IPA, który instalujesz za pomocą narzędzia do instalacji spoza App Store." }
+          "acceptedAnswer": { "@type": "Answer", "text": "Androida (7 lub nowszego). Aplikacja na Androida to podpisany plik APK. Wersja na iPhone'a pojawi się wkrótce i nie jest jeszcze dostępna do pobrania." }
         },
         {
           "@type": "Question",
@@ -189,8 +189,8 @@
       <div class="stat big rv"><b data-count="total">·</b><span>pobrań łącznie, wszystkie wersje</span></div>
       <div class="stat rv" style="--rd:.08s"><b data-count="latest">·</b><span>pobrań najnowszej wersji<small id="stat-ver"></small></span></div>
       <div class="stat rv" style="--rd:.16s"><b data-count="releases">·</b><span>wydanych wersji do tej pory</span></div>
-      <div class="stat rv" style="--rd:.08s"><b data-count="apk">·</b><span>pobrań na Androida</span></div>
-      <div class="stat rv" style="--rd:.16s"><b data-count="ipa">·</b><span>pobrań na iOS</span></div>
+      <div class="stat big rv" style="--rd:.08s"><b data-count="apk">·</b><span>pobrań na Androida</span></div>
+      <!-- <div class="stat rv" style="--rd:.16s"><b data-count="ipa">·</b><span>pobrań na iOS</span></div> -->
     </div>
   </div>
 </section>
@@ -253,11 +253,11 @@
     <h2 class="rv">Pięć sposobów na dotarcie do telefonu obok Ciebie.</h2>
     <p class="sub rv">Ripplo może korzystać z kilku połączeń naraz. Co chwilę sprawdza, jak szybkie jest każde z nich i wybiera najszybsze i najbardziej stabilne, więc nic nie musisz ręcznie wybierać.</p>
     <div class="grid c2 c3">
-      <article class="card rv" style="--c:#5b8cff"><span class="badge"><svg class="ico"><use href="../icons.svg#i-bt"/></svg></span><h3>Bluetooth Low Energy (BLE)</h3><p>Bluetooth o niskim poborze mocy. Znajduje pobliskie telefony i oszczędza baterię. Nadaje się do większych rzeczy, jak zdjęcia i wiadomości głosowe; przełącza się na szybszy kanał Bluetooth (L2CAP). Działa między Androidem a iOS.</p><div class="chips"><span class="chip ok">Android</span><span class="chip ok">iOS</span></div></article>
+      <article class="card rv" style="--c:#5b8cff"><span class="badge"><svg class="ico"><use href="../icons.svg#i-bt"/></svg></span><h3>Bluetooth Low Energy (BLE)</h3><p>Bluetooth o niskim poborze mocy. Znajduje pobliskie telefony i oszczędza baterię. Nadaje się do większych rzeczy, jak zdjęcia i wiadomości głosowe; przełącza się na szybszy kanał Bluetooth (L2CAP). Działa między telefonami z Androidem. Obsługa iOS pojawi się razem z wersją na iPhone'a.</p><div class="chips"><span class="chip ok">Android</span><span class="chip ok">iOS</span></div></article>
       <article class="card rv" style="--c:#14b8a6;--rd:.06s"><span class="badge"><svg class="ico"><use href="../icons.svg#i-wifi"/></svg></span><h3>Sieć Wi-Fi (LAN)</h3><p>Gdy telefony są w tej samej sieci Wi-Fi lub w hotspocie jednego z nich, znajdują się nawzajem, co pozwala na wymianę zaszyfrowanych pakietów.</p><div class="chips"><span class="chip ok">Android</span><span class="chip ok">iOS</span></div></article>
       <article class="card rv" style="--c:#a855f7;--rd:.12s"><span class="badge"><svg class="ico"><use href="../icons.svg#i-wifi"/></svg></span><h3>Wi-Fi Direct</h3><p>Dwa telefony z Androidem tworzą własne prywatne połączenie Wi-Fi, szybkie i bez routera.</p><div class="chips"><span class="chip ok">Android</span><span class="chip no">iOS</span></div></article>
       <article class="card rv" style="--c:#f59e0b"><span class="badge"><svg class="ico"><use href="../icons.svg#i-signal"/></svg></span><h3>Wi-Fi Aware</h3><p>Nowszy, szybszy sposób, w jaki telefony z Androidem znajdują się nawzajem i rozmawiają. Wymaga telefonu, który to obsługuje.</p><div class="chips"><span class="chip ok">Android 8+</span><span class="chip no">iOS</span></div></article>
-      <article class="card rv" style="--c:#fb7185;--rd:.06s"><span class="badge"><svg class="ico"><use href="../icons.svg#i-phone"/></svg></span><h3>Apple Multipeer</h3><p>Własna technologia Apple do komunikacji między urządzeniami w pobliżu, używana między iPhone'ami i iPadami.</p><div class="chips"><span class="chip no">Android</span><span class="chip ok">iOS</span></div></article>
+      <article class="card rv" style="--c:#fb7185;--rd:.06s"><span class="badge"><svg class="ico"><use href="../icons.svg#i-phone"/></svg></span><h3>Apple Multipeer</h3><p>Własna technologia Apple do komunikacji między urządzeniami w pobliżu, dla wersji na iPhone'a, która pojawi się wkrótce.</p><div class="chips"><span class="chip no">Android</span><span class="chip ok">iOS</span></div></article>
       <article class="card rv" style="--c:#38bdf8;--rd:.12s"><span class="badge"><svg class="ico"><use href="../icons.svg#i-lock"/></svg></span><h3>Zabezpieczenia, które za tym stoją</h3><p>Protokół Signal (libsignal) z PQXDH i potrójnym mechanizmem SPQR dla ochrony postkwantowej. Sealed sender ukrywa, kto napisał wiadomość. Twoje prywatne klucze nigdy nie opuszczają telefonu.</p></article>
     </div>
     <p class="note rv"><b>Zabezpieczenie przed podmianą:</b> każde wydanie zawiera plik SHA256SUMS, a aplikacja na Androida sprawdza własny podpis, zanim zaktualizuje się sama.</p>
@@ -346,9 +346,9 @@
       <details class="faq rv"><summary>Jak działa komunikacja w sieci mesh?</summary><p>W sieci mesh każdy telefon jest jednocześnie nadawcą i pomocnikiem. Jeśli znajomy jest za daleko, by połączyć się bezpośrednio, Twoja wiadomość przeskakuje przez inne telefony z Ripplo, aż dotrze do celu. Telefony pośredniczące tylko przekazują zaszyfrowane dane i nie mogą ich odczytać.</p></details>
       <details class="faq rv"><summary>Czy Ripplo jest prywatny i bezpieczny?</summary><p>Tak. Wiadomości, wiadomości głosowe, zdjęcia i filmy są szyfrowane end-to-end oficjalną biblioteką Signal libsignal, z ochroną postkwantową (PQXDH i potrójny mechanizm SPQR). Telefony pośredniczące nie mogą odczytać wiadomości ani zobaczyć, kto je napisał. Klucze prywatne zostają na Twoim telefonie.</p></details>
       <details class="faq rv"><summary>Czy potrzebuję numeru telefonu lub konta?</summary><p>Nie. Wybierasz tylko nazwę. Nie ma serwerów, rejestracji ani numerów telefonów. Znajomych dodajesz osobiście, przez kod QR lub wysyłając link z zaproszeniem.</p></details>
-      <details class="faq rv"><summary>Jakich technologii Ripplo używa do łączenia telefonów?</summary><p>Bluetooth Low Energy (BLE, z szybkim kanałem L2CAP), LAN przez tę samą sieć Wi-Fi lub hotspot, Wi-Fi Direct i Wi-Fi Aware na Androidzie oraz Apple Multipeer Connectivity na iPhone'ie.</p></details>
+      <details class="faq rv"><summary>Jakich technologii Ripplo używa do łączenia telefonów?</summary><p>Bluetooth Low Energy (BLE, z szybkim kanałem L2CAP), LAN przez tę samą sieć Wi-Fi lub hotspot, Wi-Fi Direct i Wi-Fi Aware na Androidzie oraz Apple Multipeer Connectivity (planowane w wersji na iPhone'a).</p></details>
       <details class="faq rv"><summary>Czy Ripplo jest darmowy?</summary><p>Tak. Ripplo jest całkowicie darmowy, nie ma reklam ani subskrypcji, a jego kod źródłowy jest otwarty na licencji AGPL-3.0.</p></details>
-      <details class="faq rv"><summary>Jakie telefony obsługuje Ripplo?</summary><p>Androida i iPhone'a. Telefony te mogą ze sobą rozmawiać przez Bluetooth i LAN. Aplikacja na Androida to podpisany plik APK. Wersja na iPhone'a to obecnie niepodpisany plik IPA, który instalujesz za pomocą narzędzia do instalacji spoza App Store.</p></details>
+      <details class="faq rv"><summary>Jakie telefony obsługuje Ripplo?</summary><p>Androida (7 lub nowszego). Aplikacja na Androida to podpisany plik APK. Wersja na iPhone'a pojawi się wkrótce i nie jest jeszcze dostępna do pobrania.</p></details>
       <details class="faq rv"><summary>Kiedy komunikator offline jest przydatny?</summary><p>Na festiwalach i koncertach, gdzie sieci są przeciążone, podczas wędrówek lub podróży bez zasięgu, w czasie blackoutów i klęsk żywiołowych, w miejscach ze słabym lub ograniczonym internetem, albo gdy chcesz porozmawiać z osobami w pobliżu bez pośrednictwa serwera innej firmy.</p></details>
     </div>
   </div>

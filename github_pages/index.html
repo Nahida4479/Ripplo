@@ -7,7 +7,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Ripplo</title>
 <meta name="description" content="Ripplo is a free, open-source messenger that does not require internet access. Communicate with friends in an emergency without internet access, a SIM card or an account. Packets hop between nearby phones, encrypted with the Signal protocol.">
-<meta name="keywords" content="offline messenger, mesh messenger, chat without internet, Bluetooth messenger, offline chat app, mesh network app, out-of-range communication, encrypted messenger, messages without internet, Android, iPhone, Ripplo">
+<meta name="keywords" content="offline messenger, mesh messenger, chat without internet, Bluetooth messenger, offline chat app, mesh network app, out-of-range communication, encrypted messenger, messages without internet, Android, Ripplo">
 <meta name="author" content="Ripplo">
 <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1">
 <meta name="theme-color" content="#0b0b0c">
@@ -52,7 +52,7 @@
       "description": "Free, open-source offline messenger. Works without internet, a SIM card or an account. Messages hop between nearby phones over Bluetooth, Wi-Fi Direct, Wi-Fi Aware, LAN and Apple Multipeer, protected by end-to-end encryption (the Signal protocol with PQXDH post-quantum protection).",
       "applicationCategory": "CommunicationApplication",
       "applicationSubCategory": "Mesh messenger",
-      "operatingSystem": "Android, iOS",
+      "operatingSystem": "Android",
       "url": "https://nahida4479.github.io/Ripplo/",
       "image": "https://nahida4479.github.io/Ripplo/og-image.png",
       "downloadUrl": "https://github.com/Nahida4479/Ripplo/releases/latest",
@@ -97,7 +97,7 @@
         {
           "@type": "Question",
           "name": "What technologies does Ripplo use to connect phones?",
-          "acceptedAnswer": { "@type": "Answer", "text": "Bluetooth Low Energy (BLE, with a fast L2CAP channel), LAN over the same Wi-Fi network or hotspot, Wi-Fi Direct and Wi-Fi Aware on Android, and Apple Multipeer Connectivity on iPhone. The app always uses the fastest working connection." }
+          "acceptedAnswer": { "@type": "Answer", "text": "Bluetooth Low Energy (BLE, with a fast L2CAP channel), LAN over the same Wi-Fi network or hotspot, Wi-Fi Direct and Wi-Fi Aware on Android, and Apple Multipeer Connectivity (planned for the iPhone version). The app always uses the fastest working connection." }
         },
         {
           "@type": "Question",
@@ -107,7 +107,7 @@
         {
           "@type": "Question",
           "name": "Which phones does Ripplo support?",
-          "acceptedAnswer": { "@type": "Answer", "text": "Android and iPhone. These phones can talk to each other over Bluetooth and LAN. The Android app comes as a signed APK file. The iPhone version is currently an unsigned IPA file that you install using a tool for installing from outside the App Store." }
+          "acceptedAnswer": { "@type": "Answer", "text": "Android (7 or newer). The Android app is a signed APK file. The iPhone version is coming soon and is not available for download right now." }
         },
         {
           "@type": "Question",
@@ -189,8 +189,8 @@
       <div class="stat big rv"><b data-count="total">·</b><span>total downloads, all versions</span></div>
       <div class="stat rv" style="--rd:.08s"><b data-count="latest">·</b><span>downloads of the latest version<small id="stat-ver"></small></span></div>
       <div class="stat rv" style="--rd:.16s"><b data-count="releases">·</b><span>versions released so far</span></div>
-      <div class="stat rv" style="--rd:.08s"><b data-count="apk">·</b><span>Android downloads</span></div>
-      <div class="stat rv" style="--rd:.16s"><b data-count="ipa">·</b><span>iOS downloads</span></div>
+      <div class="stat big rv" style="--rd:.08s"><b data-count="apk">·</b><span>Android downloads</span></div>
+      <!-- <div class="stat rv" style="--rd:.16s"><b data-count="ipa">·</b><span>iOS downloads</span></div> -->
     </div>
   </div>
 </section>
@@ -253,11 +253,11 @@
     <h2 class="rv">Five ways to reach the phone next to you.</h2>
     <p class="sub rv">Ripplo can use several connections at once. It regularly checks how fast each of them is and picks the fastest and most stable one, so you do not have to choose anything manually.</p>
     <div class="grid c2 c3">
-      <article class="card rv" style="--c:#5b8cff"><span class="badge"><svg class="ico"><use href="icons.svg#i-bt"/></svg></span><h3>Bluetooth Low Energy (BLE)</h3><p>Low-power Bluetooth. Finds nearby phones and saves battery. It is suitable for bigger things, like photos and voice notes; it switches to a faster Bluetooth channel (L2CAP). Works between Android and iOS.</p><div class="chips"><span class="chip ok">Android</span><span class="chip ok">iOS</span></div></article>
+      <article class="card rv" style="--c:#5b8cff"><span class="badge"><svg class="ico"><use href="icons.svg#i-bt"/></svg></span><h3>Bluetooth Low Energy (BLE)</h3><p>Low-power Bluetooth. Finds nearby phones and saves battery. It is suitable for bigger things, like photos and voice notes; it switches to a faster Bluetooth channel (L2CAP). Works between Android phones. iOS support is coming with the iPhone version.</p><div class="chips"><span class="chip ok">Android</span><span class="chip ok">iOS</span></div></article>
       <article class="card rv" style="--c:#14b8a6;--rd:.06s"><span class="badge"><svg class="ico"><use href="icons.svg#i-wifi"/></svg></span><h3>Wi-Fi network (LAN)</h3><p>When phones are on the same Wi-Fi network or on one of their hotspots, they find each other, which allows them to exchange encrypted packets.</p><div class="chips"><span class="chip ok">Android</span><span class="chip ok">iOS</span></div></article>
       <article class="card rv" style="--c:#a855f7;--rd:.12s"><span class="badge"><svg class="ico"><use href="icons.svg#i-wifi"/></svg></span><h3>Wi-Fi Direct</h3><p>Two Android phones create their own private Wi-Fi connection, fast and without a router.</p><div class="chips"><span class="chip ok">Android</span><span class="chip no">iOS</span></div></article>
       <article class="card rv" style="--c:#f59e0b"><span class="badge"><svg class="ico"><use href="icons.svg#i-signal"/></svg></span><h3>Wi-Fi Aware</h3><p>A newer, faster way for Android phones to find each other and talk. Requires a phone that supports it.</p><div class="chips"><span class="chip ok">Android 8+</span><span class="chip no">iOS</span></div></article>
-      <article class="card rv" style="--c:#fb7185;--rd:.06s"><span class="badge"><svg class="ico"><use href="icons.svg#i-phone"/></svg></span><h3>Apple Multipeer</h3><p>Apple's own technology for communication between nearby devices, used between iPhones and iPads.</p><div class="chips"><span class="chip no">Android</span><span class="chip ok">iOS</span></div></article>
+      <article class="card rv" style="--c:#fb7185;--rd:.06s"><span class="badge"><svg class="ico"><use href="icons.svg#i-phone"/></svg></span><h3>Apple Multipeer</h3><p>Apple's own technology for communication between nearby devices, for the iPhone version, which is coming soon.</p><div class="chips"><span class="chip no">Android</span><span class="chip ok">iOS</span></div></article>
       <article class="card rv" style="--c:#38bdf8;--rd:.12s"><span class="badge"><svg class="ico"><use href="icons.svg#i-lock"/></svg></span><h3>The security behind it</h3><p>The Signal protocol (libsignal) with PQXDH and the SPQR triple ratchet for post-quantum protection. Sealed sender hides who wrote a message. Your private keys never leave your phone.</p></article>
     </div>
     <p class="note rv"><b>Protection against tampering:</b> every release ships with a SHA256SUMS file, and the Android app verifies its own signature before it updates itself.</p>
@@ -346,9 +346,9 @@
       <details class="faq rv"><summary>How does communication in a mesh network work?</summary><p>In a mesh network every phone is both a sender and a helper. If your friend is too far away to connect directly, your message hops through other phones with Ripplo until it reaches its destination. The phones in between only pass on encrypted data and cannot read it.</p></details>
       <details class="faq rv"><summary>Is Ripplo private and secure?</summary><p>Yes. Messages, voice notes, photos and videos are end-to-end encrypted with Signal's official libsignal library, with post-quantum protection (PQXDH and the SPQR triple ratchet). Phones in between cannot read messages or see who wrote them. Private keys stay on your phone.</p></details>
       <details class="faq rv"><summary>Do I need a phone number or an account?</summary><p>No. You only choose a name. There are no servers, no registration and no phone numbers. You add friends in person, with a QR code or by sending an invite link.</p></details>
-      <details class="faq rv"><summary>What technologies does Ripplo use to connect phones?</summary><p>Bluetooth Low Energy (BLE, with a fast L2CAP channel), LAN over the same Wi-Fi network or hotspot, Wi-Fi Direct and Wi-Fi Aware on Android, and Apple Multipeer Connectivity on iPhone.</p></details>
+      <details class="faq rv"><summary>What technologies does Ripplo use to connect phones?</summary><p>Bluetooth Low Energy (BLE, with a fast L2CAP channel), LAN over the same Wi-Fi network or hotspot, Wi-Fi Direct and Wi-Fi Aware on Android, and Apple Multipeer Connectivity (planned for the iPhone version).</p></details>
       <details class="faq rv"><summary>Is Ripplo free?</summary><p>Yes. Ripplo is completely free, has no ads or subscriptions, and its source code is open under the AGPL-3.0 license.</p></details>
-      <details class="faq rv"><summary>Which phones does Ripplo support?</summary><p>Android and iPhone. These phones can talk to each other over Bluetooth and LAN. The Android app is a signed APK file. The iPhone version is currently an unsigned IPA file that you install using a tool for installing from outside the App Store.</p></details>
+      <details class="faq rv"><summary>Which phones does Ripplo support?</summary><p>Android (7 or newer). The Android app is a signed APK file. The iPhone version is coming soon and is not available for download right now.</p></details>
       <details class="faq rv"><summary>When is an offline messenger useful?</summary><p>At festivals and concerts where networks are overloaded, during hikes or trips without signal, during blackouts and natural disasters, in places with weak or restricted internet, or when you want to talk to people nearby without another company's server in between.</p></details>
     </div>
   </div>
