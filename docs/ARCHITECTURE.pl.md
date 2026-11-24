@@ -234,7 +234,7 @@ odpowiedzią, uporządkowany); peripheral wysyła fragmenty powiadomieniami na T
 
 **BLE Coded PHY (tylko Android, zawsze włączone).** Gdy telefon zgłasza
 `isLeCodedPhySupported()` i `isLeExtendedAdvertisingSupported()`, węzeł dodatkowo uruchamia rozszerzony zestaw ogłoszeń na Coded PHY
-(z możliwością połączenia, ten sam UUID usługi) i skanuje z `setLegacy(false)`. Trafienie skanu zawiera główny PHY; trafienie coded łączy się z
+(z możliwością połączenia, ten sam UUID usługi, wysoka moc nadawania) i uruchamia dwa równoległe skany: 1M oraz osobny skan wyłącznie Coded (`setLegacy(false)`), dzięki czemu Coded dostaje całe okno skanowania zamiast dzielić je z 1M i jest wykrywany na granicy zasięgu, zanim 1M w ogóle słychać. Trafienie skanu zawiera główny PHY; trafienie coded łączy się z
 `PHY_LE_CODED_MASK` (duży zasięg, 125 / 500 kbit/s), trafienie 1M z `PHY_LE_1M_MASK`. Jeśli w ciągu ostatnich 20 s widziano trafienie 1M tego samego adresu,
 trafienie coded jest ignorowane (1M jest szybsze). PHY łącza klienckiego jest odczytywany przez `readPhy()` i widoczny w szczegółach dewelopera. Nie ma przełącznika: karta dewelopera tylko pokazuje, czy telefon to obsługuje.
 iOS nie ma wyboru PHY w CoreBluetooth, więc używa wyłącznie 1M.

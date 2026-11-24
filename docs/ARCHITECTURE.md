@@ -237,7 +237,7 @@ response, ordered); peripheral notifies slices on TX. Request MTU 517.
 
 **BLE Coded PHY (Android only, always on).** On a phone that reports
 `isLeCodedPhySupported()` and `isLeExtendedAdvertisingSupported()`, the node also starts an extended advertising set on the Coded PHY
-(connectable, same service UUID) and scans with `setLegacy(false)`. A scan hit carries its primary PHY; a coded hit is connected with
+(connectable, same service UUID, high TX power) and runs two parallel scans: a 1M scan and a dedicated Coded-only scan (`setLegacy(false)`), so the Coded PHY gets the whole scan window instead of sharing it with 1M and is found at the edge of its range, before 1M is audible. A scan hit carries its primary PHY; a coded hit is connected with
 `PHY_LE_CODED_MASK` (long range, 125 / 500 kbit/s), a 1M hit with `PHY_LE_1M_MASK`. If a 1M hit for the same address was seen in the last 20 s the coded
 hit is ignored (1M is faster). The PHY of a client link is read with `readPhy()` and shown in the developer details. There is no switch: the developer card only shows whether the phone supports it.
 iOS has no PHY selection in CoreBluetooth, so it only ever uses 1M.
