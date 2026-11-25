@@ -30,3 +30,5 @@ linux/flutter/ephemeral/
 .idea/
 key.properties
 .graphifyignore
+linux/
+docs/
