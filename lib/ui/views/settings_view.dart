@@ -25,7 +25,7 @@ import '../../util/js.dart' as js;
 import '../../util/link_label.dart';
 
 const String _repo = 'https://github.com/Nahida4479/Ripplo';
-const String _devLogRecipient = '8277SCA2VX64NHHB';
+const String _devLogRecipient = '3Q3S2MaMMZ5MKRWP';
 const List<String> _specs = [
   'lan',
   'wifi-direct',
