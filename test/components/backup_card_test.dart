@@ -1,9 +1,9 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:material_ui/material_ui.dart';
-import 'package:ripplo/components/backup_card.dart';
+import 'package:ripplo/ui/components/backup_card.dart';
 import 'package:ripplo/i18n.dart';
 import 'package:ripplo/mesh/bridge.dart' as bridge;
-import 'package:ripplo/services/theme.dart';
+import 'package:ripplo/ui/theme.dart';
 import 'package:ripplo/ui/tokens.dart';
 import 'package:ripplo/ui/ui_state.dart';
 

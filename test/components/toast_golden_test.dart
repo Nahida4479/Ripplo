@@ -1,6 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:material_ui/material_ui.dart';
-import 'package:ripplo/components/add_contact_sheet.dart';
+import 'package:ripplo/ui/components/add_contact_sheet.dart';
 import 'package:ripplo/ui/ui_state.dart';
 import 'package:ripplo/ui/widgets.dart';
 

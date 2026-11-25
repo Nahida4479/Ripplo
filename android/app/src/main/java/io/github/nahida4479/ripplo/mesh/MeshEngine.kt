@@ -6,6 +6,17 @@ import android.content.SharedPreferences
 import android.net.wifi.WifiManager
 import android.os.Build
 import android.os.PowerManager
+import io.github.nahida4479.ripplo.data.Inbox
+import io.github.nahida4479.ripplo.platform.Diag
+import io.github.nahida4479.ripplo.platform.Notifier
+import io.github.nahida4479.ripplo.platform.Opener
+import io.github.nahida4479.ripplo.transport.Link
+import io.github.nahida4479.ripplo.transport.Transport
+import io.github.nahida4479.ripplo.transport.ble.BleTransport
+import io.github.nahida4479.ripplo.transport.lan.LanTransport
+import io.github.nahida4479.ripplo.transport.nearby.NearbyTransport
+import io.github.nahida4479.ripplo.transport.wifiaware.WifiAwareTransport
+import io.github.nahida4479.ripplo.transport.wifidirect.WifiDirectTransport
 import java.nio.ByteBuffer
 import java.security.SecureRandom
 import java.util.concurrent.ExecutorService
@@ -103,7 +114,7 @@ internal class MeshEngine private constructor(internal val ctx: Context) : Route
         transports.add(WifiDirectTransport(ctx, this))
         try {
             // Present only in the Play build (src/play)
-            val k = Class.forName("io.github.nahida4479.ripplo.mesh.NearbyTransport")
+            val k = Class.forName("io.github.nahida4479.ripplo.transport.nearby.NearbyTransport")
             transports.add(k.getDeclaredConstructor(Context::class.java, MeshEngine::class.java).newInstance(ctx, this) as Transport)
         } catch (ignored: ReflectiveOperationException) {
         }

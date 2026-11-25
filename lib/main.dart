@@ -8,21 +8,21 @@ import 'core/api.dart' as api;
 import 'core/call_audio.dart';
 import 'i18n.dart';
 import 'mesh/bridge.dart';
-import 'mesh/dev_mesh.dart';
+import 'mesh/dev/dev_mesh.dart';
 import 'router.dart';
-import 'services/backup.dart';
+import 'data/backup.dart';
 import 'services/deep_link.dart';
 import 'services/lock.dart';
-import 'services/media_files.dart';
+import 'data/media_files.dart';
 import 'services/notifications.dart';
 import 'services/open_intent.dart';
-import 'services/prefs.dart';
+import 'data/prefs.dart';
 import 'services/scheduler.dart';
 import 'services/share.dart';
-import 'services/theme.dart';
+import 'ui/theme.dart';
 import 'services/updater.dart';
 import 'ui/ui_state.dart';
-import 'util/github_cache.dart';
+import 'data/github_cache.dart';
 import 'util/js.dart' as js;
 
 Mesh _pickMesh() {

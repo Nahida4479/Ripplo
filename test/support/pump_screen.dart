@@ -2,7 +2,7 @@ import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:material_ui/material_ui.dart';
-import 'package:ripplo/services/theme.dart';
+import 'package:ripplo/ui/theme.dart';
 import 'package:ripplo/ui/tokens.dart';
 import 'package:ripplo/ui/ui_state.dart';
 import 'package:ripplo/util/js.dart' as js;

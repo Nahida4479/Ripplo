@@ -1,6 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:material_ui/material_ui.dart';
-import 'package:ripplo/views/chat_view.dart';
+import 'package:ripplo/ui/views/chat_view.dart';
 
 import '../support/fixtures.dart';
 import '../support/pump_screen.dart';

@@ -3,7 +3,7 @@ import 'package:ripplo/core/state.dart';
 import 'package:ripplo/mesh/bridge.dart';
 import 'package:ripplo/services/updater.dart';
 import 'package:ripplo/ui/ui_state.dart';
-import 'package:ripplo/util/github_cache.dart';
+import 'package:ripplo/data/github_cache.dart';
 
 import 'sec_mesh.dart';
 

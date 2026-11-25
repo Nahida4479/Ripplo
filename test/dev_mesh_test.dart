@@ -4,7 +4,7 @@ import 'dart:typed_data';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ripplo/mesh/bridge.dart';
-import 'package:ripplo/mesh/dev_mesh.dart';
+import 'package:ripplo/mesh/dev/dev_mesh.dart';
 import 'package:ripplo/mesh/packet.dart';
 import 'package:ripplo/util/bytes.dart';
 

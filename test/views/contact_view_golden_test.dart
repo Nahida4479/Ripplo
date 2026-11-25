@@ -2,7 +2,7 @@ import 'dart:io';
 
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:ripplo/views/contact_view.dart';
+import 'package:ripplo/ui/views/contact_view.dart';
 
 import '../support/fixtures.dart';
 import '../support/pump_screen.dart';

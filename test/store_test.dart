@@ -3,7 +3,7 @@ import 'dart:io';
 
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:ripplo/crypto/db.dart';
+import 'package:ripplo/data/db.dart';
 import 'package:ripplo/crypto/vault.dart';
 import 'package:ripplo/mesh/bridge.dart';
 import 'package:ripplo/util/bytes.dart';

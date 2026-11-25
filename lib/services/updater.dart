@@ -10,7 +10,7 @@ import '../core/state.dart';
 import '../i18n.dart';
 import '../mesh/bridge.dart';
 import '../ui/ui_state.dart';
-import '../util/github_cache.dart';
+import '../data/github_cache.dart';
 import '../util/js.dart' as js;
 
 const releasesUrl = 'https://api.github.com/repos/Nahida4479/Ripplo/releases';

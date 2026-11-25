@@ -4,8 +4,8 @@
 
 Wygląd komunikatora (Signal / WhatsApp), podejście mobile-first, domyślnie ciemny. Zbudowany z widgetów Fluttera. Ikony: Lucide, rysowane przez widget `Lucide` w
 `lib/ui/icons.dart` (generowany przez `tool/gen_icons.dart`), obrys 1.75, 22 px (`kIconStroke`, `kIconSize`). Czcionka: domyślna platformy (Roboto na Androidzie, SF Pro na iOS).
-Teksty interfejsu są w `lib/i18n.dart` (`en`, `pl`; język urządzenia, domyślnie `en`). Wspólne widgety są w `lib/ui/widgets.dart`, arkusze i nakładki w `lib/components/`,
-ekrany w `lib/views/`.
+Teksty interfejsu są w `lib/i18n.dart` (`en`, `pl`; język urządzenia, domyślnie `en`). Wspólne widgety są w `lib/ui/widgets.dart`, arkusze i nakładki w `lib/ui/components/`,
+ekrany w `lib/ui/views/`.
 
 ## Tokeny (`RipploColors` w `lib/ui/tokens.dart`)
 
@@ -32,7 +32,7 @@ okno z kolorem hex).
 Próbki gradientu: brak (ukośna kreska), fioletowy `#5b2ea6`, granatowy `#1e3a8a`, morski `#0f5257`,
 śliwkowy `#7a1f4f`, brązowy `#6b3a0a`, łupkowy `#3d4552`.
 Tryb motywu: segmentowa pigułka `Systemowy | Ciemny | Jasny`, wybrany segment wypełniony akcentem.
-Wybrana próbka: obwódka 2 px w `text` z odstępem 3 px. Wszystkie preferencje motywu w `shared_preferences` (`ripplo.theme`, `ripplo.lang`; `lib/services/prefs.dart`, `lib/services/theme.dart`).
+Wybrana próbka: obwódka 2 px w `text` z odstępem 3 px. Wszystkie preferencje motywu w `shared_preferences` (`ripplo.theme`, `ripplo.lang`; `lib/data/prefs.dart`, `lib/ui/theme.dart`).
 
 Promienie: karty 14, wiersze 12, dymki 18 (narożnik z ogonkiem 6), pigułki 999. Skala odstępów 4/8/12/16/24.
 Promienie to stałe `kRadius*` w `lib/ui/tokens.dart`. Strefy bezpieczne: `MediaQuery.paddingOf` w nagłówku i pasku zakładek.
@@ -107,7 +107,7 @@ czatu wysyła od razu i otwiera ten czat.
 ## Arkusz dodawania kontaktu
 
 Zakładki: **Mój kod** (animowany QR linku zaproszenia, około 6 klatek po 700 ms z kropkami postępu i podpowiedzią, by trzymać drugi telefon na nim do końca, + ripploId + przycisk Zaproś znajomego (udostępnia tekst i link webowy; linijka podpowiedzi mówi, że kontakt zostanie dodany jako niezweryfikowany) przez systemowe menu udostępniania (`share_plus`) /
-kopiowanie), **Skanuj** (wizjer kamery z zaokrągloną maską; ciągłe automatyczne wykrywanie przez `flutter_zxing` (`QrScanner` w `lib/components/qr_scanner.dart`); bez przycisku. Trafienie od razu zamyka arkusz z komunikatem „Klucze zostały poprawnie zweryfikowane” lub „Dodano do kontaktów” i krótką wibracją), **Wklej link**.
+kopiowanie), **Skanuj** (wizjer kamery z zaokrągloną maską; ciągłe automatyczne wykrywanie przez `flutter_zxing` (`QrScanner` w `lib/ui/components/qr_scanner.dart`); bez przycisku. Trafienie od razu zamyka arkusz z komunikatem „Klucze zostały poprawnie zweryfikowane” lub „Dodano do kontaktów” i krótką wibracją), **Wklej link**.
 
 ## Strona kontaktu
 

@@ -8,7 +8,7 @@ import 'package:crypto/crypto.dart' as c;
 
 import '../crypto/attachment.dart';
 import '../crypto/call_frame.dart';
-import '../crypto/db.dart';
+import '../data/db.dart';
 import '../crypto/identity.dart';
 import '../crypto/vault.dart';
 import '../i18n.dart';

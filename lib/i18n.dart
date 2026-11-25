@@ -2,7 +2,7 @@ import 'dart:ui' as ui;
 
 import 'package:flutter/foundation.dart';
 
-import 'services/prefs.dart';
+import 'data/prefs.dart';
 
 const Map<String, String> _en = {
   'chats': 'Chats',

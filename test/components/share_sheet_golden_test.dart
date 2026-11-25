@@ -1,6 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:material_ui/material_ui.dart';
-import 'package:ripplo/components/share_sheet.dart';
+import 'package:ripplo/ui/components/share_sheet.dart';
 
 import '../support/fixtures.dart';
 import '../support/pump_screen.dart';

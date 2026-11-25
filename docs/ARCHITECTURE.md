@@ -110,7 +110,7 @@ rides on the first real message as before.
    each AES-256-GCM encrypted with a key held by Android Keystore / iOS Keychain
    (`AfterFirstUnlockThisDeviceOnly`). The Dart-side records (messages, contacts, chats) are AES-GCM
    sealed by `lib/crypto/vault.dart` with the DB key from `getDbKey` and stored in the native SQLite store (§12.1).
-5. **Desktop dev build**: `lib/mesh/dev_signal.dart` (used by `lib/mesh/dev_mesh.dart`) replaces the native Signal calls with a
+5. **Desktop dev build**: `lib/mesh/dev/dev_signal.dart` (used by `lib/mesh/dev/dev_mesh.dart`) replaces the native Signal calls with a
    plaintext stand-in so two desktop instances can exercise the UI. It provides NO security (its DB key sits in a plain file) and the UI says so.
    Release builds never use it: `DevMesh` throws in release mode and `main.dart` picks `MeshBridge` on Android, iOS and in every release build.
 
@@ -206,7 +206,7 @@ through your phone" spam).
 
 Abuse limits (native): max 200 packets/s per neighbor, max 32 MiB queued per link, drop on overflow.
 
-Implementations. `lib/mesh/router.dart` is the Dart router: the desktop dev mesh (`lib/mesh/dev_mesh.dart`) and the tests run it, while on
+Implementations. `lib/mesh/router.dart` is the Dart router: the desktop dev mesh (`lib/mesh/dev/dev_mesh.dart`) and the tests run it, while on
 phones the app uses the native router through the bridge. It must behave exactly like `Router.kt` and `Router.swift`; a router change goes into
 all three in the same commit. Differences found while porting, present before the port and not yet reconciled:
 - the persist-to-inbox hook (`host.persist`, DATA for this node is stored before the ACK) exists only in Kotlin; Dart and Swift have no such hook;
@@ -563,30 +563,32 @@ i18n.dart                          UI strings (en, pl), `t(key)`
 contributors.dart                  contributor logins for the About card
 util/bytes.dart                    b64 / b64url / hex / utf8 / concat / random / base32
 util/js.dart                       small helpers that keep JavaScript semantics (truthiness, clock `now`, `cut`, int32) so ported logic matches the old implementation
-util/avatar.dart, qrparts.dart, schedule.dart, link_label.dart, github_cache.dart
-                                   avatar hue and initials, animated-QR piece joining, People refresh slots (§7), link-medium label, GitHub answer cache (§10)
+util/avatar.dart, qrparts.dart, schedule.dart, link_label.dart
+                                   avatar hue and initials, animated-QR piece joining, People refresh slots (§7), link-medium label
 crypto/vault.dart                  AES-GCM seal / open of records with the DB key
-crypto/db.dart                     RawStore (NativeRawStore over the bridge, FileRawStore, MemoryRawStore) and the encrypted record store
 crypto/identity.dart               identity card, tag / ripploId, invite link encode / decode (§1)
 crypto/attachment.dart             file encrypt / decrypt + chunk split (§2)
 crypto/call_frame.dart             call frame seal / open, replay window (§13)
 mesh/packet.dart                   encode / decode packets, constants (§3)
 mesh/router.dart                   Dart router (§3.1)
 mesh/bridge.dart                   `Mesh` interface and `MeshBridge` over the MethodChannel (§9)
-mesh/dev_mesh.dart, dev_signal.dart  desktop simulator: Mesh over UDP loopback, plaintext Signal stand-in (§15)
+mesh/dev/dev_mesh.dart, dev_signal.dart  desktop simulator: Mesh over UDP loopback, plaintext Signal stand-in (§15)
 core/state.dart, obs.dart          reactive app state (`ObsMap`, `ObsList`)
 core/messenger.dart, messenger_contacts.dart, messenger_msgs.dart
                                    the `Core`: profile, contacts and verification, People, messages, attachments, groups, backup restore
 core/calls.dart, call_audio.dart   call signalling and engine, Opus over the native audio channels (§13, §9.1)
 core/api.dart                      facade used by the UI (see below)
 core/diag.dart                     diagnostic log, forwarded to `usbLog`
-services/                          updater, notifications, open_intent, deep_link, share, permissions, scheduler, range_refresh, lock, backup,
-                                   ringtone, theme, prefs (theme and language in shared_preferences), media_files (§12.5)
+data/db.dart                       RawStore (NativeRawStore over the bridge, FileRawStore, MemoryRawStore) and the encrypted record store
+data/prefs.dart                    theme and language in shared_preferences
+data/media_files.dart              decrypted media cache (§12.5)
+data/backup.dart, github_cache.dart  automatic backup trigger, GitHub answer cache (§10)
+services/                          updater, notifications, open_intent, deep_link, share, permissions, scheduler, range_refresh, lock, ringtone
 ui/tokens.dart, widgets.dart       design tokens and shared widgets (docs/DESIGN.md)
-ui/icons.dart, avatar.dart, qr.dart, ui_state.dart
+ui/icons.dart, avatar.dart, qr.dart, theme.dart, ui_state.dart
                                    Lucide icons, avatar widget, QR encoder and painter, toasts / sheets state
-components/                        sheets, overlays and cards (add contact, new chat, share, confirm, call, lock, backup, QR scanner)
-views/                             Chats, Chat, People, Contact, Settings, Gate (permissions), Onboarding
+ui/components/                   sheets, overlays and cards (add contact, new chat, share, confirm, call, lock, backup, QR scanner)
+ui/views/                        Chats, Chat, People, Contact, Settings, Gate (permissions), Onboarding
 ```
 
 `core/api.dart` (UI contract), top-level functions over one shared `Core` and `RipploState`:
@@ -596,6 +598,32 @@ views/                             Chats, Chat, People, Contact, Settings, Gate 
 `retry(msgId)`, `unsendMessage`, `loadMessages(chatId)`, `markRead(chatId)`, `createGroup(name, memberIds)`,
 `refreshPeople()`, `searchPeople`, `startCall`, `acceptCall`, `hangUp`, `setMuted`, `deleteChat(chatId)`, `deleteContact(id)`,
 `saveSettings`, `restoreBackup`, `sendDevLog`, `deleteDevLog`, `nodeOf`.
+
+### 11.1 Native source layout (where to contribute)
+
+Android, `android/app/src/main/java/io/github/nahida4479/ripplo/`. Every transport is its own package and only talks to the rest of the app through `transport/Transport.kt`, `Link.kt` and `StreamLink.kt`.
+
+```
+mesh/                      MeshEngine (links, neighbours, routing glue), Router (§3.1), Packet (§3), Ids, Shared, MeshService (foreground service)
+transport/                 Transport (lifecycle), Link, StreamLink: the contract every medium implements
+transport/ble/             BleTransport: GATT server and client, scan, advertise (1M)
+transport/ble/coded/       BleCoded, CodedAdvertiser: LE Coded PHY support check, masks, coded advertising set
+transport/ble/l2cap/       BleL2cap: L2CAP CoC server and dialer used after the GATT handshake
+transport/wifidirect/      WifiDirectTransport
+transport/wifiaware/       WifiAwareTransport
+transport/lan/             LanTransport: UDP / TCP on the local network
+transport/nearby/          NearbyTransport: Play flavor only (src/play), loaded by MeshEngine through reflection
+crypto/                    SignalCore (Signal protocol), SignalFileStore (sealed key files)
+data/                      NativeStore (SQLite), Inbox, BackupEngine, BackupFormat
+calls/                     CallAudio, CallActivity, CallActionReceiver, Ringer
+update/                    UpdateEngine, UpdateJobService, UpdatedReceiver, InstallReceiver (§10)
+platform/                  AppLock, Opener, Notifier, Diag
+bridge/                    RipploMeshPlugin, Call: the `ripplo/mesh` channel (§9)
+```
+
+Unit tests mirror the packages under `src/test` (`crypto/SignalCoreTest`, `data/BackupFormatTest`).
+
+iOS keeps one flat `ios/Runner/` target for now. Map: `BleTransport`, `LanTransport`, `MultipeerTransport` are the transports, `MeshEngine`, `MeshLink`, `Router`, `Packet` the mesh core, `SignalCore` the crypto, `NativeStore`, `BackupEngine` the data, `CallAudio`, `Ringer` the calls, `AppLock`, `Notifier`, `Diag` the platform glue, `RipploMeshPlugin` the bridge.
 
 ## 12. Local storage, backup and app lock
 
@@ -612,7 +640,7 @@ CREATE INDEX rows_idx ON rows (store, idx);
 ```
 
 `value` is exactly what Dart writes: already AES-GCM sealed by `lib/crypto/vault.dart` with the DB key
-(AAD `store/key`). Native never sees chat plaintext. `lib/crypto/db.dart` reaches it through `RawStore`: `NativeRawStore` calls
+(AAD `store/key`). Native never sees chat plaintext. `lib/data/db.dart` reaches it through `RawStore`: `NativeRawStore` calls
 `dbPut` / `dbGet` / `dbDel` / `dbKeys` / `dbAll` / `dbByIdx` (§9); `FileRawStore` (a JSON file) serves the desktop dev mesh and `MemoryRawStore` the tests.
 
 The WebView IndexedDB of the old Vue app and its one-time copy into this store are gone: the Flutter app only reads `ripplo.db`, and
@@ -682,7 +710,7 @@ a "skip" option; the OS asks where to save it. Details depend on provider suppor
 ### 12.5 Decrypted media on disk
 
 Images are decrypted only in memory (`Image.memory`) and never written to disk. Video and voice need a file for the platform players
-(`video_player`, `just_audio`), so a decrypted copy is written to `cache/att/` (`lib/services/media_files.dart`; app-private cache, random 16-byte hex name,
+(`video_player`, `just_audio`), so a decrypted copy is written to `cache/att/` (`lib/data/media_files.dart`; app-private cache, random 16-byte hex name,
 extension from the mime type) only while it plays, and deleted when playback ends or the view closes. A voice recording is written there too (in clear,
 as the recorder needs a file) until it has been read for encryption and sent, then deleted. `wipeMediaCache()` removes the whole directory at every app start,
 so a crash cannot leave decrypted media behind.
@@ -787,9 +815,9 @@ Flutter 3.50.1 (Dart ^3.9; the version is pinned in CI). Commands from the repos
 | `dart run tool/parity.dart [goldens] [ref] [out] [prefixes]` | screenshot parity, see below |
 
 **Desktop simulator.** `main.dart` uses `MeshBridge` on Android, iOS and in every release build; in debug and profile builds on desktop it uses `DevMesh`
-(`lib/mesh/dev_mesh.dart`). Each instance binds a UDP port on `127.0.0.1` in the range 47700-47731 (32 slots, the starting slot is a hash of `RIPPLO_PROFILE`, the next
+(`lib/mesh/dev/dev_mesh.dart`). Each instance binds a UDP port on `127.0.0.1` in the range 47700-47731 (32 slots, the starting slot is a hash of `RIPPLO_PROFILE`, the next
 free one is taken), announces itself with a hello every 2 s, drops a peer after 5 s of silence, and runs `lib/mesh/router.dart` over a virtual `lan` link at 20 000 kbps.
-Frames are datagrams `type(1) | from(32) | to(32) | payload`. Signal is the plaintext stand-in `lib/mesh/dev_signal.dart` (§2), the store is the file
+Frames are datagrams `type(1) | from(32) | to(32) | payload`. Signal is the plaintext stand-in `lib/mesh/dev/dev_signal.dart` (§2), the store is the file
 `ripplo-dev-<profile>/db.json` in the system temp directory, and every permission reads as granted. Transports, calls, updates, backup and app lock are not simulated.
 
 **Golden tests.** Every screen and sheet has golden tests under `test/views/` and `test/components/` (device size 412 × 915, light and dark; fonts from

@@ -5,9 +5,9 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:ripplo/i18n.dart';
 import 'package:ripplo/mesh/bridge.dart' as bridge;
-import 'package:ripplo/services/theme.dart';
+import 'package:ripplo/ui/theme.dart';
 import 'package:ripplo/ui/widgets.dart';
-import 'package:ripplo/views/settings_view.dart';
+import 'package:ripplo/ui/views/settings_view.dart';
 
 import '../support/fixtures.dart';
 import '../support/pump_screen.dart';

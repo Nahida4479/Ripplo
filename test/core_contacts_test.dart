@@ -7,10 +7,10 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:ripplo/core/messenger.dart';
 import 'package:ripplo/core/obs.dart';
 import 'package:ripplo/core/state.dart';
-import 'package:ripplo/crypto/db.dart';
+import 'package:ripplo/data/db.dart';
 import 'package:ripplo/crypto/identity.dart';
 import 'package:ripplo/mesh/bridge.dart';
-import 'package:ripplo/mesh/dev_signal.dart';
+import 'package:ripplo/mesh/dev/dev_signal.dart';
 import 'package:ripplo/mesh/packet.dart';
 import 'package:ripplo/util/bytes.dart';
 

@@ -1,6 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:material_ui/material_ui.dart';
-import 'package:ripplo/services/theme.dart';
+import 'package:ripplo/ui/theme.dart';
 import 'package:ripplo/ui/widgets.dart';
 
 Widget host(Widget child, {bool light = false}) => MaterialApp(

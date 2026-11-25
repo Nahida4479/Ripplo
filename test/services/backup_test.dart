@@ -1,6 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ripplo/core/state.dart';
-import 'package:ripplo/services/backup.dart';
+import 'package:ripplo/data/backup.dart';
 import 'package:ripplo/util/js.dart' as js;
 
 import 'fake_mesh.dart';

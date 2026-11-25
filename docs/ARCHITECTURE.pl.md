@@ -108,7 +108,7 @@ Zeskanowanie albo otwarcie linku (`qr`, `link`) od razu wysyła też do wystawcy
    każdy zaszyfrowany AES-256-GCM kluczem trzymanym w Android Keystore / iOS Keychain
    (`AfterFirstUnlockThisDeviceOnly`). Rekordy po stronie Dart (wiadomości, kontakty, czaty) są zaszyfrowane AES-GCM
    przez `lib/crypto/vault.dart` kluczem bazy danych z `getDbKey` i zapisywane w natywnym magazynie SQLite (§12.1).
-5. **Wersja desktopowa do developmentu**: `lib/mesh/dev_signal.dart` (używany przez `lib/mesh/dev_mesh.dart`) zastępuje natywne wywołania Signal jawnym
+5. **Wersja desktopowa do developmentu**: `lib/mesh/dev/dev_signal.dart` (używany przez `lib/mesh/dev/dev_mesh.dart`) zastępuje natywne wywołania Signal jawnym
    zamiennikiem, aby dwie instancje na pulpicie mogły ćwiczyć interfejs. NIE zapewnia żadnego bezpieczeństwa (klucz bazy leży w zwykłym pliku),
    a interfejs to komunikuje. Wersje release nigdy go nie używają: `DevMesh` rzuca wyjątek w trybie release, a `main.dart` wybiera `MeshBridge` na Androidzie, iOS i w każdej wersji release.
 
@@ -202,7 +202,7 @@ Przekaźniki nigdy nie przekazują przekazywanych pakietów DATA do aplikacji i 
 
 Limity nadużyć (native): maks. 200 pakietów/s na sąsiada, maks. 32 MiB w kolejce na łącze, odrzucanie nadmiaru.
 
-Implementacje. `lib/mesh/router.dart` to router w Dart: uruchamiają go desktopowa sieć deweloperska (`lib/mesh/dev_mesh.dart`) i testy, a na telefonach
+Implementacje. `lib/mesh/router.dart` to router w Dart: uruchamiają go desktopowa sieć deweloperska (`lib/mesh/dev/dev_mesh.dart`) i testy, a na telefonach
 aplikacja używa routera natywnego przez most. Musi zachowywać się dokładnie jak `Router.kt` i `Router.swift`; zmiana routera trafia do
 wszystkich trzech w tym samym commicie. Różnice znalezione przy portowaniu, istniejące już przed portem i jeszcze nieujednolicone:
 - hak zapisu do skrzynki (`host.persist`, DATA dla tego węzła jest zapisywane przed ACK) istnieje tylko w Kotlinie; Dart i Swift nie mają takiego haka;
@@ -558,30 +558,32 @@ i18n.dart                          teksty interfejsu (en, pl), `t(key)`
 contributors.dart                  loginy współtwórców dla karty O aplikacji
 util/bytes.dart                    b64 / b64url / hex / utf8 / concat / random / base32
 util/js.dart                       drobne funkcje zachowujące semantykę JavaScriptu (prawdziwość, zegar `now`, `cut`, int32), by przeportowana logika pasowała do dawnej implementacji
-util/avatar.dart, qrparts.dart, schedule.dart, link_label.dart, github_cache.dart
-                                   odcień i inicjały awatara, składanie kawałków animowanego QR, sloty odświeżania Ludzi (§7), etykieta medium łącza, pamięć odpowiedzi GitHuba (§10)
+util/avatar.dart, qrparts.dart, schedule.dart, link_label.dart
+                                   odcień i inicjały awatara, składanie kawałków animowanego QR, sloty odświeżania Ludzi (§7), etykieta medium łącza
 crypto/vault.dart                  szyfrowanie / odszyfrowanie rekordów AES-GCM kluczem bazy
-crypto/db.dart                     RawStore (NativeRawStore przez most, FileRawStore, MemoryRawStore) i szyfrowany magazyn rekordów
 crypto/identity.dart               wizytówka tożsamości, tag / ripploId, kodowanie / dekodowanie linku zaproszenia (§1)
 crypto/attachment.dart             szyfrowanie / odszyfrowanie pliku + podział na fragmenty (§2)
 crypto/call_frame.dart             szyfrowanie / odszyfrowanie ramek połączenia, okno powtórzeń (§13)
 mesh/packet.dart                   kodowanie / dekodowanie pakietów, stałe (§3)
 mesh/router.dart                   router w Dart (§3.1)
 mesh/bridge.dart                   interfejs `Mesh` i `MeshBridge` na MethodChannel (§9)
-mesh/dev_mesh.dart, dev_signal.dart  symulator desktopowy: Mesh przez UDP loopback, jawny zamiennik Signal (§15)
+mesh/dev/dev_mesh.dart, dev_signal.dart  symulator desktopowy: Mesh przez UDP loopback, jawny zamiennik Signal (§15)
 core/state.dart, obs.dart          reaktywny stan aplikacji (`ObsMap`, `ObsList`)
 core/messenger.dart, messenger_contacts.dart, messenger_msgs.dart
                                    `Core`: profil, kontakty i weryfikacja, Ludzie, wiadomości, załączniki, grupy, przywracanie kopii
 core/calls.dart, call_audio.dart   sygnalizacja i silnik połączeń, Opus na natywnych kanałach dźwięku (§13, §9.1)
 core/api.dart                      fasada używana przez UI (zob. niżej)
 core/diag.dart                     dziennik diagnostyczny, przekazywany do `usbLog`
-services/                          updater, notifications, open_intent, deep_link, share, permissions, scheduler, range_refresh, lock, backup,
-                                   ringtone, theme, prefs (motyw i język w shared_preferences), media_files (§12.5)
+data/db.dart                       RawStore (NativeRawStore przez most, FileRawStore, MemoryRawStore) i szyfrowany magazyn rekordów
+data/prefs.dart                    motyw i język w shared_preferences
+data/media_files.dart              pamięć podręczna odszyfrowanych mediów (§12.5)
+data/backup.dart, github_cache.dart  wyzwalacz automatycznej kopii, pamięć odpowiedzi GitHuba (§10)
+services/                          updater, notifications, open_intent, deep_link, share, permissions, scheduler, range_refresh, lock, ringtone
 ui/tokens.dart, widgets.dart       tokeny projektu i wspólne widgety (docs/DESIGN.pl.md)
-ui/icons.dart, avatar.dart, qr.dart, ui_state.dart
+ui/icons.dart, avatar.dart, qr.dart, theme.dart, ui_state.dart
                                    ikony Lucide, widget awatara, koder i rysownik QR, stan toastów / arkuszy
-components/                        arkusze, nakładki i karty (dodawanie kontaktu, nowy czat, udostępnianie, potwierdzenie, połączenie, blokada, kopia, skaner QR)
-views/                             Czaty, Czat, Ludzie, Kontakt, Ustawienia, Gate (uprawnienia), Onboarding
+ui/components/                   arkusze, nakładki i karty (dodawanie kontaktu, nowy czat, udostępnianie, potwierdzenie, połączenie, blokada, kopia, skaner QR)
+ui/views/                        Czaty, Czat, Ludzie, Kontakt, Ustawienia, Gate (uprawnienia), Onboarding
 ```
 
 `core/api.dart` (kontrakt UI), funkcje najwyższego poziomu nad jednym wspólnym `Core` i `RipploState`:
@@ -591,6 +593,32 @@ views/                             Czaty, Czat, Ludzie, Kontakt, Ustawienia, Gat
 `retry(msgId)`, `unsendMessage`, `loadMessages(chatId)`, `markRead(chatId)`, `createGroup(name, memberIds)`,
 `refreshPeople()`, `searchPeople`, `startCall`, `acceptCall`, `hangUp`, `setMuted`, `deleteChat(chatId)`, `deleteContact(id)`,
 `saveSettings`, `restoreBackup`, `sendDevLog`, `deleteDevLog`, `nodeOf`.
+
+### 11.1 Układ źródeł natywnych (gdzie pomagać)
+
+Android, `android/app/src/main/java/io/github/nahida4479/ripplo/`. Każdy transport to osobny pakiet, który z resztą aplikacji rozmawia tylko przez `transport/Transport.kt`, `Link.kt` i `StreamLink.kt`.
+
+```
+mesh/                      MeshEngine (łącza, sąsiedzi, spoiwo routingu), Router (§3.1), Packet (§3), Ids, Shared, MeshService (usługa pierwszoplanowa)
+transport/                 Transport (cykl życia), Link, StreamLink: kontrakt, który implementuje każde medium
+transport/ble/             BleTransport: serwer i klient GATT, skanowanie, rozgłaszanie (1M)
+transport/ble/coded/       BleCoded, CodedAdvertiser: sprawdzenie LE Coded PHY, maski, zestaw rozgłaszania coded
+transport/ble/l2cap/       BleL2cap: serwer i wybieranie L2CAP CoC po uzgodnieniu GATT
+transport/wifidirect/      WifiDirectTransport
+transport/wifiaware/       WifiAwareTransport
+transport/lan/             LanTransport: UDP / TCP w sieci lokalnej
+transport/nearby/          NearbyTransport: tylko wariant Play (src/play), ładowany przez MeshEngine refleksją
+crypto/                    SignalCore (protokół Signal), SignalFileStore (zaszyfrowane pliki kluczy)
+data/                      NativeStore (SQLite), Inbox, BackupEngine, BackupFormat
+calls/                     CallAudio, CallActivity, CallActionReceiver, Ringer
+update/                    UpdateEngine, UpdateJobService, UpdatedReceiver, InstallReceiver (§10)
+platform/                  AppLock, Opener, Notifier, Diag
+bridge/                    RipploMeshPlugin, Call: kanał `ripplo/mesh` (§9)
+```
+
+Testy jednostkowe odzwierciedlają pakiety w `src/test` (`crypto/SignalCoreTest`, `data/BackupFormatTest`).
+
+iOS na razie ma jeden płaski cel `ios/Runner/`. Mapa: transporty to `BleTransport`, `LanTransport`, `MultipeerTransport`, rdzeń sieci to `MeshEngine`, `MeshLink`, `Router`, `Packet`, krypto to `SignalCore`, dane to `NativeStore`, `BackupEngine`, połączenia to `CallAudio`, `Ringer`, warstwa platformy to `AppLock`, `Notifier`, `Diag`, a most to `RipploMeshPlugin`.
 
 ## 12. Lokalny magazyn, kopia zapasowa i blokada aplikacji
 
@@ -607,7 +635,7 @@ CREATE INDEX rows_idx ON rows (store, idx);
 ```
 
 `value` to dokładnie to, co zapisuje Dart: już zaszyfrowane AES-GCM przez `lib/crypto/vault.dart` kluczem bazy
-(AAD `store/key`). Warstwa natywna nigdy nie widzi treści czatów. `lib/crypto/db.dart` sięga do niej przez `RawStore`: `NativeRawStore` wywołuje
+(AAD `store/key`). Warstwa natywna nigdy nie widzi treści czatów. `lib/data/db.dart` sięga do niej przez `RawStore`: `NativeRawStore` wywołuje
 `dbPut` / `dbGet` / `dbDel` / `dbKeys` / `dbAll` / `dbByIdx` (§9); `FileRawStore` (plik JSON) obsługuje desktopową sieć deweloperską, a `MemoryRawStore` testy.
 
 IndexedDB z WebView dawnej aplikacji Vue i jego jednorazowe kopiowanie do tego magazynu już nie istnieją: aplikacja Flutter czyta tylko `ripplo.db`, a
@@ -672,7 +700,7 @@ Szczegóły zależą od obsługi przez dostawcę (zob. README).
 ### 12.5 Odszyfrowane multimedia na dysku
 
 Obrazy są odszyfrowywane tylko w pamięci (`Image.memory`) i nigdy nie trafiają na dysk. Wideo i głos wymagają pliku dla systemowych odtwarzaczy
-(`video_player`, `just_audio`), więc odszyfrowana kopia jest zapisywana w `cache/att/` (`lib/services/media_files.dart`; prywatna pamięć podręczna aplikacji, losowa 16-bajtowa nazwa hex,
+(`video_player`, `just_audio`), więc odszyfrowana kopia jest zapisywana w `cache/att/` (`lib/data/media_files.dart`; prywatna pamięć podręczna aplikacji, losowa 16-bajtowa nazwa hex,
 rozszerzenie z typu mime) tylko na czas odtwarzania i usuwana po jego zakończeniu lub zamknięciu widoku. Nagranie głosowe też tam ląduje (jawnie,
 bo nagrywarka potrzebuje pliku), dopóki nie zostanie odczytane do zaszyfrowania i wysłane, po czym jest usuwane. `wipeMediaCache()` usuwa cały katalog przy każdym starcie aplikacji,
 więc awaria nie zostawia odszyfrowanych multimediów.
@@ -780,9 +808,9 @@ Flutter 3.50.1 (Dart ^3.9; wersja przypięta w CI). Polecenia z katalogu główn
 | `dart run tool/parity.dart [goldens] [ref] [out] [prefiksy]` | zgodność zrzutów ekranu, zob. niżej |
 
 **Symulator desktopowy.** `main.dart` używa `MeshBridge` na Androidzie, iOS i w każdej wersji release; w buildach debug i profile na pulpicie używa `DevMesh`
-(`lib/mesh/dev_mesh.dart`). Każda instancja zajmuje port UDP na `127.0.0.1` z zakresu 47700-47731 (32 sloty, slot początkowy to skrót z `RIPPLO_PROFILE`, brany jest następny
+(`lib/mesh/dev/dev_mesh.dart`). Każda instancja zajmuje port UDP na `127.0.0.1` z zakresu 47700-47731 (32 sloty, slot początkowy to skrót z `RIPPLO_PROFILE`, brany jest następny
 wolny), ogłasza się hello co 2 s, odrzuca sąsiada po 5 s ciszy i uruchamia `lib/mesh/router.dart` na wirtualnym łączu `lan` 20 000 kbps.
-Ramki to datagramy `type(1) | from(32) | to(32) | payload`. Signal to jawny zamiennik `lib/mesh/dev_signal.dart` (§2), magazyn to plik
+Ramki to datagramy `type(1) | from(32) | to(32) | payload`. Signal to jawny zamiennik `lib/mesh/dev/dev_signal.dart` (§2), magazyn to plik
 `ripplo-dev-<profil>/db.json` w systemowym katalogu tymczasowym, a każde uprawnienie wygląda na przyznane. Transporty, połączenia, aktualizacje, kopia zapasowa i blokada aplikacji nie są symulowane.
 
 **Testy golden.** Każdy ekran i arkusz ma testy golden w `test/views/` i `test/components/` (rozmiar urządzenia 412 × 915, jasny i ciemny; czcionki z

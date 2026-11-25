@@ -7,6 +7,8 @@ import android.content.pm.ServiceInfo
 import android.os.IBinder
 import androidx.core.app.ServiceCompat
 import androidx.core.content.ContextCompat
+import io.github.nahida4479.ripplo.platform.Diag
+import io.github.nahida4479.ripplo.platform.Notifier
 
 class MeshService : Service() {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {

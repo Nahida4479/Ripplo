@@ -6,7 +6,7 @@ import android.os.Bundle
 import android.view.WindowManager
 import io.flutter.embedding.android.FlutterFragmentActivity
 import io.flutter.embedding.engine.FlutterEngine
-import io.github.nahida4479.ripplo.mesh.RipploMeshPlugin
+import io.github.nahida4479.ripplo.bridge.RipploMeshPlugin
 
 class MainActivity : FlutterFragmentActivity() {
     private val mesh = RipploMeshPlugin()

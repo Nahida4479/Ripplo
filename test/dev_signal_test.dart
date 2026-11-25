@@ -5,7 +5,7 @@ import 'dart:typed_data';
 import 'package:crypto/crypto.dart' as c;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ripplo/mesh/bridge.dart';
-import 'package:ripplo/mesh/dev_signal.dart';
+import 'package:ripplo/mesh/dev/dev_signal.dart';
 import 'package:ripplo/util/bytes.dart';
 
 Uint8List seeded(String label, int n) {
