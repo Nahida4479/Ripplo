@@ -3,10 +3,10 @@ import 'dart:io';
 
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:ripplo/data/db.dart';
-import 'package:ripplo/crypto/vault.dart';
-import 'package:ripplo/mesh/bridge.dart';
-import 'package:ripplo/util/bytes.dart';
+import 'package:ripplo/data/app_database.dart';
+import 'package:ripplo/crypto/database_vault.dart';
+import 'package:ripplo/mesh/native_mesh_bridge.dart';
+import 'package:ripplo/util/byte_encoding.dart';
 
 Uint8List h(String s) => Uint8List.fromList([
       for (var i = 0; i < s.length; i += 2) int.parse(s.substring(i, i + 2), radix: 16),

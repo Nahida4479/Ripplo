@@ -1,8 +1,8 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:ripplo/core/state.dart';
-import 'package:ripplo/services/scheduler.dart';
-import 'package:ripplo/util/js.dart' as js;
-import 'package:ripplo/util/schedule.dart';
+import 'package:ripplo/core/app_state.dart';
+import 'package:ripplo/services/people_refresh_scheduler.dart';
+import 'package:ripplo/util/js_compat.dart' as js;
+import 'package:ripplo/util/refresh_slot_schedule.dart';
 
 void main() {
   final savedClock = js.now;

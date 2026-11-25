@@ -3,8 +3,8 @@ import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:ripplo/util/bytes.dart';
-import 'package:ripplo/util/js.dart';
+import 'package:ripplo/util/byte_encoding.dart';
+import 'package:ripplo/util/js_compat.dart';
 
 void main() {
   final v =

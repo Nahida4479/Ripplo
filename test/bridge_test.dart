@@ -1,7 +1,7 @@
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:ripplo/mesh/bridge.dart';
-import 'package:ripplo/util/bytes.dart';
+import 'package:ripplo/mesh/native_mesh_bridge.dart';
+import 'package:ripplo/util/byte_encoding.dart';
 
 const codec = JSONMethodCodec();
 const channel = MethodChannel('ripplo/mesh', codec);

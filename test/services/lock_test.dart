@@ -1,6 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:ripplo/core/state.dart';
-import 'package:ripplo/services/lock.dart';
+import 'package:ripplo/core/app_state.dart';
+import 'package:ripplo/services/app_lock.dart';
 
 import 'sec_mesh.dart';
 

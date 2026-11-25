@@ -1,4 +1,4 @@
-import 'package:ripplo/mesh/bridge.dart';
+import 'package:ripplo/mesh/native_mesh_bridge.dart';
 
 class SecMesh implements Mesh {
   SecMesh({this.isNative = true});

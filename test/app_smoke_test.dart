@@ -1,16 +1,16 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:material_ui/material_ui.dart';
-import 'package:ripplo/app.dart';
-import 'package:ripplo/mesh/bridge.dart';
-import 'package:ripplo/mesh/dev/dev_mesh.dart';
-import 'package:ripplo/router.dart';
-import 'package:ripplo/services/lock.dart';
+import 'package:ripplo/app_shell.dart';
+import 'package:ripplo/mesh/native_mesh_bridge.dart';
+import 'package:ripplo/mesh/dev/desktop_loopback_mesh.dart';
+import 'package:ripplo/navigation_stack.dart';
+import 'package:ripplo/services/app_lock.dart';
 import 'package:ripplo/ui/theme.dart';
-import 'package:ripplo/ui/ui_state.dart';
-import 'package:ripplo/ui/widgets.dart';
-import 'package:ripplo/ui/views/chats_view.dart';
+import 'package:ripplo/ui/ui_request_state.dart';
+import 'package:ripplo/ui/shared_widgets.dart';
+import 'package:ripplo/ui/views/chat_list_view.dart';
 import 'package:ripplo/ui/views/onboarding_view.dart';
-import 'package:ripplo/ui/views/people_view.dart';
+import 'package:ripplo/ui/views/nearby_people_view.dart';
 import 'package:ripplo/ui/views/settings_view.dart';
 
 import 'support/fixtures.dart';

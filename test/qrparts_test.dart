@@ -4,7 +4,7 @@ import 'dart:math';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:qr/qr.dart';
-import 'package:ripplo/util/qrparts.dart';
+import 'package:ripplo/util/qr_multipart_codec.dart';
 
 const _alphabet =
     'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_';

@@ -5,11 +5,11 @@ import 'dart:typed_data';
 
 import 'package:crypto/crypto.dart' as c;
 import 'package:flutter_test/flutter_test.dart';
-import 'package:ripplo/crypto/attachment.dart';
-import 'package:ripplo/crypto/call_frame.dart';
-import 'package:ripplo/crypto/identity.dart';
-import 'package:ripplo/crypto/vault.dart';
-import 'package:ripplo/util/bytes.dart';
+import 'package:ripplo/crypto/attachment_encryption.dart';
+import 'package:ripplo/crypto/call_frame_encryption.dart';
+import 'package:ripplo/crypto/contact_card_codec.dart';
+import 'package:ripplo/crypto/database_vault.dart';
+import 'package:ripplo/util/byte_encoding.dart';
 
 Uint8List h(Object? s) => unhex(s as String);
 

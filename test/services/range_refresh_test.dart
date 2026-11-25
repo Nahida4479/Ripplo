@@ -1,7 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:ripplo/core/state.dart';
-import 'package:ripplo/services/range_refresh.dart';
-import 'package:ripplo/util/js.dart' as js;
+import 'package:ripplo/core/app_state.dart';
+import 'package:ripplo/services/neighbor_range_refresh.dart';
+import 'package:ripplo/util/js_compat.dart' as js;
 
 import 'fake_mesh.dart';
 

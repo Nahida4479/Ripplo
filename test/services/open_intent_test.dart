@@ -1,6 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:ripplo/core/state.dart';
-import 'package:ripplo/services/open_intent.dart';
+import 'package:ripplo/core/app_state.dart';
+import 'package:ripplo/services/notification_open_intent.dart';
 
 import 'sec_mesh.dart';
 

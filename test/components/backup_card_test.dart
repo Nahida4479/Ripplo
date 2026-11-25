@@ -1,11 +1,11 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:ripplo/ui/components/backup_card.dart';
-import 'package:ripplo/i18n.dart';
-import 'package:ripplo/mesh/bridge.dart' as bridge;
+import 'package:ripplo/translations.dart';
+import 'package:ripplo/mesh/native_mesh_bridge.dart' as bridge;
 import 'package:ripplo/ui/theme.dart';
-import 'package:ripplo/ui/tokens.dart';
-import 'package:ripplo/ui/ui_state.dart';
+import 'package:ripplo/ui/design_tokens.dart';
+import 'package:ripplo/ui/ui_request_state.dart';
 
 class NativeMesh implements bridge.Mesh {
   Map<String, Object?> status = {'enabled': false, 'lastAt': 0, 'folder': null};

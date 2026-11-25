@@ -2,7 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:ripplo/ui/qr.dart';
+import 'package:ripplo/ui/qr_code_encoder.dart';
 
 void main() {
   final cases =

@@ -1,7 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:ripplo/ui/theme.dart';
-import 'package:ripplo/ui/widgets.dart';
+import 'package:ripplo/ui/shared_widgets.dart';
 
 Widget host(Widget child, {bool light = false}) => MaterialApp(
   debugShowCheckedModeBanner: false,

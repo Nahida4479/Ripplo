@@ -1,9 +1,9 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:ripplo/core/state.dart';
-import 'package:ripplo/mesh/bridge.dart';
-import 'package:ripplo/services/updater.dart';
-import 'package:ripplo/ui/ui_state.dart';
-import 'package:ripplo/data/github_cache.dart';
+import 'package:ripplo/core/app_state.dart';
+import 'package:ripplo/mesh/native_mesh_bridge.dart';
+import 'package:ripplo/services/app_updater.dart';
+import 'package:ripplo/ui/ui_request_state.dart';
+import 'package:ripplo/data/github_api_cache.dart';
 
 import 'sec_mesh.dart';
 

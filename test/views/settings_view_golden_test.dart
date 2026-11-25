@@ -3,10 +3,10 @@ import 'dart:io';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:material_ui/material_ui.dart';
-import 'package:ripplo/i18n.dart';
-import 'package:ripplo/mesh/bridge.dart' as bridge;
+import 'package:ripplo/translations.dart';
+import 'package:ripplo/mesh/native_mesh_bridge.dart' as bridge;
 import 'package:ripplo/ui/theme.dart';
-import 'package:ripplo/ui/widgets.dart';
+import 'package:ripplo/ui/shared_widgets.dart';
 import 'package:ripplo/ui/views/settings_view.dart';
 
 import '../support/fixtures.dart';

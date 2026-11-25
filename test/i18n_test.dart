@@ -1,6 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:ripplo/contributors.dart';
-import 'package:ripplo/i18n.dart';
+import 'package:ripplo/contributor_logins.dart';
+import 'package:ripplo/translations.dart';
 
 final _plural = RegExp(r'_(zero|one|two|few|many|other)$');
 final _ph = RegExp(r'\{(\w+)\}');

@@ -1,6 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:material_ui/material_ui.dart';
-import 'package:ripplo/util/js.dart' as js;
+import 'package:ripplo/util/js_compat.dart' as js;
 
 import 'fixtures.dart';
 import 'pump_screen.dart';

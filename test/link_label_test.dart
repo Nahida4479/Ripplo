@@ -2,7 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:ripplo/util/link_label.dart';
+import 'package:ripplo/util/coded_link_check.dart';
 
 void main() {
   test('isCodedLink vectors', () {

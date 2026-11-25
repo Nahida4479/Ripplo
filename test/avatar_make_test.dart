@@ -2,8 +2,8 @@ import 'dart:typed_data';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:image/image.dart' as img;
-import 'package:ripplo/util/avatar.dart';
-import 'package:ripplo/util/bytes.dart';
+import 'package:ripplo/util/avatar_image_processing.dart';
+import 'package:ripplo/util/byte_encoding.dart';
 
 void main() {
   test('makeAvatar crops to a 160px jpeg within the size limit', () async {

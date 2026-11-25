@@ -1,11 +1,11 @@
 import 'package:flutter/services.dart';
 import 'package:material_ui/material_ui.dart';
 
-import '../../i18n.dart';
-import '../../mesh/bridge.dart' as bridge;
-import '../ui_state.dart';
-import '../widgets.dart';
-import 'settings_parts.dart';
+import '../../translations.dart';
+import '../../mesh/native_mesh_bridge.dart' as bridge;
+import '../ui_request_state.dart';
+import '../shared_widgets.dart';
+import 'fractional_text_and_section_head.dart';
 
 String localeDateTime(int ms, [String? loc]) {
   final d = DateTime.fromMillisecondsSinceEpoch(ms);

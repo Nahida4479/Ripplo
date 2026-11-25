@@ -5,9 +5,9 @@ import 'dart:typed_data';
 
 import 'package:crypto/crypto.dart' as c;
 import 'package:flutter_test/flutter_test.dart';
-import 'package:ripplo/mesh/packet.dart';
-import 'package:ripplo/mesh/router.dart';
-import 'package:ripplo/util/bytes.dart';
+import 'package:ripplo/mesh/mesh_packet.dart';
+import 'package:ripplo/mesh/mesh_router.dart';
+import 'package:ripplo/util/byte_encoding.dart';
 
 Uint8List tag(int n) => Uint8List(16)..fillRange(0, 16, n);
 

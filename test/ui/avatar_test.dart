@@ -2,7 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:ripplo/util/avatar.dart';
+import 'package:ripplo/util/avatar_image_processing.dart';
 
 void main() {
   final a =

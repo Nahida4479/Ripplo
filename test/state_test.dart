@@ -3,10 +3,10 @@ import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:ripplo/core/diag.dart';
-import 'package:ripplo/core/obs.dart';
-import 'package:ripplo/core/state.dart';
-import 'package:ripplo/util/js.dart' as js;
+import 'package:ripplo/core/diagnostic_log.dart';
+import 'package:ripplo/core/observable_collections.dart';
+import 'package:ripplo/core/app_state.dart';
+import 'package:ripplo/util/js_compat.dart' as js;
 
 void main() {
   final v =

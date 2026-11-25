@@ -4,14 +4,14 @@ import 'package:flutter/services.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:share_plus/share_plus.dart';
 
-import '../../core/api.dart' as api;
-import '../../core/state.dart';
-import '../../crypto/identity.dart' show RipploError, webLink;
-import '../../i18n.dart';
-import '../qr.dart';
-import '../ui_state.dart';
-import '../widgets.dart';
-import '../../util/qrparts.dart';
+import '../../core/app_instances.dart' as api;
+import '../../core/app_state.dart';
+import '../../crypto/contact_card_codec.dart' show RipploError, webLink;
+import '../../translations.dart';
+import '../qr_code_encoder.dart';
+import '../ui_request_state.dart';
+import '../shared_widgets.dart';
+import '../../util/qr_multipart_codec.dart';
 import 'qr_scanner.dart';
 
 typedef ScannerBuilder =

@@ -1,7 +1,7 @@
 import 'package:material_ui/material_ui.dart';
 
-import 'tokens.dart';
-import '../data/prefs.dart';
+import 'design_tokens.dart';
+import '../data/theme_language_prefs.dart';
 
 const List<String> kAccents = [
   '#22c55e',

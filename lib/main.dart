@@ -3,27 +3,27 @@ import 'package:flutter/widgets.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-import 'app.dart';
-import 'core/api.dart' as api;
-import 'core/call_audio.dart';
-import 'i18n.dart';
-import 'mesh/bridge.dart';
-import 'mesh/dev/dev_mesh.dart';
-import 'router.dart';
-import 'data/backup.dart';
-import 'services/deep_link.dart';
-import 'services/lock.dart';
-import 'data/media_files.dart';
-import 'services/notifications.dart';
-import 'services/open_intent.dart';
-import 'data/prefs.dart';
-import 'services/scheduler.dart';
-import 'services/share.dart';
+import 'app_shell.dart';
+import 'core/app_instances.dart' as api;
+import 'core/call_audio_engine.dart';
+import 'translations.dart';
+import 'mesh/native_mesh_bridge.dart';
+import 'mesh/dev/desktop_loopback_mesh.dart';
+import 'navigation_stack.dart';
+import 'data/backup_metadata.dart';
+import 'services/deep_link_handler.dart';
+import 'services/app_lock.dart';
+import 'data/attachment_file_cache.dart';
+import 'services/local_notifications.dart';
+import 'services/notification_open_intent.dart';
+import 'data/theme_language_prefs.dart';
+import 'services/people_refresh_scheduler.dart';
+import 'services/incoming_share_check.dart';
 import 'ui/theme.dart';
-import 'services/updater.dart';
-import 'ui/ui_state.dart';
-import 'data/github_cache.dart';
-import 'util/js.dart' as js;
+import 'services/app_updater.dart';
+import 'ui/ui_request_state.dart';
+import 'data/github_api_cache.dart';
+import 'util/js_compat.dart' as js;
 
 Mesh _pickMesh() {
   final native =

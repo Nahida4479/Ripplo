@@ -3,9 +3,9 @@ import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:ripplo/ui/theme.dart';
-import 'package:ripplo/ui/tokens.dart';
-import 'package:ripplo/ui/ui_state.dart';
-import 'package:ripplo/util/js.dart' as js;
+import 'package:ripplo/ui/design_tokens.dart';
+import 'package:ripplo/ui/ui_request_state.dart';
+import 'package:ripplo/util/js_compat.dart' as js;
 
 import 'fixtures.dart';
 import 'fonts.dart';

@@ -3,9 +3,9 @@ import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:image/image.dart' as img;
-import 'package:ripplo/core/state.dart';
-import 'package:ripplo/i18n.dart';
-import 'package:ripplo/ui/ui_state.dart';
+import 'package:ripplo/core/app_state.dart';
+import 'package:ripplo/translations.dart';
+import 'package:ripplo/ui/ui_request_state.dart';
 
 typedef Json = Map<String, Object?>;
 

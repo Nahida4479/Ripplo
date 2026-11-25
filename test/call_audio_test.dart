@@ -4,11 +4,11 @@ import 'dart:math' as math;
 import 'dart:typed_data';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:ripplo/core/call_audio.dart';
-import 'package:ripplo/core/calls.dart';
-import 'package:ripplo/core/state.dart';
-import 'package:ripplo/crypto/call_frame.dart';
-import 'package:ripplo/util/bytes.dart';
+import 'package:ripplo/core/call_audio_engine.dart';
+import 'package:ripplo/core/call_manager.dart';
+import 'package:ripplo/core/app_state.dart';
+import 'package:ripplo/crypto/call_frame_encryption.dart';
+import 'package:ripplo/util/byte_encoding.dart';
 
 class FakeBackend implements CallAudioBackend {
   final ctl = StreamController<Uint8List>.broadcast();

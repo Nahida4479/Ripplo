@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:ripplo/services/notifications.dart';
+import 'package:ripplo/services/local_notifications.dart';
 
 import 'fake_mesh.dart';
 

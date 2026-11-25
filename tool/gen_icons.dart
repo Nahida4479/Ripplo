@@ -26,7 +26,7 @@ void main() {
     );
   }
   out.writeln('}');
-  File('lib/ui/icons.dart').writeAsStringSync(out.toString());
+  File('lib/ui/lucide_icons.dart').writeAsStringSync(out.toString());
   stdout.writeln('${names.length} icons');
 }
 

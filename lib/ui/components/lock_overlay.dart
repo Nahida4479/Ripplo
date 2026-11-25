@@ -1,8 +1,8 @@
 import 'package:material_ui/material_ui.dart';
 
-import '../../i18n.dart';
-import '../widgets.dart';
-import 'brand.dart';
+import '../../translations.dart';
+import '../shared_widgets.dart';
+import 'app_icon.dart';
 
 class LockOverlay extends StatelessWidget {
   const LockOverlay({super.key, this.onUnlock, this.busy = false});

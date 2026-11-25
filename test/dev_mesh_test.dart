@@ -3,10 +3,10 @@ import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:ripplo/mesh/bridge.dart';
-import 'package:ripplo/mesh/dev/dev_mesh.dart';
-import 'package:ripplo/mesh/packet.dart';
-import 'package:ripplo/util/bytes.dart';
+import 'package:ripplo/mesh/native_mesh_bridge.dart';
+import 'package:ripplo/mesh/dev/desktop_loopback_mesh.dart';
+import 'package:ripplo/mesh/mesh_packet.dart';
+import 'package:ripplo/util/byte_encoding.dart';
 
 Future<void> settle() => Future<void>.delayed(Duration.zero);
 

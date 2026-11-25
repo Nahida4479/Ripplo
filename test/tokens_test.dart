@@ -1,8 +1,8 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:material_ui/material_ui.dart';
-import 'package:ripplo/data/prefs.dart';
+import 'package:ripplo/data/theme_language_prefs.dart';
 import 'package:ripplo/ui/theme.dart';
-import 'package:ripplo/ui/tokens.dart';
+import 'package:ripplo/ui/design_tokens.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {

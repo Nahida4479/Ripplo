@@ -1,8 +1,8 @@
 import 'package:material_ui/material_ui.dart';
 
-import '../../i18n.dart';
-import '../ui_state.dart';
-import '../widgets.dart';
+import '../../translations.dart';
+import '../ui_request_state.dart';
+import '../shared_widgets.dart';
 
 class ConfirmSheet extends StatelessWidget {
   const ConfirmSheet({super.key});

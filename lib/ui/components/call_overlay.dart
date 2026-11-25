@@ -2,13 +2,13 @@ import 'dart:async';
 
 import 'package:material_ui/material_ui.dart';
 
-import '../../core/api.dart' as api;
-import '../../core/state.dart';
-import '../../i18n.dart';
-import '../../mesh/bridge.dart';
-import '../widgets.dart';
-import 'brand.dart';
-import '../../util/js.dart' as js;
+import '../../core/app_instances.dart' as api;
+import '../../core/app_state.dart';
+import '../../translations.dart';
+import '../../mesh/native_mesh_bridge.dart';
+import '../shared_widgets.dart';
+import 'app_icon.dart';
+import '../../util/js_compat.dart' as js;
 
 class CallOverlay extends StatefulWidget {
   const CallOverlay({super.key, this.state, this.onRing, this.onKeepAwake});

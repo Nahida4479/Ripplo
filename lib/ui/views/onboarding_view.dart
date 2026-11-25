@@ -1,12 +1,12 @@
 import 'package:material_ui/material_ui.dart';
 
-import '../components/brand.dart';
-import '../../core/api.dart' as api;
-import '../../crypto/identity.dart' show RipploError;
-import '../../i18n.dart';
-import '../../mesh/bridge.dart';
-import '../../data/backup.dart';
-import '../widgets.dart';
+import '../components/app_icon.dart';
+import '../../core/app_instances.dart' as api;
+import '../../crypto/contact_card_codec.dart' show RipploError;
+import '../../translations.dart';
+import '../../mesh/native_mesh_bridge.dart';
+import '../../data/backup_metadata.dart';
+import '../shared_widgets.dart';
 
 class OnboardingView extends StatefulWidget {
   const OnboardingView({super.key, this.native, this.onRestored});

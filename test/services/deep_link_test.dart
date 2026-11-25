@@ -1,7 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:ripplo/core/state.dart';
-import 'package:ripplo/services/deep_link.dart';
-import 'package:ripplo/ui/ui_state.dart';
+import 'package:ripplo/core/app_state.dart';
+import 'package:ripplo/services/deep_link_handler.dart';
+import 'package:ripplo/ui/ui_request_state.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();

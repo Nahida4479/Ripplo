@@ -1,4 +1,4 @@
-part of 'messenger.dart';
+part of 'messenger_core.dart';
 
 final _jsSpace = RegExp(r'[\s   -     　﻿]+');
 final _digits60 = RegExp(r'^\d{60}$');

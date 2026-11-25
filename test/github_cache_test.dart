@@ -2,7 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:ripplo/data/github_cache.dart';
+import 'package:ripplo/data/github_api_cache.dart';
 
 class MapStorage implements GhStorage {
   final m = <String, String>{};

@@ -4,11 +4,11 @@ import 'dart:typed_data';
 import 'package:crypto/crypto.dart' as c;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:qr/qr.dart';
-import 'package:ripplo/crypto/attachment.dart';
-import 'package:ripplo/crypto/call_frame.dart';
-import 'package:ripplo/crypto/identity.dart';
-import 'package:ripplo/crypto/vault.dart';
-import 'package:ripplo/util/bytes.dart';
+import 'package:ripplo/crypto/attachment_encryption.dart';
+import 'package:ripplo/crypto/call_frame_encryption.dart';
+import 'package:ripplo/crypto/contact_card_codec.dart';
+import 'package:ripplo/crypto/database_vault.dart';
+import 'package:ripplo/util/byte_encoding.dart';
 import 'package:zxing2/qrcode.dart';
 
 Uint8List sha(Uint8List b) => Uint8List.fromList(c.sha256.convert(b).bytes);

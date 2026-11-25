@@ -2,8 +2,8 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:ripplo/util/js.dart' as js;
-import 'package:ripplo/util/schedule.dart';
+import 'package:ripplo/util/js_compat.dart' as js;
+import 'package:ripplo/util/refresh_slot_schedule.dart';
 
 void main() {
   final v =
