@@ -2,45 +2,46 @@
 
 [🇬🇧 English](DESIGN.md) | 🇵🇱 Polski
 
-Wygląd komunikatora (Signal / WhatsApp), podejście mobile-first, domyślnie ciemny. Ikony: `lucide-vue-next`,
-obrys 1.75, 22 px. Czcionka: stos systemowy (`-apple-system, "SF Pro Text", Roboto, Inter, sans-serif`).
-Teksty interfejsu są w `src/i18n.js` (`en`, `pl`; język urządzenia, domyślnie `en`).
+Wygląd komunikatora (Signal / WhatsApp), podejście mobile-first, domyślnie ciemny. Zbudowany z widgetów Fluttera. Ikony: Lucide, rysowane przez widget `Lucide` w
+`lib/ui/icons.dart` (generowany przez `tool/gen_icons.dart`), obrys 1.75, 22 px (`kIconStroke`, `kIconSize`). Czcionka: domyślna platformy (Roboto na Androidzie, SF Pro na iOS).
+Teksty interfejsu są w `lib/i18n.dart` (`en`, `pl`; język urządzenia, domyślnie `en`). Wspólne widgety są w `lib/ui/widgets.dart`, arkusze i nakładki w `lib/components/`,
+ekrany w `lib/views/`.
 
-## Tokeny (zmienne CSS w `:root`)
+## Tokeny (`RipploColors` w `lib/ui/tokens.dart`)
 
 | token | ciemny | jasny |
 |-------|--------|-------|
-| `--bg` | `#0b0b0c` | `#ffffff` |
-| `--surface` | `#161617` | `#f4f4f6` |
-| `--surface-2` | `#1f1f21` | `#ebebef` |
-| `--border` | `#2a2a2d` | `#e2e2e7` |
-| `--text` | `#f2f2f3` | `#111114` |
-| `--text-2` | `#a1a1a6` | `#6b6b73` |
-| `--warn` | `#f5b544` | `#b7791f` |
-| `--danger` | `#ef5350` | `#d32f2f` |
-| `--ok` | `#3ecf8e` | `#1f9d63` |
+| `bg` | `#0b0b0c` | `#ffffff` |
+| `surface` | `#161617` | `#f4f4f6` |
+| `surface2` | `#1f1f21` | `#ebebef` |
+| `border` | `#2a2a2d` | `#e2e2e7` |
+| `text` | `#f2f2f3` | `#111114` |
+| `text2` | `#a1a1a6` | `#6b6b73` |
+| `warn` | `#f5b544` | `#b7791f` |
+| `danger` | `#ef5350` | `#d32f2f` |
+| `ok` | `#3ecf8e` | `#1f9d63` |
 
-`--accent` (wybór użytkownika) i `--on-accent` (biały lub `#111`, zależnie od luminancji akcentu wg WCAG).
-`--accent-soft` = akcent z 16 % przezroczystości (aktywna zakładka, zaznaczone wiersze).
-`--glow` = kolor gradientu tła (lub przezroczysty): każda strona ma
-`background: linear-gradient(180deg, color-mix(in srgb, var(--glow) 55%, transparent) 0, transparent 340px), var(--bg)`.
+`accent` (wybór użytkownika) i `onAccent` (biały lub `#111111`, zależnie od luminancji akcentu wg WCAG, `onAccentFor`).
+`accentSoft` = akcent z 16 % przezroczystości (aktywna zakładka, zaznaczone wiersze). `tabBg` = `surface` z 82 % przezroczystości (pasek zakładek).
+`glow` = kolor gradientu tła (lub przezroczysty): każda strona (`RPage`) maluje `bg`, a na nim pionowy gradient wysokości 340 px (`kGlowHeight`)
+od `glow` z 55 % przezroczystości do przezroczystego (`RipploColors.pageGradient`). Widgety czytają tokeny przez `context.rc`.
 
 Próbki akcentu: zielony `#22c55e`, morski `#14b8a6`, niebieski `#4f9cf9` (domyślny), lawendowy `#a78bfa`,
-różowy `#e467b0`, koralowy `#ea6a5f`, pomarańczowy `#e67e22`, szary `#9ca3af`, własny (tęczowa stożkowa próbka →
-natywne `<input type="color">`).
+różowy `#e467b0`, koralowy `#ea6a5f`, pomarańczowy `#e67e22`, szary `#9ca3af`, własny (tęczowa próbka →
+okno z kolorem hex).
 Próbki gradientu: brak (ukośna kreska), fioletowy `#5b2ea6`, granatowy `#1e3a8a`, morski `#0f5257`,
 śliwkowy `#7a1f4f`, brązowy `#6b3a0a`, łupkowy `#3d4552`.
 Tryb motywu: segmentowa pigułka `Systemowy | Ciemny | Jasny`, wybrany segment wypełniony akcentem.
-Wybrana próbka: obwódka 2 px w `--text` z odstępem 3 px. Wszystkie preferencje motywu w localStorage.
+Wybrana próbka: obwódka 2 px w `text` z odstępem 3 px. Wszystkie preferencje motywu w `shared_preferences` (`ripplo.theme`, `ripplo.lang`; `lib/services/prefs.dart`, `lib/services/theme.dart`).
 
 Promienie: karty 14, wiersze 12, dymki 18 (narożnik z ogonkiem 6), pigułki 999. Skala odstępów 4/8/12/16/24.
-Strefy bezpieczne: `env(safe-area-inset-*)` w nagłówku i pasku zakładek.
+Promienie to stałe `kRadius*` w `lib/ui/tokens.dart`. Strefy bezpieczne: `MediaQuery.paddingOf` w nagłówku i pasku zakładek.
 
 ## Powłoka
 
 - Nagłówek z dużym tytułem na każdej zakładce (28/700): z lewej własny awatar (otwiera profil/QR), z prawej przyciski z ikonami.
 - Pływający pasek zakładek w kształcie pigułki na dole (surface, obramowanie 1 px, rozmycie): **Czaty**, **Ludzie**,
-  **Ustawienia**. Aktywny element: ikona w kolorze akcentu + pigułka `--accent-soft` za nią. Ustawienia pokazują
+  **Ustawienia**. Aktywny element: ikona w kolorze akcentu + pigułka `accentSoft` za nią. Ustawienia pokazują
   czerwoną kropkę, gdy dostępna jest aktualizacja lub kontrola integralności się nie powiodła.
 - Bramka uprawnień (blokująca, pełny ekran przed wszystkim innym): logo, jednozdaniowe wyjaśnienie po co, lista
   wymaganych uprawnień z plakietkami statusu (Bluetooth, Wi-Fi w pobliżu / lokalizacja, Powiadomienia) i
@@ -51,8 +52,8 @@ Strefy bezpieczne: `env(safe-area-inset-*)` w nagłówku i pasku zakładek.
 
 Ikony w nagłówku: QR (skanuj/dodaj), ołówek (nowy czat / nowa grupa). Pigułka wyszukiwania pod tytułem.
 Opcjonalna sekcja „Przypięte”. Wiersz 68 px: awatar 48 (inicjały na kolorze z hasha, ikona grupy dla grup),
-nazwa 16/600, podgląd 14 `--text-2` (głosowa: ikona mikrofonu + „Wiadomość głosowa”), czas 12 po prawej, znaczek nieprzeczytanych
-(akcent, `--on-accent`). Niezweryfikowane kontakty mają mały bursztynowy znaczek tarczy na awatarze.
+nazwa 16/600, podgląd 14 `text2` (głosowa: ikona mikrofonu + „Wiadomość głosowa”), czas 12 po prawej, znaczek nieprzeczytanych
+(akcent, `onAccent`). Niezweryfikowane kontakty mają mały bursztynowy znaczek tarczy na awatarze.
 Pod pigułką wyszukiwania, gdy ktoś cię zaprosił, sekcja **Zaproszenia · n**: awatar z bursztynową tarczą, nazwa,
 „chce cię dodać”, **Odrzuć** (ghost) i **Akceptuj**.
 Stan pusty: ilustracja fal + „Dodaj znajomego kodem QR lub linkiem zaproszenia”.
@@ -63,7 +64,7 @@ Stan pusty: ilustracja fal + „Dodaj znajomego kodem QR lub linkiem zaproszenia
   / `Poza zasięgiem`. Stuknięcie → strona kontaktu.
 - Bursztynowy baner pod nagłówkiem, dopóki kontakt jest niezweryfikowany: tekst z ARCHITECTURE §5 + trzy przyciski
   (Zweryfikuj kodem QR / Ponów przez sieć / Jestem pewien, że to ta osoba). Czerwony wariant dla ostrzeżenia o podmianie klucza.
-- Dymki: przychodzące `--surface-2`, wychodzące `--accent` z tekstem `--on-accent`, maks. 78 % szerokości,
+- Dymki: przychodzące `surface2`, wychodzące `accent` z tekstem `onAccent`, maks. 78 % szerokości,
   wypełnienie 12/16, czas 11 wewnątrz w prawym dolnym rogu. Separatory dni jako wyśrodkowane pigułki.
 - Status wychodzącej pod/wewnątrz dymka (ikona + etykieta po stuknięciu):
   encrypting (obracająca się kłódka), sending (pojedynczy ptaszek + `%` dla załączników), delivered (podwójny ptaszek,
@@ -105,8 +106,8 @@ czatu wysyła od razu i otwiera ten czat.
 
 ## Arkusz dodawania kontaktu
 
-Zakładki: **Mój kod** (animowany QR linku zaproszenia, około 6 klatek po 700 ms z kropkami postępu i podpowiedzią, by trzymać drugi telefon na nim do końca, + ripploId + przycisk Zaproś znajomego (udostępnia tekst i link webowy; linijka podpowiedzi mówi, że kontakt zostanie dodany jako niezweryfikowany) przez Web Share API /
-kopiowanie), **Skanuj** (wizjer kamery z zaokrągloną maską; ciągłe automatyczne wykrywanie, natywny `BarcodeDetector`, gdy działa, w przeciwnym razie ZXing skompilowany do WebAssembly (jsQR tylko podczas ładowania); bez przycisku. Trafienie od razu zamyka arkusz z komunikatem „Klucze zostały poprawnie zweryfikowane” lub „Dodano do kontaktów” i krótką wibracją), **Wklej link**.
+Zakładki: **Mój kod** (animowany QR linku zaproszenia, około 6 klatek po 700 ms z kropkami postępu i podpowiedzią, by trzymać drugi telefon na nim do końca, + ripploId + przycisk Zaproś znajomego (udostępnia tekst i link webowy; linijka podpowiedzi mówi, że kontakt zostanie dodany jako niezweryfikowany) przez systemowe menu udostępniania (`share_plus`) /
+kopiowanie), **Skanuj** (wizjer kamery z zaokrągloną maską; ciągłe automatyczne wykrywanie przez `flutter_zxing` (`QrScanner` w `lib/components/qr_scanner.dart`); bez przycisku. Trafienie od razu zamyka arkusz z komunikatem „Klucze zostały poprawnie zweryfikowane” lub „Dodano do kontaktów” i krótką wibracją), **Wklej link**.
 
 ## Strona kontaktu
 
@@ -129,7 +130,7 @@ czcionką monospace) + jego QR, akcje: Zweryfikuj kodem QR, Ponów sprawdzenie w
 - **Aktualizacje**: obecna wersja, najnowsza wersja, Sprawdź teraz (przycisk w kolorze akcentu, żeby był dobrze widoczny; napis zmienia się na „Sprawdzanie…” na co najmniej 0,8 s, bez linii „masz najnowszą wersję”), przełącznik Aktualizuj automatycznie (Android), postęp.
 - **O aplikacji**: nazwa aplikacji + hasło, wersja (5 stuknięć w ten wiersz w ciągu 2 s włącza lub wyłącza **tryb dewelopera**, który dodaje kartę **Dla deweloperów** ze stanem transportów, informacją o obsłudze BLE Coded PHY w telefonie (bez przełącznika), wierszem dla każdego sąsiada do wymuszenia połączenia jednym standardem (LAN, Wi-Fi Direct, Wi-Fi Aware, BLE 1M / Coded PHY) lub jego zamknięcia, dziennikiem diagnostycznym i przyciskami Odśwież / Kopiuj log / Wyczyść log), link do GitHuba, Licencja, karty **Współtwórcy**: awatar
   (awatar z GitHuba online, inicjały offline), login pogrubiony, podtekst „Profil GitHub”, ikona linku zewnętrznego
-  po prawej; karta = `--surface`, obramowanie 1 px, promień 14.
+  po prawej; karta = `surface`, obramowanie 1 px, promień 14.
 
 ## Powiadomienia
 
@@ -138,3 +139,9 @@ Android: glif na pasku stanu to jednobarwne `ic_stat_ripplo` w kolorze akcentu, 
 ta sama grafika co `public/icon_ios.png`), której nie można zmienić dla pojedynczego powiadomienia.
 Tytuł to nazwa nadawcy (grupy: „grupa: nazwa”), treść to tekst wiadomości, „Wysłano zdjęcie” lub „Wysłano załącznik”; zaproszenia mają
 „Zaproszenie do kontaktów”; połączenia przychodzące używają małego natywnego pełnoekranowego ekranu połączenia (nazwa, Odbierz, Odrzuć), który może pojawić się nad ekranem blokady bez odsłaniania czatów; Odbierz łączy od razu bez odblokowywania: nad blokadą widać tylko ekran rozmowy (ekran zostaje włączony), a czaty zostają ukryte do odblokowania telefonu. Na ekranie blokady wiadomości pokazują tylko „Nowa wiadomość”.
+
+## Kontrola wizualna
+
+Każdy ekran i arkusz ma testy golden (`test/views/`, `test/components/`, 412 × 915, jasny i ciemny), których obrazy leżą w `test/goldens/`; aktualizuje się je przez
+`flutter test --update-goldens`. `dart run tool/parity.dart` porównuje je ze zrzutami wzorcowymi poprzedniej aplikacji Vue w `test/goldens/ref/` i zgłasza porażkę, gdy więcej niż
+1,5 % pikseli obrazu się różni (szczegóły w ARCHITECTURE §15).

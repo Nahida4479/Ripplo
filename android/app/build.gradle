@@ -1,7 +1,11 @@
-apply plugin: 'com.android.application'
-apply plugin: 'org.jetbrains.kotlin.android'
+plugins {
+    id "com.android.application"
+    id "org.jetbrains.kotlin.android"
+    id "dev.flutter.flutter-gradle-plugin"
+}
 
 def ripploKeystore = System.getenv('RIPPLO_KEYSTORE_FILE')
+def ripploDev = System.getenv('RIPPLO_DEV_BUILD') == 'true'
 
 android {
     namespace = "io.github.nahida4479.ripplo"
@@ -9,27 +13,29 @@ android {
     if (ciNdk) {
         ndkPath = ciNdk
         ndkVersion = new File(ciNdk).name
+    } else {
+        ndkVersion = flutter.ndkVersion
     }
-    compileSdk = rootProject.ext.compileSdkVersion
+    compileSdk = 36
     defaultConfig {
         applicationId "io.github.nahida4479.ripplo"
-        minSdkVersion rootProject.ext.minSdkVersion
-        targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode = (project.findProperty("versionCode") ?: "1").toString().toInteger()
-        versionName = (project.findProperty("versionName") ?: "0.1.0").toString()
-        testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+        manifestPlaceholders += [appLabel: "Ripplo"]
+        if (ripploDev) {
+            applicationIdSuffix ".dev"
+            manifestPlaceholders += [appLabel: "Ripplo Dev"]
+        }
+        minSdk = 24
+        targetSdk = 36
+        versionCode = flutter.versionCode
+        versionName = flutter.versionName
         ndk {
             abiFilters 'arm64-v8a', 'armeabi-v7a'
-        }
-        aaptOptions {
-            ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
         }
     }
     compileOptions {
         coreLibraryDesugaringEnabled true
-    }
-    kotlinOptions {
-        jvmTarget = '21'
+        sourceCompatibility JavaVersion.VERSION_21
+        targetCompatibility JavaVersion.VERSION_21
     }
     packaging {
         jniLibs {
@@ -46,51 +52,43 @@ android {
             }
         }
     }
+    flavorDimensions "store"
+    productFlavors {
+        full {
+            dimension "store"
+        }
+        play {
+            dimension "store"
+        }
+    }
     buildTypes {
         release {
             if (ripploKeystore) signingConfig signingConfigs.release
             minifyEnabled false
-            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
-        }
-        play {
-            initWith release
-            matchingFallbacks = ['release']
-            if (ripploKeystore) signingConfig signingConfigs.release
+            shrinkResources false
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
         }
     }
 }
 
-repositories {
-    flatDir{
-        dirs '../capacitor-cordova-android-plugins/src/main/libs', 'libs'
+kotlin {
+    compilerOptions {
+        jvmTarget = org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_21
     }
+}
+
+flutter {
+    source = "../.."
 }
 
 dependencies {
-    implementation fileTree(include: ['*.jar'], dir: 'libs')
-    implementation "androidx.appcompat:appcompat:$androidxAppCompatVersion"
-    implementation "androidx.coordinatorlayout:coordinatorlayout:$androidxCoordinatorLayoutVersion"
-    implementation "androidx.core:core-splashscreen:$coreSplashScreenVersion"
-    implementation project(':capacitor-android')
+    implementation "androidx.core:core-ktx:1.17.0"
+    implementation "androidx.appcompat:appcompat:1.7.1"
     implementation "org.signal:libsignal-android:0.108.5"
     implementation "androidx.biometric:biometric:1.1.0"
     // Google Nearby Connections: Play build only (F-Droid / GitHub builds stay free of Google services)
     playImplementation "com.google.android.gms:play-services-nearby:19.3.0"
     coreLibraryDesugaring "com.android.tools:desugar_jdk_libs:2.1.5"
-    testImplementation "junit:junit:$junitVersion"
+    testImplementation "junit:junit:4.13.2"
     testImplementation "org.signal:libsignal-client:0.108.5"
-    androidTestImplementation "androidx.test.ext:junit:$androidxJunitVersion"
-    androidTestImplementation "androidx.test.espresso:espresso-core:$androidxEspressoCoreVersion"
-    implementation project(':capacitor-cordova-android-plugins')
-}
-
-apply from: 'capacitor.build.gradle'
-
-try {
-    def servicesJSON = file('google-services.json')
-    if (servicesJSON.text) {
-        apply plugin: 'com.google.gms.google-services'
-    }
-} catch(Exception e) {
-    logger.info("google-services.json not found, google-services plugin not applied. Push Notifications won't work")
 }
