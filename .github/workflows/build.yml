@@ -26,7 +26,10 @@ jobs:
           cache: true
       - run: flutter pub get
       - run: flutter analyze
-      - run: flutter test
+      - name: Unit tests
+        env:
+          TZ: Europe/Warsaw
+        run: flutter test $(grep -rLE 'expectGolden|matchesGoldenFile' test --include='*_test.dart')
 
       - name: Compute version
         id: ver
