@@ -492,6 +492,7 @@ abstract class _Base {
       'tag': hex(ids.tag),
       'avatar': avatar,
     };
+    fire(mesh.setHello(b64(me.card), state.settings.hidden));
   }
 
   Future<void> init() async {
@@ -570,6 +571,7 @@ abstract class _Base {
     unsubs.add(mesh.on('neighbor', onNeighbor));
     unsubs.add(mesh.on('opened', (rec) => enqueue(() => handleOpened(rec))));
     await mesh.start(me.tag);
+    fire(mesh.setHello(b64(me.card), state.settings.hidden));
     for (final n in await mesh.getNeighbors()) {
       onNeighbor({...n, 'up': true});
     }
@@ -957,6 +959,9 @@ abstract class _Base {
           fire(mesh.sendApp(n.node, utf8('{"t":"bye"}')));
         }
       }
+    }
+    if (patch['hidden'] is bool) {
+      fire(mesh.setHello(b64(me.card), state.settings.hidden));
     }
     await db.put('kv', 'settings', {...state.settings});
   }

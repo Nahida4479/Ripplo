@@ -379,6 +379,9 @@ class DevMesh implements Mesh {
   Future<void> clearDiag() async {}
 
   @override
+  Future<void> setHello(String card, bool hidden) async {}
+
+  @override
   Future<bool> usbLog(String text) async => false;
 
   @override

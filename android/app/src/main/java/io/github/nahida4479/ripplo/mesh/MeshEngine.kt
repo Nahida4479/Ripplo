@@ -110,12 +110,11 @@ internal class MeshEngine private constructor(internal val ctx: Context) : Route
         if (Build.VERSION.SDK_INT >= 29) transports.add(WifiAwareTransport(ctx, this))
         transports.add(BleTransport(ctx, this))
         transports.add(LanTransport(ctx, this))
-        transports.add(WifiDirectTransport(ctx, this))
         try {
-            // Present only in the Play build (src/play)
             val k = Class.forName("io.github.nahida4479.ripplo.transport.nearby.NearbyTransport")
             transports.add(k.getDeclaredConstructor(Context::class.java, MeshEngine::class.java).newInstance(ctx, this) as Transport)
         } catch (ignored: ReflectiveOperationException) {
+            transports.add(WifiDirectTransport(ctx, this))
         }
         for (t in transports) sched.execute { t.start() }
         tickTask = sched.scheduleWithFixedDelay({ tick() }, TICK_SECONDS, TICK_SECONDS, TimeUnit.SECONDS)
@@ -187,6 +186,8 @@ internal class MeshEngine private constructor(internal val ctx: Context) : Route
         }
         for (t in transports.toList()) t.tick()
     }
+
+    private val helloAt = HashMap<String, Long>()
 
     private fun touchWake() {
         if (wake.isHeld) return
@@ -372,7 +373,27 @@ internal class MeshEngine private constructor(internal val ctx: Context) : Route
 
     override fun deliver(p: Packet, from: String) {
         val l = listener
-        if (l != null && jsAttached) l.onPacket(p.encode(), from)
+        if (l != null && jsAttached) l.onPacket(p.encode(), from) else if (p.type == Packet.APP) answerHello(p, from)
+    }
+
+    fun setHello(card: String, hidden: Boolean) {
+        prefs.edit().putString("helloCard", card).putBoolean("helloHidden", hidden).apply()
+    }
+
+    private fun answerHello(p: Packet, from: String) {
+        val card = prefs.getString("helloCard", null) ?: return
+        if (prefs.getBoolean("helloHidden", false) || p.payload.isEmpty() || p.payload[0] != '{'.code.toByte()) return
+        val now = System.currentTimeMillis()
+        synchronized(lock) {
+            if (now - (helloAt[from] ?: 0L) < 5000L) return
+            helloAt[from] = now
+        }
+        try {
+            val o = JSONObject(String(p.payload, Charsets.UTF_8))
+            if (o.optString("t") != "hello" || o.optInt("r", 0) != 1) return
+            sendApp(from, JSONObject().put("t", "hello").put("card", card).toString().toByteArray(Charsets.UTF_8))
+        } catch (ignored: JSONException) {
+        }
     }
 
     override fun persist(p: Packet, from: String): Boolean {
@@ -489,7 +510,7 @@ internal class MeshEngine private constructor(internal val ctx: Context) : Route
             instance ?: MeshEngine(ctx.applicationContext).also { instance = it }
 
         internal fun nominalKbps(medium: String): Long = when (medium) {
-            "lan", "wifi-aware", "wifi-direct", "nearby" -> 20000
+            "lan", "wifi-aware", "wifi-direct" -> 20000
             "l2cap" -> 300
             else -> 50
         }

@@ -237,9 +237,11 @@ Duplicate links of the same medium to the same node: keep the one initiated by t
 | `ble`        | ✓ | ✓ | ✓ | GATT service `6f2a0001-5c3e-4b7a-9d1e-2b9c6e1a0f01`; RX char `…0002` (write), TX char `…0003` (notify), PSM char `…0004` (read, u16) |
 | `l2cap`      | ✓ (10+) | ✓ | ✓ | BLE L2CAP CoC, PSM read from `…0004` after GATT connect |
 | `lan`        | ✓ | ✓ | ✓ | DNS-SD `_ripplo._tcp` on the current Wi-Fi/hotspot, TCP |
-| `wifi-direct`| ✓ | – | – | Wi-Fi P2P DNS-SD `_ripplo._tcp`, group owner listens on TCP 47321 |
+| `wifi-direct`| ✓ | – | – | Play flavor: Google Nearby Connections (`P2P_CLUSTER`, service id `io.github.nahida4479.ripplo.nearby`, endpoint name = nodeTag, lower nodeTag dials, the other dials after 15 s). Other flavors: Wi-Fi P2P DNS-SD `_ripplo._tcp`, group owner listens on TCP 47321 |
 | `wifi-aware` | ✓ (8+, if hardware) | – | – | NAN service `ripplo`, TCP 47322 over the NAN data path |
 | `multipeer`  | – | ✓ | – | MultipeerConnectivity service type `ripplo-mesh` |
+
+BLE dial direction: every advertisement carries manufacturer data `0xFFFF` with a random 4-byte nonce, new at every advertising restart. A scanner dials only when its own nonce is lower than the advertiser's, so two phones do not connect to each other at the same time (the duplicate link teardown dropped the surviving link on some phones). If no nonce is present, or no link exists 12 s after the first scan hit, the scanner dials anyway. A 1M dial that fails makes the next attempt use the coded PHY when a coded hit exists.
 
 BLE GATT is a byte stream per direction: central writes slices of `mtu-3` to RX (write with
 response, ordered); peripheral notifies slices on TX. Request MTU 517.
@@ -444,6 +446,7 @@ thread. A failure comes back as `PlatformException(code, message)`, which `MeshB
 | `devConnect` / `devDisconnect` | Developer mode: `{ node, spec }` → `{ started }` forces a connection attempt to a neighbor on one medium (`lan`, `wifi-direct`, `wifi-aware`, `ble:1m`, `ble:coded`), ignoring existing links and initiator rules (BLE connects to recent scan hits, since a scan hit has no node tag); `{ node, medium }` closes that medium's links |
 | `getBleCaps` | → `{ coded, extended }` (Coded PHY / extended advertising support only, no switch) |
 | `usbLog` | `{ text }` → `{ usb }`. Writes the text to logcat (tag `ripplo`) only while the phone is plugged in over USB with USB debugging enabled; otherwise does nothing and returns `usb: false`. Every diagnostic line of the app (`lib/core/diag.dart`) and the "send logs" dump go through it, so a developer with `adb logcat` reads them without any message leaving the phone. When `usb` is true "send logs" skips the recipient |
+| `setHello` | `{ card, hidden }`. Stores the own hello card (base64) and the hidden flag natively. While the UI is closed but the relay service runs, the engine answers a peer's `{"t":"hello","r":1}` APP packet with `{"t":"hello","card":…}` itself (at most one answer per node per 5 s, none when hidden). Without it a closed app showed up as an unknown user |
 | `getDiag` / `clearDiag` / `getTransports` | Android developer mode: `{ log }`, the in-memory diagnostic log (600 lines, same lines as logcat tag `ripplo`), clear it, and `{ transports: [{ name, running, unsupported }] }` |
 | `getDeviceInfo` | → `{ text }` — multi-line description of the device, radios (BLE, Coded PHY, Wi-Fi Aware / Direct) and power state, shown in the developer card and the log dump |
 | `drainInbox` | → `{ packets: [{ packet, from } or { opened }] }` — packets received while the app was not attached; `opened` is a record the engine already decrypted natively (§14) |
@@ -483,6 +486,8 @@ thread. A failure comes back as `PlatformException(code, message)`, which `MeshB
 | `signalProof` | `{ ik, n, challengerTag, proverTag }` → `{ mac }` — §2 nearby proof MAC with the own identity key |
 | `signalSafetyNumber` | `{ ik }` → `{ digits }` — 60 digits (§2) |
 | `signalForget` | `{ tag }` — delete the session and stored identity for that contact |
+
+Developer mode, received logs: every log row has a `Send USB` button that writes the log to logcat through `usbLog`, so a developer with the phone plugged in can read user logs with `adb logcat -s ripplo`.
 
 All `signal*` calls run on one serial queue in the native `SignalCore`. Errors reject with a code:
 `bad_bundle`, `no_session`, `bad_message`, `untrusted_identity`.
@@ -612,7 +617,7 @@ transport/ble/l2cap/       BleL2cap: L2CAP CoC server and dialer used after the 
 transport/wifidirect/      WifiDirectTransport
 transport/wifiaware/       WifiAwareTransport
 transport/lan/             LanTransport: UDP / TCP on the local network
-transport/nearby/          NearbyTransport: Play flavor only (src/play), loaded by MeshEngine through reflection
+transport/nearby/          NearbyTransport: Play flavor only (src/play), the `wifi-direct` medium; MeshEngine loads it through reflection and falls back to WifiDirectTransport when absent
 crypto/                    SignalCore (Signal protocol), SignalFileStore (sealed key files)
 data/                      NativeStore (SQLite), Inbox, BackupEngine, BackupFormat
 calls/                     CallAudio, CallActivity, CallActionReceiver, Ringer
@@ -649,7 +654,7 @@ data.
 
 ### 12.2 Backup
 
-Recovery code: 30 random digits (≈ 100 bits), shown as 6 groups of 5, generated natively.
+Recovery code: 30 random digits (≈ 100 bits), shown as 6 groups of 5 in one selectable box with a "Copy code" button (the clipboard gets the 30 digits without spaces), generated natively.
 `codeKey = PBKDF2-HMAC-SHA256(code digits as ASCII, salt(16), 600000, 32)`.
 Optional second factor (§12.4): `backupKey = HKDF-SHA256(ikm = codeKey | prf(32), salt, "ripplo-backup-v1", 32)`,
 otherwise `backupKey = codeKey`. `backupKey`, `salt` and the factor descriptor are kept on the device

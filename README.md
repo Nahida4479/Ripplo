@@ -119,23 +119,6 @@ Download `Ripplo-vX.Y.Z.apk` from [Releases](https://github.com/Nahida4479/Rippl
 
 The release contains an **unsigned** IPA file (`Ripplo-vX.Y.Z-beta-unsigned-for_developers.ipa`). It has to be signed using [SideStore](https://sidestore.io/). Step-by-step SideStore guide: [nahida4479.github.io/Ripplo/pl/#ios](https://nahida4479.github.io/Ripplo/pl/#ios).
 
-
-# Development
-
-Ripplo is a Flutter 3.50 (Dart) app; the Signal crypto and the transports are native Kotlin (Android) and Swift (iOS). The architecture and the native bridge are described in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md), the UI in [docs/DESIGN.md](docs/DESIGN.md).
-
-```
-flutter pub get
-flutter analyze
-TZ=Europe/Warsaw flutter test
-flutter run -d linux --dart-define=RIPPLO_PROFILE=alice
-flutter build apk --release --flavor full
-flutter build appbundle --release --flavor play
-```
-
-- `flutter run -d linux --dart-define=RIPPLO_PROFILE=<name>` starts a desktop simulator: run it twice with different names to get two phones talking over UDP loopback. It has no encryption and is never used in release builds.
-- A push to the `flutter` branch builds a test APK (workflow artifact `android-test`); pushing a tag `vX.Y.Z` builds and publishes the release. Golden tests and `dart run tool/parity.dart` check the screens against the reference screenshots.
-
 # Contributors
 
 <a href="https://github.com/Nahida4479/Ripplo/graphs/contributors">

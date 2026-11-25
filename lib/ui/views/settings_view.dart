@@ -227,6 +227,14 @@ class _SettingsViewState extends State<SettingsView> {
     }
   }
 
+  Future<void> _usbSend(DevLog l) async {
+    final who = l.name.isNotEmpty ? l.name : l.from;
+    final ok = await _mesh.usbLog(
+      'RECEIVED LOG from $who ${localeDateTime(l.ts, 'en')}\n${l.text}',
+    );
+    toast(t(ok ? 'logSent' : 'logNotSent'));
+  }
+
   void _aboutTap() {
     _devTaps++;
     _devTimer?.cancel();
@@ -970,6 +978,7 @@ class _SettingsViewState extends State<SettingsView> {
                   '${l.name.isNotEmpty ? l.name : l.from.substring(0, l.from.length.clamp(0, 8))} ${localeDateTime(l.ts, 'en')}\n${l.text}',
                 ),
               ),
+              _sm(t('devLogUsb'), () => _usbSend(l)),
               _sm(
                 t(_openId == l.id ? 'devLogClose' : 'devLogOpen'),
                 () => setState(() => _openId = _openId == l.id ? null : l.id),

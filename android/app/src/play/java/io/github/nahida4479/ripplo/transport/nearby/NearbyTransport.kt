@@ -17,6 +17,7 @@ import com.google.android.gms.nearby.connection.Payload
 import com.google.android.gms.nearby.connection.PayloadCallback
 import com.google.android.gms.nearby.connection.PayloadTransferUpdate
 import com.google.android.gms.nearby.connection.Strategy
+import com.google.android.gms.common.api.ApiException
 import io.github.nahida4479.ripplo.mesh.MeshEngine
 import io.github.nahida4479.ripplo.platform.Diag
 import io.github.nahida4479.ripplo.transport.Link
@@ -24,19 +25,26 @@ import io.github.nahida4479.ripplo.transport.Transport
 import java.io.IOException
 import java.util.concurrent.ConcurrentHashMap
 
-// Google Nearby Connections (Play Services) as an extra transport. Play build only; loaded by reflection.
 internal class NearbyTransport(ctx: Context, engine: MeshEngine) : Transport(ctx, engine) {
     companion object {
         private const val SERVICE_ID = "io.github.nahida4479.ripplo.nearby"
         private const val CHUNK = 16 * 1024
+        private const val REFRESH_MS = 300000L
+        private const val RETRY_MS = 60000L
+        private const val FALLBACK_DIAL_MS = 15000L
+        private const val MEDIUM = "wifi-direct"
     }
+
+    private class Endpoint(val peer: String, val since: Long)
 
     private var client: ConnectionsClient? = null
     private val links = ConcurrentHashMap<String, NearbyLink>()
     private val requested = ConcurrentHashMap<String, Long>()
+    private val endpoints = ConcurrentHashMap<String, Endpoint>()
     private val strategy = Strategy.P2P_CLUSTER
+    @Volatile private var lastRefresh = System.currentTimeMillis()
 
-    override fun name(): String = "nearby"
+    override fun name(): String = MEDIUM
 
     override fun startImpl() {
         if (GoogleApiAvailability.getInstance().isGooglePlayServicesAvailable(ctx) != ConnectionResult.SUCCESS) {
@@ -44,6 +52,7 @@ internal class NearbyTransport(ctx: Context, engine: MeshEngine) : Transport(ctx
         }
         val c = Nearby.getConnectionsClient(ctx)
         client = c
+        lastRefresh = System.currentTimeMillis()
         startAdvertising(c)
         startDiscovery(c)
     }
@@ -56,6 +65,7 @@ internal class NearbyTransport(ctx: Context, engine: MeshEngine) : Transport(ctx
         try { c.stopAllEndpoints() } catch (ignored: Exception) { }
         links.clear()
         requested.clear()
+        endpoints.clear()
         client = null
     }
 
@@ -63,41 +73,91 @@ internal class NearbyTransport(ctx: Context, engine: MeshEngine) : Transport(ctx
         val c = client ?: return
         val now = System.currentTimeMillis()
         requested.entries.removeIf { now - it.value > 30000 }
-        // Discovery/advertising are stopped by Play Services after a while; refresh every 5 minutes.
-        if (now - lastRefresh > 300000) {
-            lastRefresh = now
-            try { c.stopAdvertising() } catch (ignored: Exception) { }
-            try { c.stopDiscovery() } catch (ignored: Exception) { }
-            startAdvertising(c)
-            startDiscovery(c)
+        if (now - lastRefresh > REFRESH_MS) refresh(c)
+        for ((id, e) in endpoints) {
+            if (now - e.since > FALLBACK_DIAL_MS && engine.nodeTag() > e.peer) dial(id, e.peer, false)
         }
     }
 
-    @Volatile private var lastRefresh = System.currentTimeMillis()
+    private fun refresh(c: ConnectionsClient) {
+        lastRefresh = System.currentTimeMillis()
+        try { c.stopAdvertising() } catch (ignored: Exception) { }
+        try { c.stopDiscovery() } catch (ignored: Exception) { }
+        startAdvertising(c)
+        startDiscovery(c)
+    }
+
+    private fun failed(what: String, e: Exception) {
+        if (e is ApiException && e.statusCode == ConnectionsStatusCodes.STATUS_ALREADY_ADVERTISING) return
+        if (e is ApiException && e.statusCode == ConnectionsStatusCodes.STATUS_ALREADY_DISCOVERING) return
+        Diag.stage(MEDIUM, "", "failed", "$what: $e")
+        lastRefresh = System.currentTimeMillis() - REFRESH_MS + RETRY_MS
+    }
 
     private fun startAdvertising(c: ConnectionsClient) {
         c.startAdvertising(engine.nodeTag(), SERVICE_ID, lifecycle, AdvertisingOptions.Builder().setStrategy(strategy).build())
-            .addOnFailureListener { Diag.w("nearby advertise failed $it") }
+            .addOnSuccessListener { Diag.stage(MEDIUM, "", "started", "advertising") }
+            .addOnFailureListener { failed("advertise", it) }
     }
 
     private fun startDiscovery(c: ConnectionsClient) {
         c.startDiscovery(SERVICE_ID, discovery, DiscoveryOptions.Builder().setStrategy(strategy).build())
-            .addOnFailureListener { Diag.w("nearby discovery failed $it") }
+            .addOnSuccessListener { Diag.stage(MEDIUM, "", "started", "discovery running") }
+            .addOnFailureListener { failed("discovery", it) }
+    }
+
+    private fun dial(id: String, peer: String, force: Boolean): Boolean {
+        val c = client ?: return false
+        if (links.containsKey(id)) return false
+        if (!force && engine.hasLink(peer, MEDIUM)) return false
+        if (requested.putIfAbsent(id, System.currentTimeMillis()) != null) return false
+        Diag.stage(MEDIUM, peer, "connecting", "requesting connection")
+        c.requestConnection(engine.nodeTag(), id, lifecycle)
+            .addOnFailureListener {
+                requested.remove(id)
+                val code = (it as? ApiException)?.statusCode
+                if (code != ConnectionsStatusCodes.STATUS_ALREADY_CONNECTED_TO_ENDPOINT) Diag.stage(MEDIUM, peer, "failed", "request: $it")
+            }
+        return true
+    }
+
+    override fun forceConnect(node: String, option: String): Boolean {
+        val c = client
+        if (c == null || !running) {
+            Diag.stage(MEDIUM, node, "rejected", "Nearby is not running (Play Services, Bluetooth, Wi-Fi or permissions missing)")
+            return false
+        }
+        var found = endpoints.entries.firstOrNull { it.value.peer == node }
+        if (found == null) {
+            Diag.stage(MEDIUM, node, "scanning", "peer not discovered yet, restarting discovery (up to 12 s)")
+            try { c.stopDiscovery() } catch (ignored: Exception) { }
+            startDiscovery(c)
+            val end = System.currentTimeMillis() + 12000
+            while (found == null && System.currentTimeMillis() < end && running) {
+                try { Thread.sleep(500) } catch (e: InterruptedException) { break }
+                found = endpoints.entries.firstOrNull { it.value.peer == node }
+            }
+        }
+        if (found == null) {
+            Diag.stage(MEDIUM, node, "rejected", "peer not found over Nearby (other phone needs Ripplo running, Bluetooth and Wi-Fi on)")
+            return false
+        }
+        engine.closeLinks(node, MEDIUM)
+        requested.remove(found.key)
+        return dial(found.key, node, true)
     }
 
     private val discovery = object : EndpointDiscoveryCallback() {
         override fun onEndpointFound(id: String, info: DiscoveredEndpointInfo) {
             val peer = info.endpointName
-            if (peer == engine.nodeTag() || links.containsKey(id) || engine.hasLink(peer, "nearby")) return
-            // Only the lower node tag dials, so the two phones never collide.
-            if (engine.nodeTag() > peer) return
-            if (requested.putIfAbsent(id, System.currentTimeMillis()) != null) return
-            engine.noteSeen(peer, "nearby")
-            client?.requestConnection(engine.nodeTag(), id, lifecycle)
-                ?.addOnFailureListener { requested.remove(id); Diag.i("nearby request failed $it") }
+            if (peer == engine.nodeTag()) return
+            endpoints[id] = Endpoint(peer, System.currentTimeMillis())
+            engine.noteSeen(peer, MEDIUM)
+            if (engine.nodeTag() < peer) dial(id, peer, false)
         }
 
         override fun onEndpointLost(id: String) {
+            endpoints.remove(id)
             requested.remove(id)
         }
     }
@@ -110,7 +170,7 @@ internal class NearbyTransport(ctx: Context, engine: MeshEngine) : Transport(ctx
         override fun onConnectionResult(id: String, r: ConnectionResolution) {
             requested.remove(id)
             if (r.status.statusCode != ConnectionsStatusCodes.STATUS_OK) {
-                Diag.i("nearby connect failed ${r.status.statusCode}")
+                Diag.stage(MEDIUM, endpoints[id]?.peer ?: "", "failed", "connection result ${r.status.statusCode}")
                 return
             }
             val l = NearbyLink(id)
@@ -133,11 +193,7 @@ internal class NearbyTransport(ctx: Context, engine: MeshEngine) : Transport(ctx
         override fun onPayloadTransferUpdate(id: String, u: PayloadTransferUpdate) {}
     }
 
-    private inner class NearbyLink(val id: String) : Link(this@NearbyTransport.engine, "nearby", true) {
-        init {
-            kbps = 20000
-        }
-
+    private inner class NearbyLink(val id: String) : Link(this@NearbyTransport.engine, MEDIUM, true) {
         override fun writeFrame(frame: ByteArray) {
             val c = client ?: throw IOException("nearby stopped")
             for (o in 0 until frame.size step CHUNK) {

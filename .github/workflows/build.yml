@@ -154,6 +154,13 @@ jobs:
           echo "name=$name" >> "$GITHUB_OUTPUT"
           echo "code=$code" >> "$GITHUB_OUTPUT"
 
+      - name: Add native sources to the Xcode project
+        run: |
+          set -euo pipefail
+          gem install xcodeproj --no-document
+          ruby tool/ios_project.rb
+          git diff --stat
+
       - name: Build unsigned iOS app
         env:
           VER_NAME: ${{ steps.ver.outputs.name }}

@@ -128,6 +128,7 @@ class RipploMeshPlugin :
         "getBleCaps" to ::getBleCaps,
         "getDiag" to ::getDiag,
         "clearDiag" to ::clearDiag,
+        "setHello" to ::setHello,
         "usbLog" to ::usbLog,
         "getTransports" to ::getTransports,
         "devConnect" to ::devConnect,
@@ -629,6 +630,11 @@ class RipploMeshPlugin :
         }
         r.put("usb", ok)
         call.resolve(r)
+    }
+
+    private fun setHello(call: Call) {
+        engine.setHello(call.getString("card", ""), call.getBoolean("hidden", false))
+        call.resolve()
     }
 
     private fun clearDiag(call: Call) {

@@ -57,6 +57,7 @@ abstract interface class Mesh {
   Future<List<Map<String, Object?>>> getNeighbors();
   Future<String> getDiag();
   Future<void> clearDiag();
+  Future<void> setHello(String card, bool hidden);
   Future<bool> usbLog(String text);
   Future<List<Map<String, Object?>>> getTransports();
   Future<bool> devConnect(String node, String spec);
@@ -249,6 +250,10 @@ class MeshBridge implements Mesh {
 
   @override
   Future<void> clearDiag() => _ignore('clearDiag');
+
+  @override
+  Future<void> setHello(String card, bool hidden) =>
+      _ignore('setHello', {'card': card, 'hidden': hidden});
 
   @override
   Future<bool> usbLog(String text) async {

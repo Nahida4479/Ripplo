@@ -270,6 +270,8 @@ const Map<String, String> _en = {
   'notNow': 'Not now',
   'backupDone': 'Backup saved',
   'codeTitle': 'Your recovery code',
+  'codeCopy': 'Copy code',
+  'codeCopied': 'Code copied',
   'codeWarn':
       'Keep this code somewhere safe, for example in a password manager. Without it a backup cannot be opened. Fingerprint and face unlock do not move to a new phone: there you restore with this code.',
   'codeWritten': 'I wrote it down',
@@ -322,6 +324,7 @@ const Map<String, String> _en = {
   'devLogsTitle': 'Received logs',
   'devLogOpen': 'Open',
   'devLogCopy': 'Copy',
+  'devLogUsb': 'Send USB',
   'devLogClose': 'Hide',
   'devLogDelete': 'Delete',
   'logSent': 'Logs sent',
@@ -609,6 +612,8 @@ const Map<String, String> _pl = {
   'notNow': 'Nie teraz',
   'backupDone': 'Zapisano kopię',
   'codeTitle': 'Twój kod odzyskiwania',
+  'codeCopy': 'Kopiuj kod',
+  'codeCopied': 'Skopiowano kod',
   'codeWarn':
       'Przechowuj te kody w bezpiecznym miejscu, na przykład w menedżerze haseł. Bez nich nie otworzysz kopii zapasowej.',
   'codeWritten': 'Zapisałem kod',
@@ -662,6 +667,7 @@ const Map<String, String> _pl = {
   'devLogsTitle': 'Otrzymane logi',
   'devLogOpen': 'Otwórz',
   'devLogCopy': 'Kopiuj',
+  'devLogUsb': 'Wyślij USB',
   'devLogClose': 'Ukryj',
   'devLogDelete': 'Usuń',
   'logSent': 'Logi zostały wysłane',

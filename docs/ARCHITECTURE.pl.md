@@ -233,9 +233,11 @@ Zduplikowane łącza tego samego medium do tego samego węzła: zostaw to zainic
 | `ble`        | ✓ | ✓ | ✓ | GATT service `6f2a0001-5c3e-4b7a-9d1e-2b9c6e1a0f01`; RX char `…0002` (write), TX char `…0003` (notify), PSM char `…0004` (read, u16) |
 | `l2cap`      | ✓ (10+) | ✓ | ✓ | BLE L2CAP CoC, PSM read from `…0004` after GATT connect |
 | `lan`        | ✓ | ✓ | ✓ | DNS-SD `_ripplo._tcp` on the current Wi-Fi/hotspot, TCP |
-| `wifi-direct`| ✓ | – | – | Wi-Fi P2P DNS-SD `_ripplo._tcp`, group owner listens on TCP 47321 |
+| `wifi-direct`| ✓ | – | – | Wariant Play: Google Nearby Connections (`P2P_CLUSTER`, service id `io.github.nahida4479.ripplo.nearby`, nazwa endpointu = nodeTag, łączy się niższy nodeTag, drugi po 15 s). Pozostałe warianty: Wi-Fi P2P DNS-SD `_ripplo._tcp`, group owner nasłuchuje na TCP 47321 |
 | `wifi-aware` | ✓ (8+, if hardware) | – | – | NAN service `ripplo`, TCP 47322 over the NAN data path |
 | `multipeer`  | – | ✓ | – | MultipeerConnectivity service type `ripplo-mesh` |
+
+Kierunek łączenia BLE: każde ogłoszenie zawiera dane producenta `0xFFFF` z losowym 4-bajtowym nonce, nowym przy każdym restarcie ogłaszania. Skaner łączy się tylko wtedy, gdy jego nonce jest niższy niż nonce ogłaszającego, więc dwa telefony nie łączą się ze sobą naraz (zamknięcie zdublowanego łącza zrywało na niektórych telefonach również łącze, które miało zostać). Gdy nonce brak lub 12 s po pierwszym trafieniu skanu nie ma łącza, skaner łączy się mimo to. Nieudane połączenie 1M sprawia, że następna próba używa PHY coded, jeśli jest trafienie coded.
 
 BLE GATT to strumień bajtów w każdym kierunku: central zapisuje fragmenty o rozmiarze `mtu-3` do RX (zapis z
 odpowiedzią, uporządkowany); peripheral wysyła fragmenty powiadomieniami na TX. Żądaj MTU 517.
@@ -440,6 +442,7 @@ głównym wątkiem. Błąd wraca jako `PlatformException(code, message)`, który
 | `devConnect` / `devDisconnect` | Tryb dewelopera: `{ node, spec }` → `{ started }` wymusza próbę połączenia z sąsiadem jednym medium (`lan`, `wifi-direct`, `wifi-aware`, `ble:1m`, `ble:coded`), ignorując istniejące łącza i reguły inicjatora (BLE łączy się z niedawnymi trafieniami skanu, bo trafienie nie zawiera tagu węzła); `{ node, medium }` zamyka łącza tego medium |
 | `getBleCaps` | → `{ coded, extended }` (tylko informacja o obsłudze, bez przełącznika) |
 | `usbLog` | `{ text }` → `{ usb }`. Zapisuje tekst w logcat (tag `ripplo`) wyłącznie, gdy telefon jest podłączony przez USB z włączonym debugowaniem USB; w przeciwnym razie nic nie robi i zwraca `usb: false`. Przechodzi przez to każda linia diagnostyczna aplikacji (`lib/core/diag.dart`) i zrzut „wyślij logi”, więc deweloper z `adb logcat` czyta je bez wysyłania czegokolwiek z telefonu. Gdy `usb` jest true, „wyślij logi” pomija odbiorcę |
+| `setHello` | `{ card, hidden }`. Zapisuje natywnie własną kartę hello (base64) i flagę ukrycia. Gdy UI jest zamknięte, a usługa przekaźnika działa, silnik sam odpowiada na pakiet APP `{"t":"hello","r":1}` pakietem `{"t":"hello","card":…}` (najwyżej raz na 5 s na węzeł, wcale gdy ukryty). Bez tego zamknięta aplikacja wyświetlała się jako nieznany użytkownik |
 | `getDiag` / `clearDiag` / `getTransports` | Tryb dewelopera na Androidzie: `{ log }`, dziennik diagnostyczny w pamięci (600 linii, te same co w logcat pod tagiem `ripplo`), jego czyszczenie oraz `{ transports: [{ name, running, unsupported }] }` |
 | `getDeviceInfo` | → `{ text }` — wielowierszowy opis urządzenia, radiotelefonów (BLE, Coded PHY, Wi-Fi Aware / Direct) i stanu zasilania, pokazywany w karcie dewelopera i w zrzucie logów |
 | `drainInbox` | → `{ packets: [{ packet, from } lub { opened }] }` — pakiety odebrane, gdy aplikacja nie była podpięta; `opened` to rekord już odszyfrowany natywnie (§14) |
@@ -479,6 +482,8 @@ głównym wątkiem. Błąd wraca jako `PlatformException(code, message)`, który
 | `signalProof` | `{ ik, n, challengerTag, proverTag }` → `{ mac }` — §2 nearby proof MAC with the own identity key |
 | `signalSafetyNumber` | `{ ik }` → `{ digits }` — 60 digits (§2) |
 | `signalForget` | `{ tag }` — delete the session and stored identity for that contact |
+
+Tryb dewelopera, otrzymane logi: każdy wiersz logu ma przycisk `Wyślij USB`, który zapisuje log w logcat przez `usbLog`, więc deweloper z podłączonym telefonem odczyta logi użytkowników przez `adb logcat -s ripplo`.
 
 Wszystkie wywołania `signal*` działają na jednej kolejce szeregowej w natywnym `SignalCore`. Błędy odrzucają z kodem:
 `bad_bundle`, `no_session`, `bad_message`, `untrusted_identity`.
@@ -607,7 +612,7 @@ transport/ble/l2cap/       BleL2cap: serwer i wybieranie L2CAP CoC po uzgodnieni
 transport/wifidirect/      WifiDirectTransport
 transport/wifiaware/       WifiAwareTransport
 transport/lan/             LanTransport: UDP / TCP w sieci lokalnej
-transport/nearby/          NearbyTransport: tylko wariant Play (src/play), ładowany przez MeshEngine refleksją
+transport/nearby/          NearbyTransport: tylko wariant Play (src/play), medium `wifi-direct`; MeshEngine ładuje go refleksją, a bez niego używa WifiDirectTransport
 crypto/                    SignalCore (protokół Signal), SignalFileStore (zaszyfrowane pliki kluczy)
 data/                      NativeStore (SQLite), Inbox, BackupEngine, BackupFormat
 calls/                     CallAudio, CallActivity, CallActionReceiver, Ringer
@@ -644,7 +649,7 @@ danych.
 
 ### 12.2 Kopia zapasowa
 
-Kod odzyskiwania: 30 losowych cyfr (≈ 100 bitów), pokazanych jako 6 grup po 5, generowany natywnie.
+Kod odzyskiwania: 30 losowych cyfr (≈ 100 bitów), pokazanych jako 6 grup po 5 w jednym zaznaczalnym polu z przyciskiem „Kopiuj kod” (do schowka trafia 30 cyfr bez spacji), generowany natywnie.
 `codeKey = PBKDF2-HMAC-SHA256(cyfry kodu jako ASCII, salt(16), 600000, 32)`.
 Opcjonalny drugi czynnik (§12.4): `backupKey = HKDF-SHA256(ikm = codeKey | prf(32), salt, "ripplo-backup-v1", 32)`,
 w przeciwnym razie `backupKey = codeKey`. `backupKey`, `salt` i opis czynnika są trzymane na urządzeniu, opakowane niebiometrycznym kluczem Keystore / Keychain,

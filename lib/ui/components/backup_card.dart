@@ -1,3 +1,4 @@
+import 'package:flutter/services.dart';
 import 'package:material_ui/material_ui.dart';
 
 import '../../i18n.dart';
@@ -172,48 +173,34 @@ class _BackupCardState extends State<BackupCard> {
 
   Widget _codeGrid() {
     final c = context.rc;
-    final g = _groups;
-    Widget cell(String s) => Container(
-      padding: const EdgeInsets.symmetric(vertical: 10),
-      alignment: Alignment.center,
-      decoration: BoxDecoration(
-        color: c.surface2,
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Text(
-        s,
-        style: monoStyle(
-          context,
-          const TextStyle(
-            fontSize: 22,
-            height: 1.4,
-            fontWeight: FontWeight.w600,
-            letterSpacing: 22 * .08,
+    return Semantics(
+      label: t('codeTitle'),
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 12),
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: c.surface2,
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: SelectableText(
+          _groups.join(' '),
+          textAlign: TextAlign.center,
+          style: monoStyle(
+            context,
+            const TextStyle(
+              fontSize: 20,
+              height: 1.5,
+              fontWeight: FontWeight.w600,
+            ),
           ),
         ),
       ),
     );
-    return Semantics(
-      label: t('codeTitle'),
-      child: Column(
-        children: gapped(
-          [
-            for (var i = 0; i < g.length; i += 2)
-              Row(
-                children: [
-                  Expanded(child: cell(g[i])),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: i + 1 < g.length ? cell(g[i + 1]) : const SizedBox(),
-                  ),
-                ],
-              ),
-          ],
-          8,
-          vertical: true,
-        ),
-      ),
-    );
+  }
+
+  Future<void> _copyCode() async {
+    await Clipboard.setData(ClipboardData(text: _code));
+    toast(t('codeCopied'));
   }
 
   List<Widget> _body() {
@@ -235,6 +222,13 @@ class _BackupCardState extends State<BackupCard> {
           _bold(t('codeTitle')),
           const SizedBox(height: 12),
           _codeGrid(),
+          const SizedBox(height: 8),
+          RBtn(
+            text: t('codeCopy'),
+            block: true,
+            kind: RBtnKind.ghost,
+            onTap: _copyCode,
+          ),
           const SizedBox(height: 12),
           if (_setup) ...[
             _hint(t('codeWarn')),

@@ -52,6 +52,8 @@ internal class BleTransport(ctx: Context, engine: MeshEngine) : Transport(ctx, e
         val PSM: UUID = UUID.fromString("6f2a0004-5c3e-4b7a-9d1e-2b9c6e1a0f01")
         val CCCD: UUID = UUID.fromString("00002902-0000-1000-8000-00805f9b34fb")
         private const val MAX_CLIENTS = 5
+        private const val NONCE_ID = 0xFFFF
+        private const val DIAL_GRACE_MS = 12000L
     }
 
     private var mgr: BluetoothManager? = null
@@ -66,6 +68,9 @@ internal class BleTransport(ctx: Context, engine: MeshEngine) : Transport(ctx, e
     private val addrNode = ConcurrentHashMap<String, String>()
     private val hits = ConcurrentHashMap<String, Hit>()
     private val phyNotes = ConcurrentHashMap<String, String>()
+    private val fails = ConcurrentHashMap<String, Int>()
+    private val since = ConcurrentHashMap<String, Long>()
+    @Volatile private var nonce = newNonce()
     private val inboundSock = ConcurrentHashMap<String, StreamLink>()
     private val codedAdv = CodedAdvertiser()
     @Volatile private var lastHitAt = 0L
@@ -80,6 +85,19 @@ internal class BleTransport(ctx: Context, engine: MeshEngine) : Transport(ctx, e
 
     private class Hit(val device: BluetoothDevice, val phy: Int, val at: Long) {
         val isCoded: Boolean get() = BleCoded.isCoded(phy)
+    }
+
+    private fun newNonce(): ByteArray = ByteArray(4).also { java.security.SecureRandom().nextBytes(it) }
+
+    private fun nonceInt(b: ByteArray): Long =
+        ((b[0].toLong() and 0xFF) shl 24) or ((b[1].toLong() and 0xFF) shl 16) or ((b[2].toLong() and 0xFF) shl 8) or (b[3].toLong() and 0xFF)
+
+    private fun peerShouldDial(r: ScanResult, a: String, now: Long): Boolean {
+        val pn = r.scanRecord?.getManufacturerSpecificData(NONCE_ID)
+        if (pn == null || pn.size != 4) return false
+        if (nonceInt(nonce) < nonceInt(pn)) return false
+        val first = since[a] ?: now
+        return now - first < DIAL_GRACE_MS
     }
 
     private fun codedOn(): Boolean = BleCoded.supported(adapter)
@@ -113,6 +131,8 @@ internal class BleTransport(ctx: Context, engine: MeshEngine) : Transport(ctx, e
         try { advertiser?.stopAdvertising(advCb) } catch (ignored: Exception) { }
         codedAdv.stop(advertiser)
         hits.clear()
+        fails.clear()
+        since.clear()
         scanner = null
         advertiser = null
         val all = synchronized(mine) { mine.toTypedArray() }
@@ -217,6 +237,7 @@ internal class BleTransport(ctx: Context, engine: MeshEngine) : Transport(ctx, e
 
     private fun restartAdvertising() {
         if (!running || server == null) return
+        nonce = newNonce()
         try { advertiser?.stopAdvertising(advCb) } catch (ignored: Exception) { }
         codedAdv.stop(advertiser)
         try { startAdvertise() } catch (e: Exception) { Diag.w("ble re-advertise failed $e") }
@@ -259,6 +280,7 @@ internal class BleTransport(ctx: Context, engine: MeshEngine) : Transport(ctx, e
         val d = AdvertiseData.Builder()
             .setIncludeDeviceName(false)
             .addServiceUuid(ParcelUuid(SERVICE))
+            .addManufacturerData(NONCE_ID, nonce)
             .build()
         adv.startAdvertising(s, d, advCb)
         if (codedOn()) codedAdv.start(adv, d)
@@ -317,15 +339,23 @@ internal class BleTransport(ctx: Context, engine: MeshEngine) : Transport(ctx, e
             Diag.i("ble scan hit " + a + (if (coded) " coded" else ""))
             val now = System.currentTimeMillis()
             lastHitAt = now
-            hits[a + (if (coded) "/c" else "/1")] = Hit(d, phy, now)
+            val key = a + (if (coded) "/c" else "/1")
+            val prev = hits[key]
+            if (prev == null || now - prev.at > 30000) since[a] = now
+            hits[key] = Hit(d, phy, now)
+            val failed = (fails[a] ?: 0) > 0
             if (coded) {
                 val oneM = hits[a + "/1"]
-                if (oneM != null && now - oneM.at < 20000) return
+                if (oneM != null && now - oneM.at < 20000 && !failed) return
+            } else {
+                val c = hits[a + "/c"]
+                if (failed && c != null && now - c.at < 20000) return
             }
             val known = addrNode[a]
             if (known != null && (engine.hasLink(known, "ble") || engine.hasLink(known, "l2cap"))) return
             if (coded && known != null && engine.hasFastLink(known)) return
             if (dialInProgress()) return
+            if (peerShouldDial(result, a, now)) return
             synchronized(active) {
                 if (active.contains(a) || active.size >= MAX_CLIENTS) return
                 val last = attempts[a]
@@ -487,6 +517,7 @@ internal class BleTransport(ctx: Context, engine: MeshEngine) : Transport(ctx, e
         private fun finish(psm: Int) {
             if (!alive.get()) return
             registered = true
+            fails.remove(device.address)
             Diag.i("ble client link up ${device.address} psm=$psm")
             if (!engine.addLink(this)) {
                 Diag.stage("ble", device.address, "rejected", "engine did not accept the link")
@@ -629,6 +660,7 @@ internal class BleTransport(ctx: Context, engine: MeshEngine) : Transport(ctx, e
 
         override fun closeImpl() {
             mine.remove(this)
+            if (!registered) fails.merge(device.address, 1, Int::plus)
             val peer = node ?: helloTag
             if (peer != null) addrNode[device.address] = peer
             synchronized(active) { active.remove(device.address) }

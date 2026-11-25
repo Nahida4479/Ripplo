@@ -64,8 +64,8 @@ void main() {
     await tester.tap(find.text(t('backupEnable')));
     await tester.pump();
     await tester.pump();
-    expect(find.text('11111'), findsOneWidget);
-    expect(find.text('55555'), findsOneWidget);
+    expect(find.textContaining('11111 22222'), findsOneWidget);
+    expect(find.byType(SelectableText), findsOneWidget);
     await tester.tap(find.text(t('codeWritten')));
     await tester.pump();
     await tester.enterText(find.byType(TextField), '12345');

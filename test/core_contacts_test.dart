@@ -127,6 +127,9 @@ class FakeMesh implements Mesh {
   Future<int> send(Uint8List pkt) => sendHook == null ? _send(pkt) : sendHook!(pkt, _send);
 
   @override
+  Future<void> setHello(String card, bool hidden) async {}
+
+  @override
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }
 

@@ -74,5 +74,8 @@ class FakeMesh implements Mesh {
   }
 
   @override
+  Future<void> setHello(String card, bool hidden) async {}
+
+  @override
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }
