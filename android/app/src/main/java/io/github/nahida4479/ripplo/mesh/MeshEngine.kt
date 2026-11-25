@@ -101,6 +101,12 @@ internal class MeshEngine private constructor(internal val ctx: Context) : Route
         transports.add(BleTransport(ctx, this))
         transports.add(LanTransport(ctx, this))
         transports.add(WifiDirectTransport(ctx, this))
+        try {
+            // Present only in the Play build (src/play)
+            val k = Class.forName("io.github.nahida4479.ripplo.mesh.NearbyTransport")
+            transports.add(k.getDeclaredConstructor(Context::class.java, MeshEngine::class.java).newInstance(ctx, this) as Transport)
+        } catch (ignored: ReflectiveOperationException) {
+        }
         for (t in transports) sched.execute { t.start() }
         tickTask = sched.scheduleWithFixedDelay({ tick() }, TICK_SECONDS, TICK_SECONDS, TimeUnit.SECONDS)
         if (launchService) MeshService.launch(ctx)
@@ -156,7 +162,8 @@ internal class MeshEngine private constructor(internal val ctx: Context) : Route
         }
         for (l in all) {
             if (now - l.lastRx > QUIET_NANOS) {
-                if (++l.strikes >= 2) {
+                // BLE peers with the screen off answer slowly (radio duty-cycling): allow more missed checks
+                if (++l.strikes >= (if (l.medium == "ble" || l.medium == "l2cap") 6 else 2)) {
                     val node = l.node
                     Diag.i("quiet close " + l.medium + " node=" + (node?.substring(0, 8) ?: "none"))
                     l.close()
@@ -472,7 +479,7 @@ internal class MeshEngine private constructor(internal val ctx: Context) : Route
             instance ?: MeshEngine(ctx.applicationContext).also { instance = it }
 
         internal fun nominalKbps(medium: String): Long = when (medium) {
-            "lan", "wifi-aware", "wifi-direct" -> 20000
+            "lan", "wifi-aware", "wifi-direct", "nearby" -> 20000
             "l2cap" -> 300
             else -> 50
         }
