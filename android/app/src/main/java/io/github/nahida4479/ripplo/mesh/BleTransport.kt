@@ -236,7 +236,7 @@ internal class BleTransport(ctx: Context, engine: MeshEngine) : Transport(ctx, e
         if (a == null || !a.isEnabled) return
         val now = System.currentTimeMillis()
         if (server != null && serverLinks.isEmpty() && engine.neighbors().isEmpty() && now - lastAdvStart > 120000) restartAdvertising()
-        if (now - lastScanStart > 300000 || (now - lastHit() > 90000 && now - lastScanStart > 30000)) restartScan()
+        if (now - lastScanStart > 300000 || (now - lastHit() > 45000 && now - lastScanStart > 20000)) restartScan()
     }
 
     private fun lastHit(): Long = if (lastHitAt == 0L) lastScanStart else lastHitAt
@@ -331,8 +331,8 @@ internal class BleTransport(ctx: Context, engine: MeshEngine) : Transport(ctx, e
         advertiser = adv
         if (adv == null) return
         val s = AdvertiseSettings.Builder()
-            .setAdvertiseMode(AdvertiseSettings.ADVERTISE_MODE_BALANCED)
-            .setTxPowerLevel(AdvertiseSettings.ADVERTISE_TX_POWER_MEDIUM)
+            .setAdvertiseMode(AdvertiseSettings.ADVERTISE_MODE_LOW_LATENCY)
+            .setTxPowerLevel(AdvertiseSettings.ADVERTISE_TX_POWER_HIGH)
             .setConnectable(true)
             .setTimeout(0)
             .build()
