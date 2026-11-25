@@ -266,7 +266,7 @@ const Map<String, String> _en = {
   'backupLast': 'Last backup: {time}',
   'backupFolder': 'Folder: {name}',
   'backupNoFolder': 'No automatic backup folder',
-  'chooseFolder': 'Choose automatic backup folder',
+  'chooseFolder': 'Choose backup folder',
   'notNow': 'Not now',
   'backupDone': 'Backup saved',
   'codeTitle': 'Your recovery code',

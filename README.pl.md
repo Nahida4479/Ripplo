@@ -2,7 +2,7 @@
 
 [🇬🇧 English](README.md) | 🇵🇱 Polski
 
-<p align="center"><img src="./public/icon_android.png" width="120"></p>
+<p align="center"><img src="./public/Ripplo animated banner.gif" width="120"></p>
 
 <p align="center" style="text-align: center; font-weight: bold;">Komunikator mesh działający offline, z szyfrowaniem end-to-end. Bez serwerów, bez kont, bez internetu: wiadomości przeskakują z telefonu na telefon przez Bluetooth i Wi-Fi.</p>
 
