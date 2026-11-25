@@ -5,6 +5,7 @@ plugins {
 }
 
 def ripploKeystore = System.getenv('RIPPLO_KEYSTORE_FILE')
+def ripploDev = System.getenv('RIPPLO_DEV_BUILD') == 'true'
 
 android {
     namespace = "io.github.nahida4479.ripplo"
@@ -18,6 +19,11 @@ android {
     compileSdk = 36
     defaultConfig {
         applicationId "io.github.nahida4479.ripplo"
+        manifestPlaceholders = [appLabel: "Ripplo"]
+        if (ripploDev) {
+            applicationIdSuffix ".dev"
+            manifestPlaceholders = [appLabel: "Ripplo Dev"]
+        }
         minSdk = 24
         targetSdk = 36
         versionCode = flutter.versionCode

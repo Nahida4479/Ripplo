@@ -89,6 +89,7 @@ jobs:
         env:
           VER_NAME: ${{ steps.ver.outputs.name }}
           VER_CODE: ${{ steps.ver.outputs.code }}
+          RIPPLO_DEV_BUILD: ${{ github.ref_type == 'branch' && github.event_name == 'push' }}
         run: |
           set -euo pipefail
           flutter build apk --release --flavor full \
