@@ -534,7 +534,9 @@ class RipploMeshPlugin :
         val node = call.getString("node", "")
         val spec = call.getString("spec", "")
         val r = JSONObject()
-        r.put("started", node.isNotEmpty() && spec.isNotEmpty() && engine.forceConnect(node, spec))
+        val err = if (node.isNotEmpty() && spec.isNotEmpty()) engine.forceConnect(node, spec) else "Forced connection needs a node and a medium"
+        r.put("started", err == null)
+        r.put("error", err ?: "")
         call.resolve(r)
     }
 
@@ -542,6 +544,7 @@ class RipploMeshPlugin :
         val node = call.getString("node", "")
         val medium = call.getString("medium", "")
         if (node.isNotEmpty() && medium.isNotEmpty()) engine.closeLinks(node, medium)
+        if (node.isNotEmpty()) engine.forceEnd(node)
         call.resolve()
     }
 

@@ -184,6 +184,10 @@ internal class MeshEngine private constructor(internal val ctx: Context) : Route
             val due = asked == 0L || now - asked > QUIET_NANOS
             if (due && (l.medium != "ble" || tickCount % 3 == 0)) sendPing(l)
         }
+        val fn = forceNode
+        if (fn != null) {
+            if (System.currentTimeMillis() >= forceUntil) forceEnd(fn) else forceEnforce(fn)
+        }
         for (t in transports.toList()) t.tick()
     }
 
@@ -294,6 +298,9 @@ internal class MeshEngine private constructor(internal val ctx: Context) : Route
                     return
                 }
                 if (p.type == Packet.DATA || p.type == Packet.ACK) touchWake()
+                if (p.type == Packet.APP && p.payload.isNotEmpty() && p.payload[0] == '{'.code.toByte()) {
+                    Diag.i("app in " + from.substring(0, 8) + " via " + link.medium + " " + p.payload.size + "B js=" + jsAttached)
+                }
                 r.onPacket(p, from)
             }
         }
@@ -304,6 +311,11 @@ internal class MeshEngine private constructor(internal val ctx: Context) : Route
         link.helloTag = tag
         link.helloHook?.accept(tag)
         if (tag == nodeTag) {
+            link.close()
+            return
+        }
+        if (forceVetoes(tag, link)) {
+            Diag.stage("force", tag, "closed", "refused a ${link.medium} link while ${forceSpec} is forced")
             link.close()
             return
         }
@@ -458,13 +470,115 @@ internal class MeshEngine private constructor(internal val ctx: Context) : Route
         false
     }
 
-    fun forceConnect(node: String, spec: String): Boolean {
-        val p = spec.split(":", limit = 2)
-        Diag.i("force connect " + p[0] + " node=" + node.take(8))
-        for (t in transports.toList()) {
-            if (t.name() == p[0]) return t.forceConnect(node, if (p.size > 1) p[1] else "")
+    private val forceLock = Any()
+    @Volatile private var forceNode: String? = null
+    @Volatile private var forceSpec = ""
+    @Volatile private var forceUntil = 0L
+    @Volatile private var forceDial = 0L
+
+    internal fun forcing(): Boolean = System.currentTimeMillis() < forceDial
+
+    private fun forceFamily(medium: String, spec: String): Boolean {
+        val m = spec.substringBefore(":")
+        return if (m == "ble") medium == "ble" || medium == "l2cap" else medium == m
+    }
+
+    private fun phyWrong(l: Link, spec: String): Boolean {
+        if (l.note.isEmpty()) return false
+        val coded = l.note.contains("coded")
+        return (spec == "ble:coded" && !coded) || (spec == "ble:1m" && coded)
+    }
+
+    private fun forceMatches(l: Link, spec: String): Boolean {
+        if (!forceFamily(l.medium, spec)) return false
+        val coded = l.note.contains("coded")
+        return when (spec) {
+            "ble:coded" -> coded
+            "ble:1m" -> !coded
+            else -> true
         }
-        return false
+    }
+
+    private fun forceVetoes(node: String, link: Link): Boolean {
+        if (node != forceNode || System.currentTimeMillis() >= forceUntil) return false
+        return !forceFamily(link.medium, forceSpec) || phyWrong(link, forceSpec)
+    }
+
+    private fun forceEnforce(node: String) {
+        val spec = forceSpec
+        val out = synchronized(lock) { byNode[node]?.filter { !forceFamily(it.medium, spec) || phyWrong(it, spec) } ?: emptyList() }
+        for (l in out) {
+            Diag.stage("force", node, "closed", "dropped a ${l.medium} link that does not match $spec")
+            l.close()
+        }
+    }
+
+    fun forceEnd(node: String?) {
+        synchronized(forceLock) {
+            if (node != null && node != forceNode) return
+            forceNode = null
+            forceSpec = ""
+            forceUntil = 0L
+            forceDial = 0L
+        }
+    }
+
+    private fun describeLinks(node: String): String = synchronized(lock) {
+        byNode[node]?.joinToString(", ") { it.medium + (if (it.note.isEmpty()) "" else " (" + it.note + ")") }
+    } ?: "none"
+
+    fun forceConnect(node: String, spec: String): String? {
+        val p = spec.split(":", limit = 2)
+        val t = transports.toList().firstOrNull { it.name() == p[0] }
+            ?: return "Forced $spec to ${node.take(8)} failed: transport ${p[0]} does not exist in this build"
+        val mark = Diag.mark()
+        val start = System.currentTimeMillis()
+        val before = describeLinks(node)
+        synchronized(forceLock) {
+            if (start < forceDial) return "Forced connection to ${node.take(8)} not started: another forced attempt is still running"
+            forceNode = node
+            forceSpec = spec
+            forceDial = start + FORCE_MS
+            forceUntil = start + FORCE_HOLD_MS
+        }
+        Diag.stage("force", node, "attempt", "$spec within ${FORCE_MS / 1000} s; links before: $before; dropping them")
+        val doomed = synchronized(lock) { byNode[node]?.let { ArrayList(it) } ?: ArrayList<Link>() }
+        for (l in doomed) l.close()
+        val res = java.util.concurrent.atomic.AtomicReference<Boolean?>(null)
+        val worker = Thread({
+            res.set(try { t.forceConnect(node, if (p.size > 1) p[1] else "") } catch (e: Exception) {
+                Diag.w("force ${p[0]} threw $e")
+                false
+            })
+        }, "ripplo-force")
+        worker.isDaemon = true
+        worker.start()
+        val end = start + FORCE_MS
+        var matched: Link? = null
+        while (System.currentTimeMillis() < end) {
+            matched = synchronized(lock) { byNode[node]?.firstOrNull { forceMatches(it, spec) } }
+            if (matched != null || res.get() == false) break
+            try { Thread.sleep(150) } catch (e: InterruptedException) { break }
+        }
+        if (matched == null) matched = synchronized(lock) { byNode[node]?.firstOrNull { forceMatches(it, spec) } }
+        if (matched != null) {
+            forceDial = 0L
+            Diag.stage("force", node, "linked", "${matched.medium} up after ${System.currentTimeMillis() - start} ms; other links to this phone stay blocked until Close")
+            return null
+        }
+        val now = describeLinks(node)
+        val why = when {
+            res.get() == false -> "the transport refused to start (see its last step below)"
+            res.get() == null -> "no ${spec} link appeared within ${FORCE_MS / 1000} s and the transport was still trying"
+            else -> "the transport started but no ${spec} link appeared within ${FORCE_MS / 1000} s"
+        }
+        val n8 = node.take(8)
+        val steps = Diag.since(mark).filter { (it.contains(" $n8 ") || it.contains("force")) && !it.contains("scan hit") }.takeLast(14)
+        forceEnd(node)
+        for (x in transports.toList()) sched.execute { x.tick() }
+        val msg = "Forced $spec to $n8 failed: $why. Links before: $before. Links now: $now. Steps:\n" + steps.joinToString("\n").ifEmpty { "(no transport reported any step)" }
+        Diag.stage("force", node, "failed", msg)
+        return msg
     }
 
     fun closeLinks(node: String, medium: String) {
@@ -515,6 +629,8 @@ internal class MeshEngine private constructor(internal val ctx: Context) : Route
     companion object {
         private const val QUIET_NANOS = 30L * 1000000000L
         private const val TICK_SECONDS = 5L
+        private const val FORCE_MS = 7000L
+        private const val FORCE_HOLD_MS = 10L * 60L * 1000L
         private const val PROBE_NANOS = 120L * 1000000000L
         private var instance: MeshEngine? = null
 

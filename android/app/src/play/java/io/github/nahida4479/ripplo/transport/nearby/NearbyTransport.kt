@@ -133,7 +133,7 @@ internal class NearbyTransport(ctx: Context, engine: MeshEngine) : Transport(ctx
             try { c.stopDiscovery() } catch (ignored: Exception) { }
             startDiscovery(c)
             val end = System.currentTimeMillis() + 12000
-            while (found == null && System.currentTimeMillis() < end && running) {
+            while (found == null && System.currentTimeMillis() < end && running && engine.forcing()) {
                 try { Thread.sleep(500) } catch (e: InterruptedException) { break }
                 found = endpoints.entries.firstOrNull { it.value.peer == node }
             }
@@ -153,7 +153,7 @@ internal class NearbyTransport(ctx: Context, engine: MeshEngine) : Transport(ctx
             if (peer == engine.nodeTag()) return
             endpoints[id] = Endpoint(peer, System.currentTimeMillis())
             engine.noteSeen(peer, MEDIUM)
-            if (engine.nodeTag() < peer) dial(id, peer, false)
+            if (engine.nodeTag() < peer && !engine.forcing()) dial(id, peer, false)
         }
 
         override fun onEndpointLost(id: String) {

@@ -118,7 +118,7 @@ internal class WifiAwareTransport(ctx: Context, engine: MeshEngine) : Transport(
                     engine.noteSeen(tag, "wifi-aware")
                     handles[tag] = peer!!
                 }
-                if (engine.nodeTag() >= tag || engine.hasLink(tag, "wifi-aware")) return
+                if (engine.forcing() || engine.nodeTag() >= tag || engine.hasLink(tag, "wifi-aware")) return
                 val now = System.currentTimeMillis()
                 synchronized(attempts) {
                     val last = attempts[tag]

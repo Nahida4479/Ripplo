@@ -265,9 +265,10 @@ class _SettingsViewState extends State<SettingsView> {
   String _specOf(Neighbor n) => _forceSpec[n.node] ?? 'lan';
 
   Future<void> _forceConnect(Neighbor n) async {
+    toast(t('devForceRunning'));
     final ok = await _mesh.devConnect(n.node, _specOf(n));
-    toast(t(ok ? 'devStarted' : 'devNotStarted'));
-    unawaited(Future.delayed(const Duration(milliseconds: 1500), _loadDev));
+    toast(t(ok ? 'devForceOk' : 'devForceFailed'));
+    await _loadDev();
   }
 
   Future<void> _forceClose(Neighbor n) async {

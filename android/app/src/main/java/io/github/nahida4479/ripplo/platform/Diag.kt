@@ -9,6 +9,7 @@ import java.util.Locale
 internal object Diag {
     private const val MAX = 600
     private val lines = ArrayDeque<String>()
+    private var added = 0L
 
     fun i(m: String) {
         add(m)
@@ -39,8 +40,15 @@ internal object Diag {
     @Synchronized
     private fun add(m: String) {
         if (lines.size >= MAX) lines.removeFirst()
+        added++
         lines.addLast(SimpleDateFormat("HH:mm:ss.SSS", Locale.US).format(Date()) + " " + m)
     }
+
+    @Synchronized
+    fun mark(): Long = added
+
+    @Synchronized
+    fun since(mark: Long): List<String> = lines.toList().takeLast(minOf(added - mark, lines.size.toLong()).toInt())
 
     @Synchronized
     fun dump(): String = lines.joinToString("") { "$it\n" }

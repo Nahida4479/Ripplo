@@ -367,9 +367,16 @@ mixin _Contacts on _Base {
       enqueue(() => onSealed(inner));
       return;
     }
-    final raw = jsonDecode(unutf8(p.payload));
+    final Object? raw;
+    try {
+      raw = jsonDecode(unutf8(p.payload));
+    } catch (_) {
+      diagLog('app bad payload ${cut(from, 0, 8)} ${p.payload.length}B');
+      return;
+    }
     final nb = state.neighbors.where((n) => n.node == from).firstOrNull;
     if (raw is! Map) return;
+    diagLog('app in ${cut(from, 0, 8)} ${raw['t']}${nb == null ? ' (no neighbor)' : ''}');
     final msg = Map<String, Object?>.from(raw);
     final t = msg['t'];
     if (t == 'hello') {

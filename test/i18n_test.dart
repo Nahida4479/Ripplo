@@ -12,8 +12,8 @@ void main() {
   final pl = i18nTable('pl');
 
   test('key sets match apart from plural categories', () {
-    expect(en.length, 304);
-    expect(pl.length, 306);
+    expect(en.length, 307);
+    expect(pl.length, 309);
     final enBase = en.keys.map(_base).toSet();
     final plBase = pl.keys.map(_base).toSet();
     expect(plBase, enBase);

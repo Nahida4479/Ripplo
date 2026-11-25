@@ -159,7 +159,7 @@ internal class BleTransport(ctx: Context, engine: MeshEngine) : Transport(ctx, e
             boostCoded = coded
             restartScan()
             val end = System.currentTimeMillis() + 15000
-            while (!hasHit(coded) && System.currentTimeMillis() < end && running) {
+            while (!hasHit(coded) && System.currentTimeMillis() < end && running && engine.forcing()) {
                 try { Thread.sleep(500) } catch (e: InterruptedException) { break }
             }
             if (coded) {
@@ -170,11 +170,14 @@ internal class BleTransport(ctx: Context, engine: MeshEngine) : Transport(ctx, e
             }
         }
         if (hasHit(coded)) {
+            val settle = System.currentTimeMillis() + 3000
+            while (!freeHit(coded) && System.currentTimeMillis() < settle && running) {
+                try { Thread.sleep(200) } catch (e: InterruptedException) { break }
+            }
             if (freeHit(coded)) {
-                engine.closeLinks(node, "ble")
                 started = connectHits(coded)
             } else {
-                Diag.stage("ble", node, "rejected", "a $phy connection attempt is already running, the existing link was kept; try again in 20 s")
+                Diag.stage("ble", node, "rejected", "a $phy connection attempt is already running, try again in 20 s")
                 return false
             }
         }
@@ -343,6 +346,7 @@ internal class BleTransport(ctx: Context, engine: MeshEngine) : Transport(ctx, e
             val prev = hits[key]
             if (prev == null || now - prev.at > 30000) since[a] = now
             hits[key] = Hit(d, phy, now)
+            if (engine.forcing()) return
             val failed = (fails[a] ?: 0) > 0
             if (coded) {
                 val oneM = hits[a + "/1"]

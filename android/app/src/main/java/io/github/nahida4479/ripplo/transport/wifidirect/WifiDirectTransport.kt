@@ -137,7 +137,7 @@ internal class WifiDirectTransport(ctx: Context, engine: MeshEngine) : Transport
             engine.noteSeen(tag, "wifi-direct")
         }
         log("peer " + tag.take(8) + " " + dev.deviceName + " initiator=" + (engine.nodeTag() < tag))
-        if (engine.nodeTag() >= tag || engine.hasLink(tag, "wifi-direct")) return
+        if (engine.forcing() || engine.nodeTag() >= tag || engine.hasLink(tag, "wifi-direct")) return
         if (engine.hasFastLink(tag)) return
         val now = System.currentTimeMillis()
         synchronized(attempts) {
@@ -159,7 +159,7 @@ internal class WifiDirectTransport(ctx: Context, engine: MeshEngine) : Transport
             discover()
             logPeers()
             val end = System.currentTimeMillis() + 12000
-            while (dev == null && System.currentTimeMillis() < end && running) {
+            while (dev == null && System.currentTimeMillis() < end && running && engine.forcing()) {
                 try {
                     Thread.sleep(500)
                 } catch (e: InterruptedException) {
