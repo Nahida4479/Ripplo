@@ -66,9 +66,9 @@ internal class WifiDirectTransport(ctx: Context, engine: MeshEngine) : Transport
 
         val txt = hashMapOf("nt" to engine.nodeTag())
         localService = WifiP2pDnsSdServiceInfo.newInstance("ripplo-" + engine.nodeTag().substring(0, 8), "_ripplo._tcp", txt)
-        m.setDnsSdResponseListeners(ch, { _, _, _ -> }, { _, record, dev ->
+        m.setDnsSdResponseListeners(ch, { name, type, dev -> log("service response " + name + " " + type + " from " + dev.deviceName) }, { _, record, dev ->
             val tag = record?.get("nt")
-            if (tag != null) onPeer(tag, dev)
+            if (tag != null) onPeer(tag, dev) else log("txt record without node tag from " + dev.deviceName)
         })
         request = WifiP2pDnsSdServiceRequest.newInstance()
         m.clearLocalServices(ch, null)
@@ -148,6 +148,7 @@ internal class WifiDirectTransport(ctx: Context, engine: MeshEngine) : Transport
         requestConnect(tag, dev)
     }
 
+    @SuppressLint("MissingPermission")
     override fun forceConnect(node: String, option: String): Boolean {
         if (manager == null || channel == null) {
             Diag.stage("wifi-direct", node, "rejected", "Wi-Fi Direct is not running (Wi-Fi off or no permission)")
@@ -155,24 +156,38 @@ internal class WifiDirectTransport(ctx: Context, engine: MeshEngine) : Transport
         }
         var dev = devices[node]
         if (dev == null) {
-            Diag.stage("wifi-direct", node, "scanning", "peer not discovered yet, restarting discovery (up to 12 s)")
+            Diag.stage("wifi-direct", node, "scanning", "peer not discovered yet, restarting discovery (up to 15 s)")
             discover()
-            logPeers()
-            val end = System.currentTimeMillis() + 12000
+            val end = System.currentTimeMillis() + 15000
+            var lastSvc = 0L
             while (dev == null && System.currentTimeMillis() < end && running && engine.forcing()) {
                 try {
                     Thread.sleep(500)
                 } catch (e: InterruptedException) {
                     break
                 }
+                val now = System.currentTimeMillis()
+                if (now - lastSvc > 4000) {
+                    lastSvc = now
+                    try {
+                        manager?.discoverServices(channel!!, null)
+                    } catch (ignored: Exception) {
+                    }
+                }
                 dev = devices[node]
             }
             if (dev == null) {
-                Diag.stage("wifi-direct", node, "rejected", "peer not found over Wi-Fi Direct (other phone needs Wi-Fi on and Ripplo running)")
+                logPeers()
+                try {
+                    Thread.sleep(700)
+                } catch (ignored: InterruptedException) {
+                }
+                Diag.stage("wifi-direct", node, "rejected", "peer not found over Wi-Fi Direct service discovery (other phone needs Wi-Fi on, Ripplo running and its own Wi-Fi Direct discovery active)")
                 return false
             }
         }
         Diag.stage("wifi-direct", node, "attempt", dev.deviceName ?: "")
+        engine.forceDialing()
         requestConnect(node, dev)
         return true
     }
@@ -181,7 +196,7 @@ internal class WifiDirectTransport(ctx: Context, engine: MeshEngine) : Transport
     private fun logPeers() {
         try {
             manager!!.requestPeers(channel!!) { list ->
-                Diag.stage("wifi-direct", "", "started", "p2p peers in range: " + (if (list == null) 0 else list.deviceList.size))
+                Diag.stage("wifi-direct", "", "started", "p2p peers in range: " + (if (list == null) "0" else list.deviceList.size.toString() + " " + list.deviceList.joinToString { it.deviceName + " status=" + it.status }))
             }
         } catch (ignored: Exception) {
         }
@@ -270,6 +285,19 @@ internal class WifiDirectTransport(ctx: Context, engine: MeshEngine) : Transport
             lastDiscover = now
             discover()
         }
+    }
+
+    override fun rescan() {
+        if (manager == null || channel == null || clientConnecting || engine.forcing()) return
+        lastDiscover = System.currentTimeMillis()
+        discover()
+    }
+
+    override fun probe() {
+        if (manager == null || channel == null || clientConnecting || engine.forcing()) return
+        Diag.stage("wifi-direct", "", "scanning", "periodic Wi-Fi Direct scan")
+        lastDiscover = System.currentTimeMillis()
+        discover()
     }
 
     @SuppressLint("MissingPermission")

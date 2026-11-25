@@ -143,6 +143,7 @@ internal class WifiAwareTransport(ctx: Context, engine: MeshEngine) : Transport(
             return false
         }
         Diag.stage("wifi-aware", node, "attempt", "")
+        engine.forceDialing()
         initiate(h)
         return true
     }

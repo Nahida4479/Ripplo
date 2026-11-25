@@ -132,7 +132,7 @@ internal class NearbyTransport(ctx: Context, engine: MeshEngine) : Transport(ctx
             Diag.stage(MEDIUM, node, "scanning", "peer not discovered yet, restarting discovery (up to 12 s)")
             try { c.stopDiscovery() } catch (ignored: Exception) { }
             startDiscovery(c)
-            val end = System.currentTimeMillis() + 12000
+            val end = System.currentTimeMillis() + 15000
             while (found == null && System.currentTimeMillis() < end && running && engine.forcing()) {
                 try { Thread.sleep(500) } catch (e: InterruptedException) { break }
                 found = endpoints.entries.firstOrNull { it.value.peer == node }
@@ -142,6 +142,7 @@ internal class NearbyTransport(ctx: Context, engine: MeshEngine) : Transport(ctx
             Diag.stage(MEDIUM, node, "rejected", "peer not found over Nearby (other phone needs Ripplo running, Bluetooth and Wi-Fi on)")
             return false
         }
+        engine.forceDialing()
         engine.closeLinks(node, MEDIUM)
         requested.remove(found.key)
         return dial(found.key, node, true)

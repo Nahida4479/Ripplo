@@ -175,6 +175,7 @@ internal class BleTransport(ctx: Context, engine: MeshEngine) : Transport(ctx, e
                 try { Thread.sleep(200) } catch (e: InterruptedException) { break }
             }
             if (freeHit(coded)) {
+                engine.forceDialing()
                 started = connectHits(coded)
             } else {
                 Diag.stage("ble", node, "rejected", "a $phy connection attempt is already running, try again in 20 s")
@@ -228,12 +229,31 @@ internal class BleTransport(ctx: Context, engine: MeshEngine) : Transport(ctx, e
         return started
     }
 
+    override fun rescan() {
+        if (adapter?.isEnabled != true || engine.forcing()) return
+        if (System.currentTimeMillis() - lastScanStart > 10000) restartScan()
+    }
+
     override fun tickImpl() {
         val a = adapter
-        if (a == null || !a.isEnabled) return
+        if (a == null || !a.isEnabled) {
+            stop()
+            return
+        }
         val now = System.currentTimeMillis()
         if (server != null && serverLinks.isEmpty() && engine.neighbors().isEmpty() && now - lastAdvStart > 120000) restartAdvertising()
         if (now - lastScanStart > 300000 || (now - lastHit() > 45000 && now - lastScanStart > 20000)) restartScan()
+    }
+
+    override fun probe() {
+        if (!codedOn() || boostCoded || engine.forcing()) return
+        Diag.stage("ble", "", "scanning", "periodic BLE Coded scan")
+        boostCoded = true
+        restartScan()
+        main.postDelayed({
+            boostCoded = false
+            restartScan()
+        }, 6000)
     }
 
     private fun lastHit(): Long = if (lastHitAt == 0L) lastScanStart else lastHitAt

@@ -24,6 +24,10 @@ internal abstract class Transport(val ctx: Context, val engine: MeshEngine) {
 
     open fun tickImpl() {}
 
+    open fun probe() {}
+
+    open fun rescan() {}
+
     open fun onPeerRequest(kind: Int) {}
 
     @Synchronized
@@ -59,6 +63,24 @@ internal abstract class Transport(val ctx: Context, val engine: MeshEngine) {
         } else {
             try {
                 tickImpl()
+            } catch (ignored: Throwable) {
+            }
+        }
+    }
+
+    fun rescanNow() {
+        if (running) {
+            try {
+                rescan()
+            } catch (ignored: Throwable) {
+            }
+        }
+    }
+
+    fun probeNow() {
+        if (running) {
+            try {
+                probe()
             } catch (ignored: Throwable) {
             }
         }

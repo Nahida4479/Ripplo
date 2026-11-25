@@ -51,6 +51,10 @@ internal class LanTransport(ctx: Context, engine: MeshEngine) : Transport(ctx, e
             start()
         }
 
+        startNsd(n, ss)
+    }
+
+    private fun startNsd(n: NsdManager, ss: ServerSocket) {
         val name = "ripplo-" + engine.nodeTag().substring(0, 8)
         serviceName = name
         val info = NsdServiceInfo().apply {
@@ -169,6 +173,32 @@ internal class LanTransport(ctx: Context, engine: MeshEngine) : Transport(ctx, e
         connect(p)
     }
 
+    override fun rescan() {
+        val n = nsd ?: return
+        val ss = server ?: return
+        Diag.stage("lan", "", "scanning", "rescanning the network for Ripplo phones")
+        synchronized(this) {
+            resolveTries.clear()
+            toResolve.clear()
+            resolving = false
+            for (p in peers.values) {
+                p.fails = 0
+                p.lastTry = 0
+            }
+        }
+        try {
+            discListener?.let { n.stopServiceDiscovery(it) }
+        } catch (ignored: Exception) {
+        }
+        try {
+            regListener?.let { n.unregisterService(it) }
+        } catch (ignored: Exception) {
+        }
+        startNsd(n, ss)
+        val list = synchronized(this) { ArrayList(peers.values) }
+        for (p in list) connect(p)
+    }
+
     override fun forceConnect(node: String, option: String): Boolean {
         val target = synchronized(this) { peers.values.lastOrNull { it.tag == node } }
         if (target == null) {
@@ -177,6 +207,7 @@ internal class LanTransport(ctx: Context, engine: MeshEngine) : Transport(ctx, e
             return false
         }
         Diag.stage("lan", node, "attempt", target.host.hostAddress + ":" + target.port)
+        engine.forceDialing()
         connect(target, true)
         return true
     }

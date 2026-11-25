@@ -189,6 +189,13 @@ internal class MeshEngine private constructor(internal val ctx: Context) : Route
             if (System.currentTimeMillis() >= forceUntil) forceEnd(fn) else forceEnforce(fn)
         }
         for (t in transports.toList()) t.tick()
+        if (tickCount % LONELY_TICKS == 0 && synchronized(lock) { byNode.isEmpty() } && forceNode == null) {
+            for (t in transports.toList()) sched.execute { t.rescanNow() }
+        }
+        if (tickCount % PROBE_TICKS == 0 && forceNode == null && !forcing()) {
+            val name = if ((tickCount / PROBE_TICKS) % 2 == 0) "ble" else "wifi-direct"
+            for (t in transports.toList()) if (t.name() == name) sched.execute { t.probeNow() }
+        }
     }
 
     private val helloAt = HashMap<String, Long>()
@@ -242,9 +249,27 @@ internal class MeshEngine private constructor(internal val ctx: Context) : Route
         if (down && node != null) {
             router?.linkDown(node)
             emitNeighbor(node, false, link.medium, link.kbps)
+            scheduleRescan()
         } else if (node != null) {
             emitBest(node)
         }
+    }
+
+    private var lastRescan = 0L
+
+    private fun scheduleRescan() {
+        if (!running || forceNode != null) return
+        val now = System.currentTimeMillis()
+        synchronized(lock) {
+            if (now - lastRescan < RESCAN_GAP_MS) return
+            lastRescan = now
+        }
+        sched.schedule({
+            if (running) {
+                Diag.i("rescan after losing a neighbor")
+                for (t in transports.toList()) t.rescanNow()
+            }
+        }, 1500, TimeUnit.MILLISECONDS)
     }
 
     private fun emitBest(node: String) {
@@ -475,6 +500,7 @@ internal class MeshEngine private constructor(internal val ctx: Context) : Route
     @Volatile private var forceSpec = ""
     @Volatile private var forceUntil = 0L
     @Volatile private var forceDial = 0L
+    @Volatile private var forceDialAt = 0L
 
     internal fun forcing(): Boolean = System.currentTimeMillis() < forceDial
 
@@ -513,9 +539,17 @@ internal class MeshEngine private constructor(internal val ctx: Context) : Route
         }
     }
 
+    internal fun forceDialing() {
+        val n = forceNode ?: return
+        if (forceDialAt != 0L || System.currentTimeMillis() >= forceDial) return
+        forceDialAt = System.currentTimeMillis()
+        Diag.stage("force", n, "dialing", "peer found, ${FORCE_MS / 1000} s to bring the link up")
+    }
+
     fun forceEnd(node: String?) {
         synchronized(forceLock) {
             if (node != null && node != forceNode) return
+            forceDialAt = 0L
             forceNode = null
             forceSpec = ""
             forceUntil = 0L
@@ -538,10 +572,11 @@ internal class MeshEngine private constructor(internal val ctx: Context) : Route
             if (start < forceDial) return "Forced connection to ${node.take(8)} not started: another forced attempt is still running"
             forceNode = node
             forceSpec = spec
-            forceDial = start + FORCE_MS
+            forceDialAt = 0L
+            forceDial = start + FORCE_FIND_MS + FORCE_MS
             forceUntil = start + FORCE_HOLD_MS
         }
-        Diag.stage("force", node, "attempt", "$spec within ${FORCE_MS / 1000} s; links before: $before; dropping them")
+        Diag.stage("force", node, "attempt", "$spec: up to ${FORCE_FIND_MS / 1000} s to find the peer, then ${FORCE_MS / 1000} s to connect; links before: $before; dropping them")
         val doomed = synchronized(lock) { byNode[node]?.let { ArrayList(it) } ?: ArrayList<Link>() }
         for (l in doomed) l.close()
         val res = java.util.concurrent.atomic.AtomicReference<Boolean?>(null)
@@ -553,9 +588,8 @@ internal class MeshEngine private constructor(internal val ctx: Context) : Route
         }, "ripplo-force")
         worker.isDaemon = true
         worker.start()
-        val end = start + FORCE_MS
         var matched: Link? = null
-        while (System.currentTimeMillis() < end) {
+        while (System.currentTimeMillis() < (if (forceDialAt == 0L) start + FORCE_FIND_MS else forceDialAt + FORCE_MS)) {
             matched = synchronized(lock) { byNode[node]?.firstOrNull { forceMatches(it, spec) } }
             if (matched != null || res.get() == false) break
             try { Thread.sleep(150) } catch (e: InterruptedException) { break }
@@ -567,13 +601,14 @@ internal class MeshEngine private constructor(internal val ctx: Context) : Route
             return null
         }
         val now = describeLinks(node)
+        val dialed = forceDialAt != 0L
         val why = when {
             res.get() == false -> "the transport refused to start (see its last step below)"
-            res.get() == null -> "no ${spec} link appeared within ${FORCE_MS / 1000} s and the transport was still trying"
-            else -> "the transport started but no ${spec} link appeared within ${FORCE_MS / 1000} s"
+            !dialed -> "the peer was not found over $spec within ${FORCE_FIND_MS / 1000} s, so no connection was even attempted"
+            else -> "the peer was found and dialed, but no $spec link came up within ${FORCE_MS / 1000} s"
         }
         val n8 = node.take(8)
-        val steps = Diag.since(mark).filter { (it.contains(" $n8 ") || it.contains("force")) && !it.contains("scan hit") }.takeLast(14)
+        val steps = Diag.since(mark).filter { (it.contains(" $n8 ") || it.contains("force") || it.contains(" ${p[0]} ")) && !it.contains("scan hit") }.takeLast(16)
         forceEnd(node)
         for (x in transports.toList()) sched.execute { x.tick() }
         val msg = "Forced $spec to $n8 failed: $why. Links before: $before. Links now: $now. Steps:\n" + steps.joinToString("\n").ifEmpty { "(no transport reported any step)" }
@@ -629,7 +664,11 @@ internal class MeshEngine private constructor(internal val ctx: Context) : Route
     companion object {
         private const val QUIET_NANOS = 30L * 1000000000L
         private const val TICK_SECONDS = 5L
+        private const val PROBE_TICKS = 3
+        private const val LONELY_TICKS = 6
+        private const val RESCAN_GAP_MS = 8000L
         private const val FORCE_MS = 7000L
+        private const val FORCE_FIND_MS = 15000L
         private const val FORCE_HOLD_MS = 10L * 60L * 1000L
         private const val PROBE_NANOS = 120L * 1000000000L
         private var instance: MeshEngine? = null
