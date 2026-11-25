@@ -110,6 +110,7 @@ class SettingsView extends StatefulWidget {
     this.onInstall,
     this.onSetAppLock,
     this.onPickAvatar,
+    this.onRestored,
     this.onPickColor,
     this.onOpenUrl,
     this.onMyCode,
@@ -125,6 +126,7 @@ class SettingsView extends StatefulWidget {
   final Future<void> Function()? onInstall;
   final Future<void> Function(bool on)? onSetAppLock;
   final Future<String?> Function()? onPickAvatar;
+  final VoidCallback? onRestored;
   final Future<String?> Function(String current)? onPickColor;
   final ValueChanged<String>? onOpenUrl;
   final VoidCallback? onMyCode;
@@ -1146,7 +1148,11 @@ class _SettingsViewState extends State<SettingsView> {
         _network(s),
         SectionHead(t('security')),
         _security(s),
-        BackupCard(mesh: widget.mesh, backupMeta: widget.backupMeta),
+        BackupCard(
+          mesh: widget.mesh,
+          backupMeta: widget.backupMeta,
+          onRestored: widget.onRestored,
+        ),
         SectionHead(t('updates')),
         _updates(s),
         SectionHead(t('about')),

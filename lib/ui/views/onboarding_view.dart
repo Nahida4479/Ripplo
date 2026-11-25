@@ -56,7 +56,11 @@ class _OnboardingViewState extends State<OnboardingView> {
       await api.restoreBackup(_code.text.replaceAll(RegExp(r'\D'), ''));
       widget.onRestored?.call();
     } catch (e) {
-      final code = e is RipploError ? e.code : null;
+      final code = e is MeshError
+          ? e.code
+          : e is RipploError
+          ? e.code
+          : null;
       if (mounted) {
         setState(
           () => _error = t(

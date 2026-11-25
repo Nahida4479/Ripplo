@@ -285,6 +285,8 @@ const Map<String, String> _en = {
   'folderHint':
       'Pick a folder and Ripplo saves a fresh backup there when you open the app, at most once a day. Each new backup replaces the previous one, so there is always a single file.',
   'restoreFromBackup': 'Restore from backup',
+  'restoreOverwrite':
+      'Restoring replaces everything on this phone with the contents of the backup file: chats, contacts and your identity.',
   'restoreHint':
       'Enter your 30-digit recovery code, then choose the backup file.',
   'recoveryCode': 'Recovery code',
@@ -627,6 +629,8 @@ const Map<String, String> _pl = {
   'folderHint':
       'Wybierz folder, a Ripplo zapisze w nim świeżą kopię po otwarciu aplikacji, najwyżej raz dziennie. Każda nowa kopia zastępuje poprzednią, więc zawsze jest jeden plik.',
   'restoreFromBackup': 'Przywróć z kopii zapasowej',
+  'restoreOverwrite':
+      'Przywracanie zastąpi wszystko na tym telefonie zawartością pliku kopii: czaty, kontakty i twoją tożsamość.',
   'restoreHint':
       'Wpisz 30-cyfrowy kod odzyskiwania, a potem wybierz plik kopii.',
   'recoveryCode': 'Kod odzyskiwania',

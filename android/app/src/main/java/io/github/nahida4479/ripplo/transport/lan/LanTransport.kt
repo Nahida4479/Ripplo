@@ -200,8 +200,7 @@ internal class LanTransport(ctx: Context, engine: MeshEngine) : Transport(ctx, e
             } catch (e: Exception) {
                 if (force) Diag.stage("lan", p.tag, "failed", e.javaClass.simpleName + " " + e.message)
                 log("connect failed " + p.host.hostAddress + " " + e)
-                val refused = e.message?.contains("ECONNREFUSED") == true
-                if (refused && ++p.fails >= 6) {
+                if (++p.fails >= 6) {
                     synchronized(this@LanTransport) { peers.values.remove(p) }
                     log("dropped peer " + p.host.hostAddress + ":" + p.port)
                 }
@@ -226,7 +225,7 @@ internal class LanTransport(ctx: Context, engine: MeshEngine) : Transport(ctx, e
             done()
         }
         val list = synchronized(this) { ArrayList(peers.values) }
-        for (p in list) if (now - p.lastTry > 4000) connect(p)
+        for (p in list) if (now - p.lastTry > minOf(4000L shl minOf(p.fails, 4), 60000L)) connect(p)
     }
 
     override fun stopImpl() {

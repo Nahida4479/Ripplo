@@ -271,6 +271,7 @@ abstract class _Base {
   final lastReset = <String, int>{};
   final helloCards = <String, Map<String, Object?>>{};
   final greeted = <String>{};
+  final askedAt = <String, int>{};
   final byed = <String>{};
   final lastResend = <String, int>{};
   final lastTyping = <String, int>{};
@@ -614,6 +615,7 @@ abstract class _Base {
       if (i >= 0) state.neighbors.removeAt(i);
       helloCards.remove(node);
       greeted.remove(node);
+      askedAt.remove(node);
       byed.remove(node);
       return;
     }
@@ -622,6 +624,9 @@ abstract class _Base {
       n['medium'] = medium;
       n['kbps'] = kbps;
       n['rttMs'] = rttMs;
+      if (!truthy(n['card']) && now() - (askedAt[node] ?? 0) > 5000) {
+        sendHello(node, true);
+      }
     } else {
       state.neighbors.add(
         Neighbor(
@@ -869,6 +874,7 @@ abstract class _Base {
       if (!truthy(id) || c == null || truthy(c.request)) return;
     }
     greeted.add(node);
+    if (ask) askedAt[node] = now();
     diagLog('hello out ${cut(node, 0, 8)}${ask ? ' ask' : ''}');
     fire(
       mesh.sendApp(

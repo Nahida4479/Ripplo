@@ -47,6 +47,12 @@ internal abstract class Link(val engine: MeshEngine, val medium: String, val out
     @Volatile
     var pingBits: Int = 0
 
+    @Volatile
+    var pingProbe: Boolean = false
+
+    @Volatile
+    var probeAt: Long = 0L
+
     var windowStart: Long = 0L
     var windowCount: Int = 0
     val alive = AtomicBoolean(true)

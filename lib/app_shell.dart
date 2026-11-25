@@ -156,6 +156,7 @@ class _ShellState extends State<_Shell> {
           onInstall: _a.updater?.install,
           onSetAppLock: (on) => _a.lock.setAppLock(on),
           onPickAvatar: _a.onPickAvatar,
+          onRestored: _a.onRestored,
         );
       default:
         return ChatsView(

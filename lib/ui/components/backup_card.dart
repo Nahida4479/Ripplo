@@ -1,6 +1,9 @@
 import 'package:flutter/services.dart';
 import 'package:material_ui/material_ui.dart';
 
+import '../../core/app_instances.dart' as api;
+import '../../crypto/contact_card_codec.dart' show RipploError;
+import '../../data/backup_metadata.dart' show groupCode;
 import '../../translations.dart';
 import '../../mesh/native_mesh_bridge.dart' as bridge;
 import '../ui_request_state.dart';
@@ -19,8 +22,9 @@ String localeDateTime(int ms, [String? loc]) {
 }
 
 class BackupCard extends StatefulWidget implements Margined {
-  const BackupCard({super.key, this.mesh, this.backupMeta});
+  const BackupCard({super.key, this.mesh, this.backupMeta, this.onRestored});
 
+  final VoidCallback? onRestored;
   final bridge.Mesh? mesh;
   final Map<String, Object?> Function()? backupMeta;
 
@@ -46,6 +50,8 @@ class _BackupCardState extends State<BackupCard> {
   String _check = '';
   bool _busy = false;
   final _input = TextEditingController();
+  final _restoreCode = TextEditingController();
+  String _restoreError = '';
 
   bridge.Mesh get _mesh => widget.mesh ?? bridge.mesh;
 
@@ -62,6 +68,7 @@ class _BackupCardState extends State<BackupCard> {
   @override
   void dispose() {
     _input.dispose();
+    _restoreCode.dispose();
     super.dispose();
   }
 
@@ -93,7 +100,69 @@ class _BackupCardState extends State<BackupCard> {
     _code = '';
     _check = '';
     _input.clear();
+    _restoreCode.clear();
+    _restoreError = '';
   });
+
+  bool get _restoreOk =>
+      _restoreCode.text.replaceAll(RegExp(r'\D'), '').length == 30 && !_busy;
+
+  void _askRestore() => ui.confirm = ConfirmRequest(
+    title: t('restoreFromBackup'),
+    text: t('restoreOverwrite'),
+    ok: t('continue'),
+    danger: true,
+    onOk: () => setState(() => _step = 'restore'),
+  );
+
+  void _onRestoreCode(String v) {
+    final g = groupCode(v);
+    if (g != v) {
+      _restoreCode.value = TextEditingValue(
+        text: g,
+        selection: TextSelection.collapsed(offset: g.length),
+      );
+    }
+    setState(() => _restoreError = '');
+  }
+
+  Future<void> _restore() async {
+    if (!_restoreOk) return;
+    setState(() {
+      _busy = true;
+      _restoreError = '';
+    });
+    try {
+      await api.restoreBackup(_restoreCode.text.replaceAll(RegExp(r'\D'), ''));
+      if (!mounted) return;
+      _close();
+      widget.onRestored?.call();
+    } catch (e) {
+      final code = e is bridge.MeshError
+          ? e.code
+          : e is RipploError
+          ? e.code
+          : null;
+      if (mounted && code != 'cancelled') {
+        setState(
+          () => _restoreError = t(
+            const ['bad_code', 'bad_file', 'need_factor'].contains(code)
+                ? 'bk_$code'
+                : 'bk_failed',
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Widget _restoreButton() => RBtn(
+    text: t('restoreFromBackup'),
+    kind: RBtnKind.ghost,
+    block: true,
+    onTap: _busy ? null : _askRestore,
+  );
 
   Future<void> _enable() => _run(() async {
     final code = await _mesh.backupEnable();
@@ -265,6 +334,39 @@ class _BackupCardState extends State<BackupCard> {
             ]),
           ]),
         ];
+      case 'restore':
+        return [
+          _stack([
+            _bold(t('restoreFromBackup')),
+            _hint(t('restoreHint')),
+            RField(
+              controller: _restoreCode,
+              hint: t('recoveryCode'),
+              label: t('recoveryCode'),
+              keyboardType: TextInputType.number,
+              onChanged: _onRestoreCode,
+              onSubmitted: (_) => _restore(),
+            ),
+            if (_restoreError.isNotEmpty)
+              Text(
+                _restoreError,
+                style: rs(context, RipploText.body, context.rc.danger),
+              ),
+            _acts([
+              RBtn(
+                text: t('back'),
+                kind: RBtnKind.ghost,
+                block: true,
+                onTap: _busy ? null : _close,
+              ),
+              RBtn(
+                text: t('restore'),
+                block: true,
+                onTap: _restoreOk ? _restore : null,
+              ),
+            ]),
+          ]),
+        ];
       case 'folder':
         return [
           _stack([
@@ -295,6 +397,7 @@ class _BackupCardState extends State<BackupCard> {
             block: true,
             onTap: _busy ? null : _enable,
           ),
+          _restoreButton(),
         ]),
       ];
     }
@@ -346,6 +449,7 @@ class _BackupCardState extends State<BackupCard> {
             onTap: _busy ? null : _off,
           ),
         ]),
+        _restoreButton(),
       ]),
     ];
   }

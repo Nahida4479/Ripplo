@@ -238,7 +238,14 @@ internal class MeshEngine private constructor(internal val ctx: Context) : Route
         if (down && node != null) {
             router?.linkDown(node)
             emitNeighbor(node, false, link.medium, link.kbps)
+        } else if (node != null) {
+            emitBest(node)
         }
+    }
+
+    private fun emitBest(node: String) {
+        val best = sortedLinks(node).firstOrNull() ?: return
+        emitNeighbor(node, true, best.medium, best.kbps)
     }
 
     private fun emitNeighbor(node: String, up: Boolean, medium: String, kbps: Long) {
@@ -330,20 +337,25 @@ internal class MeshEngine private constructor(internal val ctx: Context) : Route
             return
         }
         for (o in toClose) o.close()
-        if (first) emitNeighbor(tag, true, link.medium, link.kbps)
+        if (first) emitNeighbor(tag, true, link.medium, link.kbps) else emitBest(tag)
         sendPing(link)
     }
 
     private fun sendPing(link: Link) {
         if (link.node == null || !link.alive.get()) return
-        val filler = if (link.medium == "ble") 2048 else 16384
+        val now = System.nanoTime()
+        val slow = link.medium == "ble" || link.medium == "l2cap" || link.note.contains("coded")
+        val probe = !slow && (link.probeAt == 0L || now - link.probeAt > PROBE_NANOS)
+        val filler = if (probe) 16384 else 0
         val b = ByteBuffer.allocate(16 + filler)
         val nonce = SecureRandom().nextLong()
         b.putLong(nonce).putLong(System.currentTimeMillis())
         val p = Packet.make(Packet.PING, ByteArray(16), b.array())
         link.pingNonce = nonce
         link.pingBits = (Packet.HEADER + b.capacity() + 4) * 8
-        link.pingStartNanos = System.nanoTime()
+        link.pingProbe = probe
+        if (probe) link.probeAt = now
+        link.pingStartNanos = now
         link.send(p.encode())
     }
 
@@ -354,6 +366,7 @@ internal class MeshEngine private constructor(internal val ctx: Context) : Route
         val ms = maxOf(1L, (System.nanoTime() - link.pingStartNanos) / 1000000L)
         link.pingStartNanos = 0
         link.rttMs = ms
+        if (!link.pingProbe) return
         link.kbps = maxOf(1L, link.pingBits / ms)
         val sorted = sortedLinks(node)
         if (sorted.isNotEmpty()) emitNeighbor(node, true, sorted[0].medium, sorted[0].kbps)
@@ -502,6 +515,7 @@ internal class MeshEngine private constructor(internal val ctx: Context) : Route
     companion object {
         private const val QUIET_NANOS = 30L * 1000000000L
         private const val TICK_SECONDS = 5L
+        private const val PROBE_NANOS = 120L * 1000000000L
         private var instance: MeshEngine? = null
 
         @JvmStatic
