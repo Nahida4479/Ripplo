@@ -12,6 +12,17 @@ subprojects {
     project.layout.buildDirectory.value(rootProject.layout.buildDirectory.dir(project.name).get())
 }
 
+subprojects { Project p ->
+    if (!p.state.executed) {
+        p.afterEvaluate {
+            def ext = p.extensions.findByName('android')
+            if (ext != null) {
+                ext.compileSdk = 36
+            }
+        }
+    }
+}
+
 subprojects {
     project.evaluationDependsOn(":app")
 }
