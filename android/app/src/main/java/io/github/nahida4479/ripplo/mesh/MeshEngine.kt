@@ -14,7 +14,6 @@ import io.github.nahida4479.ripplo.transport.Link
 import io.github.nahida4479.ripplo.transport.Transport
 import io.github.nahida4479.ripplo.transport.ble.BleTransport
 import io.github.nahida4479.ripplo.transport.lan.LanTransport
-import io.github.nahida4479.ripplo.transport.nearby.NearbyTransport
 import io.github.nahida4479.ripplo.transport.wifiaware.WifiAwareTransport
 import io.github.nahida4479.ripplo.transport.wifidirect.WifiDirectTransport
 import java.nio.ByteBuffer
