@@ -92,9 +92,13 @@ jobs:
           RIPPLO_DEV_BUILD: ${{ github.ref_type == 'branch' && github.event_name == 'push' }}
         run: |
           set -euo pipefail
-          flutter build apk --release --flavor full \
-            --build-name "$VER_NAME" \
-            --build-number "$VER_CODE"
+          for i in 1 2 3 4; do
+            flutter build apk --release --flavor full \
+              --build-name "$VER_NAME" \
+              --build-number "$VER_CODE" && exit 0
+            sleep $((i * 60))
+          done
+          exit 1
 
       - name: Verify signature and collect
         env:
