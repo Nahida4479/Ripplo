@@ -312,8 +312,9 @@ class ChatViewState extends State<ChatView> {
   double lastExtent = 0;
 
   bool _onScroll(ScrollNotification n) {
-    if (n is ScrollUpdateNotification || n is ScrollEndNotification)
+    if (n is ScrollUpdateNotification || n is ScrollEndNotification) {
       pinned = n.metrics.extentAfter < 2;
+    }
     return false;
   }
 
@@ -321,16 +322,18 @@ class ChatViewState extends State<ChatView> {
     final m = n.metrics;
     if (pinned &&
         m.viewportDimension == lastViewport &&
-        m.maxScrollExtent > lastExtent + .5)
+        m.maxScrollExtent > lastExtent + .5) {
       _jump();
+    }
     lastViewport = m.viewportDimension;
     lastExtent = m.maxScrollExtent;
     return false;
   }
 
   void _jump() {
-    if (mounted && scroll.hasClients)
+    if (mounted && scroll.hasClients) {
       scroll.jumpTo(scroll.position.maxScrollExtent);
+    }
   }
 
   void _toBottom() {
@@ -586,8 +589,9 @@ class ChatViewState extends State<ChatView> {
   }
 
   void onDown(PointerDownEvent e, Msg m) {
-    if (e.kind == PointerDeviceKind.mouse && e.buttons != kPrimaryButton)
+    if (e.kind == PointerDeviceKind.mouse && e.buttons != kPrimaryButton) {
       return;
+    }
     swiped = false;
     final d = SwipeDrag(m, e.position.dx, e.position.dy);
     drag = d;
@@ -701,8 +705,9 @@ class ChatViewState extends State<ChatView> {
       audioFile = path;
       await p.setFilePath(path);
       p.processingStateStream.listen((s) {
-        if (s == ProcessingState.completed && identical(audio, p))
+        if (s == ProcessingState.completed && identical(audio, p)) {
           fire(stopAudio());
+        }
       });
       await p.play();
     } catch (_) {
@@ -741,8 +746,9 @@ class ChatViewState extends State<ChatView> {
         if (!mounted) return;
         setState(() {
           liveBars = [...liveBars, 3 + (math.min(1, peak * 2.5) * 22).round()];
-          if (liveBars.length > 32)
+          if (liveBars.length > 32) {
             liveBars = liveBars.sublist(liveBars.length - 32);
+          }
         });
       });
       tick = Timer.periodic(const Duration(seconds: 1), (_) {
@@ -1105,8 +1111,9 @@ class ChatViewState extends State<ChatView> {
         final items = <Widget>[_lockLine(context, c)];
         for (var i = 0; i < list.length; i++) {
           final m = list[i];
-          if (i == 0 || !_sameDay(list[i - 1].ts, m.ts))
+          if (i == 0 || !_sameDay(list[i - 1].ts, m.ts)) {
             items.add(_dayChip(context, c, m.ts));
+          }
           if (m.from == 'system') {
             items.add(
               Align(
@@ -1726,10 +1733,11 @@ class ChatViewState extends State<ChatView> {
   );
 
   Widget _thumb(StagedMedia s) {
-    if (s.kind == 'video')
+    if (s.kind == 'video') {
       return s.path == null
           ? const SizedBox.shrink()
           : _VideoThumb(path: s.path!);
+    }
     final b = s.bytes;
     return b != null
         ? Image.memory(

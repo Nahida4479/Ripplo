@@ -10,8 +10,7 @@
 <img src="https://img.shields.io/badge/Ripplo-Offline_Mesh_Messenger-blue">
 <img src="https://img.shields.io/badge/Android-3DDC84?logo=android&logoColor=white" alt="Android">
 <img src="https://img.shields.io/badge/iOS-000000?logo=apple&logoColor=white" alt="iOS">
-<img src="https://img.shields.io/badge/Vue-3-4FC08D?logo=vue.js&logoColor=white" alt="Vue 3">
-<img src="https://img.shields.io/badge/Capacitor-8-119EFF?logo=capacitor&logoColor=white" alt="Capacitor 8">
+<img src="https://img.shields.io/badge/Flutter-3.50-02569B?logo=flutter&logoColor=white" alt="Flutter 3.50">
 <img src="https://img.shields.io/badge/libsignal-PQXDH-3A76F0?logo=signal&logoColor=white" alt="libsignal PQXDH">
 <a href="./LICENSE"><img src="https://img.shields.io/github/license/Nahida4479/Ripplo"></a>
 <img src="https://github.com/Nahida4479/Ripplo/actions/workflows/build.yml/badge.svg">
@@ -118,8 +117,24 @@ Download `Ripplo-vX.Y.Z.apk` from [Releases](https://github.com/Nahida4479/Rippl
 
 ## IOS
 
-The release contains an **unsigned** IPA file (`Ripplo-vX.Y.Z-unsigned.ipa`). It has to be signed using [SideStore](https://sidestore.io/). Step-by-step SideStore guide: [nahida4479.github.io/Ripplo/pl/#ios](https://nahida4479.github.io/Ripplo/pl/#ios).
+The release contains an **unsigned** IPA file (`Ripplo-vX.Y.Z-beta-unsigned-for_developers.ipa`). It has to be signed using [SideStore](https://sidestore.io/). Step-by-step SideStore guide: [nahida4479.github.io/Ripplo/pl/#ios](https://nahida4479.github.io/Ripplo/pl/#ios).
 
+
+# Development
+
+Ripplo is a Flutter 3.50 (Dart) app; the Signal crypto and the transports are native Kotlin (Android) and Swift (iOS). The architecture and the native bridge are described in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md), the UI in [docs/DESIGN.md](docs/DESIGN.md).
+
+```
+flutter pub get
+flutter analyze
+TZ=Europe/Warsaw flutter test
+flutter run -d linux --dart-define=RIPPLO_PROFILE=alice
+flutter build apk --release --flavor full
+flutter build appbundle --release --flavor play
+```
+
+- `flutter run -d linux --dart-define=RIPPLO_PROFILE=<name>` starts a desktop simulator: run it twice with different names to get two phones talking over UDP loopback. It has no encryption and is never used in release builds.
+- A push to the `flutter` branch builds a test APK (workflow artifact `android-test`); pushing a tag `vX.Y.Z` builds and publishes the release. Golden tests and `dart run tool/parity.dart` check the screens against the reference screenshots.
 
 # Contributors
 

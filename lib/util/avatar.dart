@@ -1,5 +1,8 @@
 import 'dart:math' as math;
 
+import 'package:flutter/foundation.dart';
+import 'package:image/image.dart' as img;
+
 import 'bytes.dart';
 
 const int maxAvatar = 16 * 1024;
@@ -81,3 +84,45 @@ String avatarInitials(String? name) => jsUpper(
 
 String settingsInitials(String login) =>
     jsUpper(login.substring(0, math.min(2, login.length)));
+
+const int _avatarSize = 160;
+
+img.Image? _scaled(Uint8List bytes) {
+  final decoded = img.decodeImage(bytes);
+  if (decoded == null) return null;
+  final src = img.bakeOrientation(decoded);
+  final side = math.min(src.width, src.height);
+  final crop = img.copyCrop(
+    src,
+    x: (src.width - side) ~/ 2,
+    y: (src.height - side) ~/ 2,
+    width: side,
+    height: side,
+  );
+  final small = img.copyResize(
+    crop,
+    width: _avatarSize,
+    height: _avatarSize,
+    interpolation: img.Interpolation.average,
+  );
+  final canvas = img.Image(width: _avatarSize, height: _avatarSize);
+  img.fill(canvas, color: img.ColorRgb8(0, 0, 0));
+  img.compositeImage(canvas, small);
+  return canvas;
+}
+
+String? _encodeAvatar(Uint8List bytes) {
+  final canvas = _scaled(bytes);
+  if (canvas == null) return null;
+  for (var q = 0.85; q > 0.2; q -= 0.15) {
+    final s = b64(img.encodeJpg(canvas, quality: (q * 100).round()));
+    if (isAvatar(s)) return s;
+  }
+  return null;
+}
+
+Future<String> makeAvatar(Uint8List bytes) async {
+  final s = await compute(_encodeAvatar, bytes);
+  if (s == null) throw StateError('avatar too large');
+  return s;
+}

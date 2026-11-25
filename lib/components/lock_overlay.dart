@@ -18,13 +18,20 @@ class LockOverlay extends StatelessWidget {
       return Semantics(
         container: true,
         scopesRoute: true,
+        explicitChildNodes: true,
         namesRoute: true,
         label: t('locked'),
         child: ScrollCenter(
           children: [
             const AppIcon(),
-            Text('Ripplo', style: brandH1(context)),
-            Text(t('locked'), style: rs(context, RipploText.body, c.text2)),
+            Nudge(-1, child: Text('Ripplo', style: brandH1(context))),
+            Nudge(
+              -1,
+              child: Text(
+                t('locked'),
+                style: rs(context, RipploText.body, c.text2),
+              ),
+            ),
             ConstrainedBox(
               constraints: const BoxConstraints(minWidth: 200),
               child: IntrinsicWidth(

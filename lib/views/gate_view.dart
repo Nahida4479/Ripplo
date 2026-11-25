@@ -119,11 +119,14 @@ class _GateViewState extends State<GateView> {
             RRow(
               children: [
                 Lucide(icon, size: 22, strokeWidth: 1.75),
-                Expanded(child: RLabel(t(label))),
-                RChip(
-                  t('perm_${_perms[k] ?? 'prompt'}'),
-                  kind: _kind(_perms[k]),
-                  icon: _perms[k] == 'granted' ? LucideIcons.check : null,
+                Expanded(child: Nudge(-1, child: RLabel(t(label)))),
+                Nudge(
+                  -1,
+                  child: RChip(
+                    t('perm_${_perms[k] ?? 'prompt'}'),
+                    kind: _kind(_perms[k]),
+                    icon: _perms[k] == 'granted' ? LucideIcons.check : null,
+                  ),
                 ),
               ],
             ),
@@ -132,11 +135,11 @@ class _GateViewState extends State<GateView> {
       return ScrollCenter(
         children: [
           const AppIcon(),
-          Text('Ripplo', style: brandH1(context)),
-          RCenterText(t('gateWhy')),
+          Nudge(-1, child: Text('Ripplo', style: brandH1(context))),
+          Nudge(-1, child: RCenterText(t('gateWhy'))),
           Narrow(
-            child: Align(
-              alignment: Alignment.centerLeft,
+            child: Padding(
+              padding: const EdgeInsets.only(bottom: kCardMarginBottom),
               child: RCard(
                 marginBottom: 0,
                 children: [
@@ -150,26 +153,33 @@ class _GateViewState extends State<GateView> {
                         strokeWidth: 1.75,
                       ),
                       Expanded(
-                        child: Text.rich(
-                          TextSpan(
-                            children: [
-                              TextSpan(
-                                text: t('allowBackground'),
-                                style: rs(context, RipploText.rowLabel),
-                              ),
-                              const TextSpan(text: '\n'),
-                              TextSpan(
-                                text: t('optional'),
-                                style: rs(context, RipploText.rowHint, c.text2),
-                              ),
-                            ],
-                          ),
-                          textAlign: TextAlign.left,
-                          strutStyle: const StrutStyle(
-                            fontSize: 15,
-                            height: 1.4,
-                            forceStrutHeight: true,
-                            leadingDistribution: TextLeadingDistribution.even,
+                        child: Nudge(
+                          1,
+                          child: Text.rich(
+                            TextSpan(
+                              children: [
+                                TextSpan(
+                                  text: t('allowBackground'),
+                                  style: rs(context, RipploText.rowLabel),
+                                ),
+                                const TextSpan(text: '\n'),
+                                TextSpan(
+                                  text: t('optional'),
+                                  style: rs(
+                                    context,
+                                    RipploText.rowHint,
+                                    c.text2,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            textAlign: TextAlign.left,
+                            strutStyle: const StrutStyle(
+                              fontSize: 15,
+                              height: 1.4,
+                              forceStrutHeight: true,
+                              leadingDistribution: TextLeadingDistribution.even,
+                            ),
                           ),
                         ),
                       ),

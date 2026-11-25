@@ -90,27 +90,36 @@ class _OnboardingViewState extends State<OnboardingView> {
       final native = widget.native ?? mesh.isNative;
       return ScrollCenter(
         children: [
-          Lucide(LucideIcons.keyRound, size: 48, strokeWidth: 1.5, color: c.accent),
+          Lucide(
+            LucideIcons.keyRound,
+            size: 48,
+            strokeWidth: 1.5,
+            color: c.accent,
+          ),
           Text(t('welcome'), style: brandH1(context)),
           RCenterText(t('onboardHint')),
           Narrow(
             child: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: gapped([
-                RField(
-                  controller: _name,
-                  maxLength: 32,
-                  hint: t('yourName'),
-                  label: t('yourName'),
-                  onChanged: (_) => setState(() {}),
-                  onSubmitted: (_) => _go(),
-                ),
-                RBtn(
-                  text: t('generateIdentity'),
-                  onTap: _nameOk ? _go : null,
-                ),
-              ], 12, vertical: true),
+              children: gapped(
+                [
+                  RField(
+                    controller: _name,
+                    maxLength: 32,
+                    hint: t('yourName'),
+                    label: t('yourName'),
+                    onChanged: (_) => setState(() {}),
+                    onSubmitted: (_) => _go(),
+                  ),
+                  RBtn(
+                    text: t('generateIdentity'),
+                    onTap: _nameOk ? _go : null,
+                  ),
+                ],
+                12,
+                vertical: true,
+              ),
             ),
           ),
           if (native && _restoring)
@@ -118,28 +127,32 @@ class _OnboardingViewState extends State<OnboardingView> {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: gapped([
-                  Text(
-                    t('restoreHint'),
-                    textAlign: TextAlign.center,
-                    style: rs(context, RipploText.body, c.text2),
-                  ),
-                  RField(
-                    controller: _code,
-                    hint: t('recoveryCode'),
-                    label: t('recoveryCode'),
-                    keyboardType: TextInputType.number,
-                    onChanged: _onCode,
-                    onSubmitted: (_) => _restore(),
-                  ),
-                  if (_error.isNotEmpty)
+                children: gapped(
+                  [
                     Text(
-                      _error,
+                      t('restoreHint'),
                       textAlign: TextAlign.center,
-                      style: rs(context, RipploText.body, c.danger),
+                      style: rs(context, RipploText.body, c.text2),
                     ),
-                  RBtn(text: t('restore'), onTap: _codeOk ? _restore : null),
-                ], 12, vertical: true),
+                    RField(
+                      controller: _code,
+                      hint: t('recoveryCode'),
+                      label: t('recoveryCode'),
+                      keyboardType: TextInputType.number,
+                      onChanged: _onCode,
+                      onSubmitted: (_) => _restore(),
+                    ),
+                    if (_error.isNotEmpty)
+                      Text(
+                        _error,
+                        textAlign: TextAlign.center,
+                        style: rs(context, RipploText.body, c.danger),
+                      ),
+                    RBtn(text: t('restore'), onTap: _codeOk ? _restore : null),
+                  ],
+                  12,
+                  vertical: true,
+                ),
               ),
             )
           else if (native)

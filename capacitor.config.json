@@ -1,8 +1,0 @@
-{
-  "appId": "io.github.nahida4479.ripplo",
-  "appName": "Ripplo",
-  "webDir": "dist",
-  "android": { "allowMixedContent": false, "webContentsDebuggingEnabled": false },
-  "ios": { "contentInset": "never", "limitsNavigationsToAppBoundDomains": false },
-  "plugins": { "LocalNotifications": { "smallIcon": "ic_stat_ripplo", "iconColor": "#4f9cf9" } }
-}

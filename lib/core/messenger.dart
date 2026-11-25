@@ -211,12 +211,13 @@ abstract class _Base {
         }
       },
       notify: (id) {
-        if (!silentNow)
+        if (!silentNow) {
           this.notifier((
             title: contactOf(id)?.name ?? '',
             body: t('incomingCall'),
             chatId: null,
           ));
+        }
       },
       log: (id, reason, ms) {
         if (contactOf(id) == null) return;
@@ -463,8 +464,9 @@ abstract class _Base {
     var chat = chatOf(chatId);
     final peer = contactOf(chatId);
     if (truthy(peer?.request)) throw RipploError('no_chat');
-    if (chat == null && peer != null)
+    if (chat == null && peer != null) {
       chat = ensureChat(chatId, 'direct', peer.name);
+    }
     if (chat == null) throw RipploError('no_chat');
     return chat.type == 'group'
         ? [for (final x in chat.members ?? const []) x as String]
@@ -640,13 +642,15 @@ abstract class _Base {
           if (fresh != null) break;
         }
         final cur = state.neighbors.where((n) => n.node == node).firstOrNull;
-        if (fresh?['links'] != null && cur != null)
+        if (fresh?['links'] != null && cur != null) {
           cur['links'] = fresh!['links'];
+        }
       }),
     );
     final nb = state.neighbors.firstWhere((n) => n.node == node);
-    if (nb['card'] == null && helloCards.containsKey(node))
+    if (nb['card'] == null && helloCards.containsKey(node)) {
       nb['card'] = helloCards[node];
+    }
     if (i < 0) sendHello(node, nb['card'] == null);
   }
 
@@ -883,8 +887,9 @@ abstract class _Base {
   }
 
   Future<bool> resetSession(Contact c) async {
-    if (!truthy(c.card) || now() - (lastReset[c.id] ?? 0) < resetGap)
+    if (!truthy(c.card) || now() - (lastReset[c.id] ?? 0) < resetGap) {
       return false;
+    }
     lastReset[c.id] = now();
     final v = checkCard(unb64(c.card!));
     try {
@@ -906,8 +911,9 @@ abstract class _Base {
   Future<void> deleteChat(String chatId) async {
     for (final m in await db.msgs(chatId)) {
       final att = m['att'];
-      if (att is Map && att['attId'] is String)
+      if (att is Map && att['attId'] is String) {
         await db.del('blobs', att['attId'] as String);
+      }
       await db.delMsg(m['id'] as String);
     }
     state.messages.remove(chatId);
@@ -947,8 +953,9 @@ abstract class _Base {
       for (final n in state.neighbors.toList()) {
         final card = n['card'];
         final c = card is Map ? contactOf(card['id'] as String?) : null;
-        if (c == null || truthy(c.request))
+        if (c == null || truthy(c.request)) {
           fire(mesh.sendApp(n.node, utf8('{"t":"bye"}')));
+        }
       }
     }
     await db.put('kv', 'settings', {...state.settings});

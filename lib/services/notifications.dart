@@ -46,8 +46,9 @@ class Notifications {
   }
 
   Future<bool> _ask() async {
-    if ((await mesh.checkPermissions())['notifications'] == 'granted')
+    if ((await mesh.checkPermissions())['notifications'] == 'granted') {
       return true;
+    }
     return (await mesh.requestPermissions())['notifications'] == 'granted';
   }
 }

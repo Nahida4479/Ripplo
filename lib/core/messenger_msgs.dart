@@ -128,8 +128,9 @@ mixin _Msgs on _Base {
     if (raw is! Map ||
         !_msgWireId(raw['id']) ||
         raw['who'] is! String ||
-        !idRe.hasMatch(raw['who'] as String))
+        !idRe.hasMatch(raw['who'] as String)) {
       return null;
+    }
     final id = raw['id'] as String, who = raw['who'] as String;
     final out = <String, Object?>{
       'id': id,
@@ -192,8 +193,9 @@ mixin _Msgs on _Base {
     if (!kinds.contains(kind)) throw RipploError('bad_kind');
     if (file.bytes.length > maxFile) throw RipploError('too_big');
     final peer = contactOf(chatId);
-    if (peer != null && peer.addedVia != 'incoming' && !peer.cardAck)
+    if (peer != null && peer.addedVia != 'incoming' && !peer.cardAck) {
       throw RipploError('media_locked');
+    }
     final bytes = file.bytes;
     final attId = hex(random(16));
     await db.putBin('blobs', attId, bytes);
@@ -205,13 +207,15 @@ mixin _Msgs on _Base {
       'bytes': bytes,
     };
     final dur = duration ?? file.duration;
-    if (dur != null && isFiniteNum(dur) && dur > 0)
+    if (dur != null && isFiniteNum(dur) && dur > 0) {
       att['duration'] = _msgNum(dur > 3600 ? 3600 : dur);
+    }
     if (wave != null && wave.length <= maxWave) {
       att['wave'] = [for (final v in wave) toInt32(v).clamp(0, 255)];
     }
-    if (truthy(caption) && captionOf(caption) == null)
+    if (truthy(caption) && captionOf(caption) == null) {
       throw RipploError('too_long');
+    }
     final cap = captionOf(caption);
     final re = truthy(replyTo) ? localRef(chatId, replyTo!) : null;
     final o = newOutgoing(chatId, {
@@ -329,8 +333,9 @@ mixin _Msgs on _Base {
     }
     if (m == null ||
         m.from != 'me' ||
-        !const ['out_of_range', 'failed'].contains(m.status))
+        !const ['out_of_range', 'failed'].contains(m.status)) {
       return;
+    }
     final un = m.undelivered ?? const [];
     final recips = un.isNotEmpty
         ? [for (final x in un) x as String]
@@ -459,8 +464,9 @@ mixin _Msgs on _Base {
         final sender = contactOf(f);
         if (sender != null &&
             sender.addedVia == 'incoming' &&
-            !truthy(sender['cardSent']))
+            !truthy(sender['cardSent'])) {
           return;
+        }
         final aid = m['attId'],
             sha = m['sha256'],
             size = m['size'],
@@ -471,19 +477,22 @@ mixin _Msgs on _Base {
             !_msgAttIdRe.hasMatch(aid) ||
             !kinds.contains(m['kind']) ||
             sha is! String ||
-            !_msgShaRe.hasMatch(sha))
+            !_msgShaRe.hasMatch(sha)) {
           return;
+        }
         if (!isInt(size) ||
             (size as num) < 0 ||
             size > maxFile ||
             !isInt(chunks) ||
             (chunks as num) < 1 ||
-            chunks > maxChunks)
+            chunks > maxChunks) {
           return;
+        }
         if (key is! String ||
             unb64(key).length != 32 ||
-            routeChat(f, m) == null)
+            routeChat(f, m) == null) {
           return;
+        }
         await db.put('kv', 'ptr/$aid', {'f': f, 'msg': m, 'silent': silentNow});
         await tryFinish(aid);
       case 'unsend':
@@ -500,8 +509,9 @@ mixin _Msgs on _Base {
         if (sender == null ||
             truthy(sender.request) ||
             id is! String ||
-            id.length > 64)
+            id.length > 64) {
           return;
+        }
         String? text;
         try {
           text = await unpackLog(m);
@@ -563,8 +573,9 @@ mixin _Msgs on _Base {
         !_msgGroupRe.hasMatch(g) ||
         members is! List ||
         members.length < 2 ||
-        members.length > maxGroup + 1)
+        members.length > maxGroup + 1) {
       return;
+    }
     final name = cleanName(msg['name']);
     if (name.isEmpty) return;
     List<ParsedCard> cards;
@@ -578,8 +589,9 @@ mixin _Msgs on _Base {
     final existing = chatOf(g);
     if (existing != null &&
         (existing.type != 'group' ||
-            !(existing.members ?? const []).contains(f)))
+            !(existing.members ?? const []).contains(f))) {
       return;
+    }
     for (final v in cards) {
       if (v.id != me.id) await learnCard(v, 'group');
     }
@@ -607,8 +619,9 @@ mixin _Msgs on _Base {
     if (m != null) m['unsent'] = true;
     if (i >= 0) list!.removeAt(i);
     final att = m?['att'];
-    if (att is Map && att['attId'] is String)
+    if (att is Map && att['attId'] is String) {
       await db.del('blobs', att['attId'] as String);
+    }
     await db.delMsg(localId);
     for (final x in (list ?? const <Msg>[]).toList()) {
       final re = x.re;
@@ -698,8 +711,9 @@ mixin _Msgs on _Base {
   @override
   Future<ObsList<Msg>> loadMessages(String chatId) async {
     if (loaded.contains(chatId)) {
-      if (state.msgs(chatId) == null)
+      if (state.msgs(chatId) == null) {
         state.messages[chatId] = state.list<Msg>();
+      }
       return state.msgs(chatId)!;
     }
     loaded.add(chatId);
@@ -710,8 +724,9 @@ mixin _Msgs on _Base {
       if (mem.containsKey(r['id']) ||
           att is! Map ||
           att['bytes'] != null ||
-          att['attId'] is! String)
+          att['attId'] is! String) {
         continue;
+      }
       final bytes = await db.getBin('blobs', att['attId'] as String);
       if (bytes != null) att['bytes'] = bytes;
     }
@@ -796,16 +811,18 @@ mixin _Msgs on _Base {
         total > maxChunks ||
         index >= total ||
         bytes.isEmpty ||
-        bytes.length > chunkSize)
+        bytes.length > chunkSize) {
       return;
+    }
     await dropExpired();
     final meta =
         pending[aid] ?? {'ts': now(), 'total': total, 'count': 0, 'bytes': 0};
     final key = '$aid/$index';
     if (meta['total'] != total ||
         await db.has('chunks', key) ||
-        pendingBytes() + bytes.length > maxPending)
+        pendingBytes() + bytes.length > maxPending) {
       return;
+    }
     await db.putBin('chunks', key, bytes);
     meta['count'] = (meta['count'] as int) + 1;
     meta['bytes'] = (meta['bytes'] as int) + bytes.length;
@@ -820,8 +837,9 @@ mixin _Msgs on _Base {
     final meta = pending[aid];
     if (ptr is! Map ||
         meta == null ||
-        (meta['count'] as num) < (meta['total'] as num))
+        (meta['count'] as num) < (meta['total'] as num)) {
       return;
+    }
     final f = ptr['f'] as String;
     final msg = Map<String, Object?>.from(ptr['msg'] as Map);
     final silent = ptr['silent'];
@@ -832,8 +850,9 @@ mixin _Msgs on _Base {
         parts.add((await db.getBin('chunks', '$aid/$i'))!);
       }
       final ct = concat(parts);
-      if (!equal(c.sha256.convert(ct).bytes, unhex(msg['sha256'] as String)))
+      if (!equal(c.sha256.convert(ct).bytes, unhex(msg['sha256'] as String))) {
         throw StateError('hash');
+      }
       final plain = await decryptFile(ct, unb64(msg['key'] as String));
       if (plain.length != msg['size']) throw StateError('size');
       final mime = safeMime(msg['mime']);
@@ -846,11 +865,13 @@ mixin _Msgs on _Base {
         'bytes': plain,
       };
       final dur = msg['duration'];
-      if (isFiniteNum(dur) && (dur as num) > 0)
+      if (isFiniteNum(dur) && (dur as num) > 0) {
         att['duration'] = _msgNum(dur > 3600 ? 3600 : dur);
+      }
       final wave = msg['wave'];
-      if (wave is String && wave.length <= 96 && _msgWaveRe.hasMatch(wave))
+      if (wave is String && wave.length <= 96 && _msgWaveRe.hasMatch(wave)) {
         att['wave'] = unb64(wave).toList();
+      }
       final caption = captionOf(msg['text']);
       final re = parseRe(msg['re']);
       silentNow = truthy(silent);

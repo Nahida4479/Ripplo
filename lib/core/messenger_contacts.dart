@@ -116,12 +116,13 @@ mixin _Contacts on _Base {
       if (fresh) {
         c['notified'] = true;
         await persistContact(c);
-        if (!silentNow)
+        if (!silentNow) {
           notifier((
             title: t('inviteNotifyTitle'),
             body: t('inviteNotifyBody', {'name': c.name}),
             chatId: null,
           ));
+        }
       }
       return;
     }
@@ -131,8 +132,9 @@ mixin _Contacts on _Base {
         return;
       }
       await becomeContact(c, 'people');
-      if (m?['t'] == 'invite')
+      if (m?['t'] == 'invite') {
         fire(buildPacket(c, {'t': 'accept'}).then((p) => transmit(p)));
+      }
     }
     await onAppMessage(f, msg);
   }
@@ -143,8 +145,9 @@ mixin _Contacts on _Base {
     final data = e.data;
     final raw = data is Map ? data['tag'] : null;
     final tag = raw is String ? raw : null;
-    if (!const ['bad_message', 'no_session'].contains(e.code) || !truthy(tag))
+    if (!const ['bad_message', 'no_session'].contains(e.code) || !truthy(tag)) {
       return;
+    }
     Contact? c;
     for (final x in _allContacts) {
       if (hex(tagOf(x)) == tag) {
@@ -389,8 +392,9 @@ mixin _Contacts on _Base {
         'ik': b64(v.ik),
         'card': b64(v.card),
       };
-      if (helloCards.length >= maxHellos && !helloCards.containsKey(from))
+      if (helloCards.length >= maxHellos && !helloCards.containsKey(from)) {
         helloCards.remove(helloCards.keys.first);
+      }
       helloCards[from] = card;
       byed.remove(from);
       if (nb != null) nb['card'] = card;
@@ -411,8 +415,9 @@ mixin _Contacts on _Base {
         fire(verifyNearby(v.id));
       }
       if (truthy(msg['r']) ||
-          (state.settings.hidden && !greeted.contains(from)))
+          (state.settings.hidden && !greeted.contains(from))) {
         sendHello(from, false);
+      }
     } else if (nb == null) {
       return;
     } else if (t == 'bye') {
@@ -434,8 +439,9 @@ mixin _Contacts on _Base {
         final cc = fromId is String ? contactOf(fromId) : null;
         if (cc != null) ik = unb64(cc.ik!);
       }
-      if (n.length != 32 || ik == null || deriveIds(ik).ripploId != fromId)
+      if (n.length != 32 || ik == null || deriveIds(ik).ripploId != fromId) {
         return;
+      }
       final mac = await mesh.signalProof(ik, n, deriveIds(ik).tag, me.tag);
       await mesh.sendApp(
         from,
@@ -508,8 +514,9 @@ mixin _Contacts on _Base {
     final cur = contactOf(id);
     if (cur == null) return false;
     if (ok) {
-      if (cur.verification == 'none' || cur.verification == 'nearby')
+      if (cur.verification == 'none' || cur.verification == 'nearby') {
         cur.verification = cur.addedVia == 'qr' ? 'qr' : 'nearby';
+      }
       cur.verifiedAt = now();
       cur.verifyState = 'idle';
     } else {
@@ -549,8 +556,9 @@ mixin _Contacts on _Base {
     if (c == null) return false;
     final text = '$scanned';
     final digits = text.replaceAll(_jsSpace, '');
-    if (_digits60.hasMatch(digits))
+    if (_digits60.hasMatch(digits)) {
       return digits == await safetyNumber(id) && await setVerified(id, 'qr');
+    }
     try {
       final v = parseLink(text);
       return b64(v.ik) == c.ik && await setVerified(id, 'qr');

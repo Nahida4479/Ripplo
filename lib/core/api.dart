@@ -1,4 +1,5 @@
 import '../mesh/bridge.dart';
+import '../util/js.dart' as js;
 import 'messenger.dart';
 import 'state.dart';
 
@@ -8,9 +9,19 @@ const _devProfile = String.fromEnvironment('RIPPLO_PROFILE');
 
 final state = RipploState();
 
+Notifier? notifySink;
+
 final core = Core(
   mesh: mesh,
   state: state,
+  notifier: (n) {
+    final sink = notifySink;
+    if (sink != null) {
+      sink(n);
+    } else {
+      js.fire(mesh.notify(n.title, n.body, n.chatId));
+    }
+  },
   dbName: !mesh.isNative && _devProfile.isNotEmpty
       ? 'ripplo-$_devProfile'
       : 'ripplo',

@@ -18,23 +18,32 @@ void main() {
 
   test('backupMeta carries app version, clock and ripploId', () {
     js.now = () => 42;
-    final s = RipploState()..profile = {'tag': 't', 'ripploId': 'rid', 'name': 'n'};
-    expect(backupMeta(s, '1.0'), {'app': '1.0', 'created': 42, 'ripploId': 'rid'});
+    final s = RipploState()
+      ..profile = {'tag': 't', 'ripploId': 'rid', 'name': 'n'};
+    expect(backupMeta(s, '1.0'), {
+      'app': '1.0',
+      'created': 42,
+      'ripploId': 'rid',
+    });
     expect(backupMeta(RipploState(), '1.0'), {'app': '1.0', 'created': 42});
   });
 
-  test('autoBackup creates an auto backup only when enabled with a folder', () async {
-    final m = FakeMesh()..backupStatusResult = {'enabled': true, 'folder': 'f'};
-    await autoBackup(m, RipploState(), '1.0');
-    expect(m.created.length, 1);
-    expect(m.created.single.$1, 'auto');
+  test(
+    'autoBackup creates an auto backup only when enabled with a folder',
+    () async {
+      final m = FakeMesh()
+        ..backupStatusResult = {'enabled': true, 'folder': 'f'};
+      await autoBackup(m, RipploState(), '1.0');
+      expect(m.created.length, 1);
+      expect(m.created.single.$1, 'auto');
 
-    m.backupStatusResult = {'enabled': true, 'folder': ''};
-    await autoBackup(m, RipploState(), '1.0');
-    m.backupStatusResult = {'enabled': false, 'folder': 'f'};
-    await autoBackup(m, RipploState(), '1.0');
-    expect(m.created.length, 1);
-  });
+      m.backupStatusResult = {'enabled': true, 'folder': ''};
+      await autoBackup(m, RipploState(), '1.0');
+      m.backupStatusResult = {'enabled': false, 'folder': 'f'};
+      await autoBackup(m, RipploState(), '1.0');
+      expect(m.created.length, 1);
+    },
+  );
 
   test('autoBackup does nothing off device and swallows failures', () async {
     final off = FakeMesh(isNative: false);

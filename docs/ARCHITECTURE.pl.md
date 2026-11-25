@@ -3,17 +3,17 @@
 [🇬🇧 English](ARCHITECTURE.md) | 🇵🇱 Polski
 
 Ripplo to komunikator mesh typu offline-first, z szyfrowaniem end-to-end.
-Interfejs Vue 3 (JS) działa w WebView Capacitor 8. Kryptografia Signal (oficjalna `libsignal`), transporty i router
-przekaźnikowy są natywne (Java / Swift), więc klucze prywatne nigdy nie trafiają do WebView, a telefony przekazują
-wiadomości także przy wyłączonym ekranie.
+Interfejs i rdzeń aplikacji to Flutter 3.50 (Dart). Kryptografia Signal (oficjalna `libsignal`), transporty i router
+przekaźnikowy są natywne (Kotlin / Swift), więc prywatne klucze Signal nigdy nie opuszczają kodu natywnego, a telefony przekazują
+wiadomości także przy wyłączonym ekranie. Aplikacja Dart i kod natywny rozmawiają przez MethodChannel (§9).
 
 ```
-┌──────────────── WebView (JS) ────────────────┐      ┌──────── native (Java / Swift) ──────────┐
-│ Vue UI ── core/api.js ── core/messenger.js   │      │ SignalCore (libsignal 0.108.5: PQXDH +   │
+┌─────────────── Flutter (Dart) ───────────────┐      ┌─────── native (Kotlin / Swift) ─────────┐
+│ Widgets ── core/api.dart ── core/messenger   │      │ SignalCore (libsignal 0.108.5: PQXDH +   │
 │   (cards, chats, attachments, at-rest DB)    │ base64│   SPQR triple ratchet, sealed, proofs)  │
-│            mesh/bridge.js ───────────────────┼──────►│ MeshEngine: Router + Links + Transports │
-│  web dev fallback: devSignal.js (NO crypto)  │◄──────┤  BLE GATT, L2CAP, LAN, Wi-Fi Direct*,   │
-│   + mesh/router.js over BroadcastChannel     │events │  Wi-Fi Aware*, Multipeer**              │
+│   mesh/bridge.dart (MethodChannel) ──────────┼──────►│ MeshEngine: Router + Links + Transports │
+│  desktop dev: dev_mesh.dart (NO crypto)      │◄──────┤  BLE GATT, L2CAP, LAN, Wi-Fi Direct*,   │
+│   + mesh/router.dart over UDP loopback       │events │  Wi-Fi Aware*, Multipeer**              │
 └──────────────────────────────────────────────┘      └──────────────────────────────────────────┘
                                                         * Android only   ** iOS only
 ```
@@ -48,7 +48,7 @@ Przekaźniki nigdy nie widzą treści, nigdy nie odszyfrowują i nigdy nie powia
 | 1569 | kyber public key (`KEMPublicKey.serialize()`, type byte `0x08` + 1568) |
 | 64   | kyber signature |
 
-### Wizytówka kontaktu (JS) i link zaproszenia / QR
+### Wizytówka kontaktu (Dart) i link zaproszenia / QR
 
 `card = 0x02 | nameLen u8 | name UTF-8 (≤ 120 bytes, ≤ 40 chars) | bundle(1776)`
 
@@ -100,17 +100,17 @@ Zeskanowanie albo otwarcie linku (`qr`, `link`) od razu wysyła też do wystawcy
    Odbiorca odszyfrowuje swoim kluczem prywatnym tożsamości, a następnie uruchamia deszyfrowanie Signal dla
    adresu `hex(senderTag)`. Wiadomość PreKey, której klucz tożsamości nie daje skrótu równego `senderTag`,
    jest odrzucana przed deszyfrowaniem.
-3. **Załączniki** (w stylu Signal, w JS): plik jest szyfrowany raz losowym kluczem AES-256-GCM
+3. **Załączniki** (w stylu Signal, w Dart, `lib/crypto/attachment.dart`): plik jest szyfrowany raz losowym kluczem AES-256-GCM
    (`ct = nonce(12) | GCM(file)`). `ct` jest dzielony na fragmenty po 32 KiB wysyłane jako osobne pakiety DATA.
    Klucz, `SHA-256(ct)`, typ mime, rozmiar i liczba fragmentów podróżują w wiadomości-wskaźniku zaszyfrowanej
    protokołem Signal, wysyłanej **po** potwierdzeniu (ACK) każdego fragmentu. Odbiorca weryfikuje skrót przed odszyfrowaniem.
 4. **Dane w spoczynku**: stan Signal (tożsamość, prekeye, sesje, tożsamości) jest przechowywany natywnie jako pliki,
    każdy zaszyfrowany AES-256-GCM kluczem trzymanym w Android Keystore / iOS Keychain
-   (`AfterFirstUnlockThisDeviceOnly`). IndexedDB w JS (wiadomości, kontakty, czaty) jest szyfrowane AES-GCM
-   kluczem bazy danych z `RipploMesh.getDbKey()`.
-5. **Wersja webowa do developmentu**: `src/mesh/devSignal.js` zastępuje natywne wywołania Signal jawnym
-   zamiennikiem, aby dwie karty przeglądarki mogły ćwiczyć interfejs. NIE zapewnia żadnego bezpieczeństwa,
-   a interfejs to komunikuje.
+   (`AfterFirstUnlockThisDeviceOnly`). Rekordy po stronie Dart (wiadomości, kontakty, czaty) są zaszyfrowane AES-GCM
+   przez `lib/crypto/vault.dart` kluczem bazy danych z `getDbKey` i zapisywane w natywnym magazynie SQLite (§12.1).
+5. **Wersja desktopowa do developmentu**: `lib/mesh/dev_signal.dart` (używany przez `lib/mesh/dev_mesh.dart`) zastępuje natywne wywołania Signal jawnym
+   zamiennikiem, aby dwie instancje na pulpicie mogły ćwiczyć interfejs. NIE zapewnia żadnego bezpieczeństwa (klucz bazy leży w zwykłym pliku),
+   a interfejs to komunikuje. Wersje release nigdy go nie używają: `DevMesh` rzuca wyjątek w trybie release, a `main.dart` wybiera `MeshBridge` na Androidzie, iOS i w każdej wersji release.
 
 Numer bezpieczeństwa (safety number): `NumericFingerprintGenerator(5200).createFor(1, myTag, myIk, theirTag, theirIk)`,
 wyświetlane 60 cyfr (identyczne po obu stronach, na obu platformach).
@@ -144,7 +144,7 @@ Maksymalny pakiet to 65 536 bajtów. Typy:
 | 12   | DEAD_END    | id of the DATA/DISCOVER     | backward, aggregated |
 | 13   | DISCOVER    | zeros (broadcast)           | flood |
 | 14   | REPLY       | id of the DISCOVER          | backward (reverse path) |
-| 20   | APP         | zeros                       | link-local, handed to JS |
+| 20   | APP         | zeros                       | link-local, handed to the app |
 
 Pierwszy bajt payloadu DATA: `0x01` wiadomość sealed, `0x02` fragment załącznika
 (`0x02 | attId(16) | index u32 | total u32 | bytes`).
@@ -157,19 +157,19 @@ potrafi odczytać, zostaje sąsiadem i jest pokazany w Ustawieniach jako „Wyma
 
 Brak limitu przeskoków. Wartości domyślne: wpisy seen/reverse/route wygasają po 10 min, limit pamięci podręcznej seen to 20 000.
 
-### 3.1 Router (identyczny w `src/mesh/router.js`, Kotlin i Swift)
+### 3.1 Router (identyczny w `lib/mesh/router.dart`, `Router.kt` i `Router.swift`)
 
 Stan: zbiór `seen` par `(type,id)`, `reverse[id] = {prev, dest, pending, done}`,
-`routes[destTag] = neighbor`, tag `self`. `prev = SELF` dla pakietów, które pochodzą z lokalnego JS.
+`routes[destTag] = neighbor`, tag `self`. `prev = SELF` dla pakietów, które pochodzą z lokalnej aplikacji (Dart).
 
 ```
-onPacket(p, from):                       # from = neighbor nodeTag, or SELF for JS-originated
-  APP                -> deliver to JS (from)
+onPacket(p, from):                       # from = neighbor nodeTag, or SELF for app-originated
+  APP                -> deliver to the app (from)
   DATA | DISCOVER:
     if seen(p): if from != SELF: send DEAD_END(dest=p.id) to from;  return
     mark seen; reverse[p.id] = {prev: from, dest: p.dest, pending: 0, done: false}
     if DATA and p.dest == self: persist to inbox; send ACK(dest=p.id, hops=0) to from; deliver; return
-    if DISCOVER and from != SELF: deliver to JS          # JS may answer with REPLY
+    if DISCOVER and from != SELF: deliver to the app     # the app may answer with REPLY
     q = copy(p); if from != SELF: q.hops = min(p.hops+1, 255)
     targets = DATA and routes[p.dest] alive and != from ? [routes[p.dest]] : neighbors - from
     if targets empty: deadEnd(p.id); return
@@ -179,28 +179,36 @@ onPacket(p, from):                       # from = neighbor nodeTag, or SELF for 
     r = reverse[p.dest]; if !r: return
     if ACK: routes[r.dest] = from (unless from == SELF); r.done = true
     q = copy(p) with hops+1          # hops = links traversed; a direct neighbor gives 1
-    if r.prev == SELF: deliver q to JS  else: send q to r.prev
+    if r.prev == SELF: deliver q to the app  else: send q to r.prev
   DEAD_END:
     if seen(p): return; mark seen
     r = reverse[p.dest]; if !r or r.done: return
     r.pending -= 1; if r.pending <= 0: deadEnd(p.dest)
 
 deadEnd(id):  r = reverse[id]; r.done = true
-              if r.prev == SELF: deliver DEAD_END(dest=id) to JS   # JS deliveries for own traffic use from = 'self'
+              if r.prev == SELF: deliver DEAD_END(dest=id) to the app   # deliveries for own traffic use from = 'self'
               else send DEAD_END(new id, dest=id) to r.prev
 ```
 
 Dlaczego wiadomości nie mogą krążyć w pętli: każdy węzeł przekazuje dany `id` najwyżej raz (zbiór seen), więc pakiet nigdy nie przejdzie dwa razy przez ten sam telefon, a duplikaty dostają w odpowiedzi DEAD_END zamiast być przekazywane dalej.
 Gdy wszystkie gałęzie wygasną, DEAD_END-y agregują się z powrotem do nadawcy, który pokazuje *„Kontakt jest poza zasięgiem sieci mesh”*.
-Nie ma limitu przeskoków, więc wiadomość przejdzie przez dowolnie długi łańcuch telefonów. JS rezygnuje też po 5 min bez ACK/DEAD_END (łącza mogą zniknąć w trakcie przesyłu).
+Nie ma limitu przeskoków, więc wiadomość przejdzie przez dowolnie długi łańcuch telefonów. Aplikacja rezygnuje też po 60 s bez ACK/DEAD_END (łącza mogą zniknąć w trakcie przesyłu); fragmenty załączników czekają 20 s i są wysyłane ponownie do 4 razy ze świeżymi identyfikatorami pakietów.
 
 ACK wracający trasą uczy każdy przekaźnik `routes[dest] = neighbor`, więc kolejne pakiety (np. fragmenty
 multimediów) idą unicastem wyuczoną ścieżką zamiast być zalewane (flood).
 
-Przekaźniki nigdy nie przekazują przekazywanych pakietów DATA do JS i nigdy nie powiadamiają użytkownika (wymaganie: żadnego spamu
+Przekaźniki nigdy nie przekazują przekazywanych pakietów DATA do aplikacji i nigdy nie powiadamiają użytkownika (wymaganie: żadnego spamu
 „wiadomość przeszła przez twój telefon”).
 
 Limity nadużyć (native): maks. 200 pakietów/s na sąsiada, maks. 32 MiB w kolejce na łącze, odrzucanie nadmiaru.
+
+Implementacje. `lib/mesh/router.dart` to router w Dart: uruchamiają go desktopowa sieć deweloperska (`lib/mesh/dev_mesh.dart`) i testy, a na telefonach
+aplikacja używa routera natywnego przez most. Musi zachowywać się dokładnie jak `Router.kt` i `Router.swift`; zmiana routera trafia do
+wszystkich trzech w tym samym commicie. Różnice znalezione przy portowaniu, istniejące już przed portem i jeszcze nieujednolicone:
+- hak zapisu do skrzynki (`host.persist`, DATA dla tego węzła jest zapisywane przed ACK) istnieje tylko w Kotlinie; Dart i Swift nie mają takiego haka;
+- Swift najpierw dostarcza DATA dla tego węzła do aplikacji, a dopiero potem wysyła ACK, czyli odwrotnie niż w opisie powyżej (Kotlin i Dart najpierw ACK);
+- Kotlin i Swift inaczej niż wzorzec (`router.dart`, port dawnego routera JS) traktują nieudane wysłanie do wybranego celu (rozliczanie `DEAD_END`) oraz wygasanie
+  i usuwanie nadmiaru `seen`: wzorzec wygasza wpisy `seen`, `reverse` i `routes` po 10 min, a po przekroczeniu limitu 20 000 usuwa najstarsze wpisy `seen`.
 
 ## 4. Łącza i wybór prędkości
 
@@ -314,9 +322,9 @@ niczego nie zmieniają w uprawnieniach: bramkowanie multimediów z sekcji 6.1 na
 
 ### Wiadomości głosowe
 
-Nagrywane przez `MediaRecorder` (`audio/webm;codecs=opus`, w razie braku `audio/mp4`, `audio/ogg`), paczki co 250 ms.
-Pasek poziomu na żywo (analizator WebAudio) zasila kreski podczas nagrywania oraz `wave`, do 64 bajtów (40 używanych),
-każdy 0-255 względem najgłośniejszej próbki. Prawdziwy czas jest mierzony, a nie czytany z Blob. Wiadomość-wskaźnik niesie
+Nagrywane pakietem `record` (`AudioRecorder`, AAC-LC, `audio/mp4`) do pliku tymczasowego w `cache/att/` (§12.5), który po zakończeniu
+nagrywania jest odczytywany i usuwany. Amplituda próbkowana co 100 ms zasila kreski podczas nagrywania oraz `wave`, do 64 bajtów (40 używanych),
+każdy 0-255 względem najgłośniejszej próbki. Prawdziwy czas jest mierzony zegarem, a nie czytany z pliku. Wiadomość-wskaźnik niesie
 `duration` (s, ≤ 3600) i `wave` (base64, ≤ 96 znaków); odbiorca waliduje oba i rysuje kreski z `wave`. Nagranie krótsze niż
 ~800 bajtów lub ze szczytem < 0.02 nie jest wysyłane („Nie nagrano dźwięku”).
 
@@ -390,7 +398,7 @@ harmonogram: okno 02:00-05:00 czasu lokalnego jest pocięte na 720 slotów po 15
 który spał w swoim slocie, skanuje, gdy tylko aplikacja obudzi się w oknie, najwyżej raz na 20 h. Czas ostatniego skanu jest zapisywany (`kv/peopleRefreshedAt`), więc nagłówek
 pokazuje go, a limit 20 h działa także po restarcie.
 Wyszukiwanie kończy się po 30 s albo wcześniej, gdy przyszedł zagregowany DEAD_END i przez 10 s nie dotarła żadna
-odpowiedź REPLY (telefon na końcu łańcucha od razu odsyła ślepy zaułek, ale jego REPLY buduje JS chwilę później, więc
+odpowiedź REPLY (telefon na końcu łańcucha od razu odsyła ślepy zaułek, ale jego REPLY buduje aplikacja chwilę później, więc
 sam ślepy zaułek nie może kończyć wyszukiwania), albo od razu, gdy DISCOVER nie dotarł do żadnego sąsiada. Osoba dodana stąd jest
 niezweryfikowana (przekaźnik mógł podmienić wizytówkę) i dostaje to samo ostrzeżenie co przy linku zaproszenia.
 
@@ -411,31 +419,59 @@ protokołem Signal, tylko do kontaktów, które odpowiedziały i są bezpośredn
 nie trafia do skrzynki ani powiadomienia, a Android odrzuca go, gdy interfejs jest odłączony. Odbiorca pokazuje w tym czacie trzy animowane
 kropki przez 5 s (lub do nadejścia wiadomości), ignoruje je od kogoś, kto nie jest zaakceptowanym kontaktem, i ignoruje starsze niż 5 s.
 
-## 9. Kontrakt wtyczki natywnej — `RipploMesh` (Capacitor)
+## 9. Kontrakt mostu natywnego — `ripplo/mesh` (MethodChannel)
 
-Wartości binarne to ciągi base64 (standardowego); tagi węzłów to małe litery hex.
+Strona Dart: `lib/mesh/bridge.dart` (interfejs `Mesh`, `MeshBridge` na kanałach, `DevMesh` zamiast niego w buildach deweloperskich na pulpicie).
+Strona natywna: `RipploMeshPlugin.kt` (Android, `FlutterPlugin`) i `RipploMeshPlugin.swift` (iOS), z tymi samymi nazwami metod.
+
+Kanały: `MethodChannel('ripplo/mesh', JSONMethodCodec())` dla wywołań i `EventChannel('ripplo/mesh/events', JSONMethodCodec())` dla zdarzeń.
+Argumenty i wyniki to obiekty JSON. Wartości binarne to ciągi base64 (standardowego); tagi węzłów to małe litery hex. Warstwa natywna wykonuje każde wywołanie poza
+głównym wątkiem. Błąd wraca jako `PlatformException(code, message)`, który `MeshBridge` rzuca ponownie jako `MeshError(code, message)`; nieznana metoda odpowiada
+`notImplemented`. Wywołania opcjonalne i diagnostyczne (`getDiag`, `getTransports`, `getBleCaps`, `getDeviceInfo`, `usbLog`, `devConnect`, `isLocked`, `takeOpen`,
+`takeShare`, `fromPlay` oraz `setAutoUpdate` / `requestFullScreen` / `startRing`, gdy ich brak) nigdy nie rzucają po stronie Dart: zwracają pustą wartość.
 
 | method | args → result |
 |--------|---------------|
-| `start` | `{ selfTag }` → `{ nodeTag }` — starts transports + background service |
+| `start` | `{ selfTag, background? }` → `{ nodeTag }` — uruchamia transporty + usługę w tle (`background` domyślnie true; `MeshBridge` wysyła tylko `selfTag`) |
 | `stop` | – |
-| `send` | `{ packet }` → `{ neighbors }` — JS-originated DATA/DISCOVER/REPLY (`from = SELF`) |
-| `sendApp` | `{ node, payload }` — link-local APP packet to one neighbor |
+| `send` | `{ packet }` → `{ neighbors }` — DATA/DISCOVER/REPLY pochodzące z aplikacji (`from = SELF`) |
+| `sendApp` | `{ node, payload }` — pakiet APP link-local do jednego sąsiada; odrzuca `no link`, gdy łącza nie ma |
 | `getNeighbors` | → `{ neighbors: [{ node, medium, kbps, rttMs, links: [{medium,kbps,rttMs,outbound}], seen: [medium] }] }` — `seen` = media, na których sąsiad został wykryty w ostatnich 2 min (LAN, Wi-Fi Direct, Wi-Fi Aware) bez otwartego łącza; zakładka Znajdź osoby pokazuje je jako wyszarzone plakietki bez ptaszka |
 | `devConnect` / `devDisconnect` | Tryb dewelopera: `{ node, spec }` → `{ started }` wymusza próbę połączenia z sąsiadem jednym medium (`lan`, `wifi-direct`, `wifi-aware`, `ble:1m`, `ble:coded`), ignorując istniejące łącza i reguły inicjatora (BLE łączy się z niedawnymi trafieniami skanu, bo trafienie nie zawiera tagu węzła); `{ node, medium }` zamyka łącza tego medium |
 | `getBleCaps` | → `{ coded, extended }` (tylko informacja o obsłudze, bez przełącznika) |
-| `usbLog` | `{ text }` → `{ usb }`. Zapisuje tekst w logcat (tag `ripplo`) wyłącznie, gdy telefon jest podłączony przez USB z włączonym debugowaniem USB; w przeciwnym razie nic nie robi i zwraca `usb: false`. Przechodzi przez to każda linia diagnostyczna JS i zrzut „wyślij logi”, więc deweloper z `adb logcat` czyta je bez wysyłania czegokolwiek z telefonu. Gdy `usb` jest true, „wyślij logi” pomija odbiorcę |
-| `getDiag` / `clearDiag` / `getTransports` | Tryb dewelopera na Androidzie: dziennik diagnostyczny w pamięci (600 linii, te same co w logcat pod tagiem `ripplo`), jego czyszczenie oraz `{ transports: [{ name, running, unsupported }] }` |
-| `drainInbox` | → `{ packets: [{ packet, from }] }` — packets received while JS was not attached |
-| `getDbKey` | → `{ key }` 32 bytes, created once, stored with Keystore / Keychain |
-| `selfHash` | → `{ sha256 }` hex of the installed APK (Android only) |
-| `fromPlay` | → `{ play }` true, gdy pakiet instalujący to `com.android.vending` (Android). Wtedy JS pomija sprawdzanie aktualizacji i integralności, wyłącza `setAutoUpdate`, a Ustawienia → Aktualizacje pokazują tylko obecną wersję (§10) |
+| `usbLog` | `{ text }` → `{ usb }`. Zapisuje tekst w logcat (tag `ripplo`) wyłącznie, gdy telefon jest podłączony przez USB z włączonym debugowaniem USB; w przeciwnym razie nic nie robi i zwraca `usb: false`. Przechodzi przez to każda linia diagnostyczna aplikacji (`lib/core/diag.dart`) i zrzut „wyślij logi”, więc deweloper z `adb logcat` czyta je bez wysyłania czegokolwiek z telefonu. Gdy `usb` jest true, „wyślij logi” pomija odbiorcę |
+| `getDiag` / `clearDiag` / `getTransports` | Tryb dewelopera na Androidzie: `{ log }`, dziennik diagnostyczny w pamięci (600 linii, te same co w logcat pod tagiem `ripplo`), jego czyszczenie oraz `{ transports: [{ name, running, unsupported }] }` |
+| `getDeviceInfo` | → `{ text }` — wielowierszowy opis urządzenia, radiotelefonów (BLE, Coded PHY, Wi-Fi Aware / Direct) i stanu zasilania, pokazywany w karcie dewelopera i w zrzucie logów |
+| `drainInbox` | → `{ packets: [{ packet, from } lub { opened }] }` — pakiety odebrane, gdy aplikacja nie była podpięta; `opened` to rekord już odszyfrowany natywnie (§14) |
+| `isLocked` | → `{ locked }` — czy blokada ekranu urządzenia jest aktywna |
+| `keepAwake` | `{ on }` — Android: trzyma ekran włączony, gdy ekran połączenia jest pokazany nad ekranem blokady (§14) |
+| `endLockedCall` | – Android: kończy aktywność otwartą nad ekranem blokady po połączeniu odebranym z ekranu blokady (§14) |
+| `takeOpen` | → `{ open? }`, gdzie `open = { chatId, answer? }` — stuknięcie powiadomienia lub odebranie połączenia, które uruchomiło aplikację, czyszczone po odczycie; zdarzenie `open` to zapowiada |
+| `getDbKey` | → `{ key }` 32 bajty, tworzony raz, przechowywany w Keystore / Keychain |
+| `selfHash` | → `{ sha256 }` w hex zainstalowanego APK (tylko Android) |
+| `fromPlay` | → `{ play }` true, gdy pakiet instalujący to `com.android.vending` (Android). Wtedy aplikacja pomija sprawdzanie aktualizacji i integralności, wyłącza `setAutoUpdate`, a Ustawienia → Aktualizacje pokazują tylko obecną wersję (§10) |
 | `installUpdate` | `{ url, sha256, prompt? }` → `{ status }` — pobranie, weryfikacja SHA-256 i certyfikatu, instalacja. Odrzuca `install_permission` (przed pobraniem), gdy Ripplo nie ma zgody „instaluj nieznane aplikacje”; z `prompt` otwiera ten ekran ustawień |
 | `requestBatteryExemption` | – (Android) |
+| `requestFullScreen` | – (Android 14+) otwiera ustawienia specjalnego dostępu do powiadomień pełnoekranowych (§14) |
 | `startRing` / `stopRing` | – (Android) — dzwoni i wibruje przy połączeniu przychodzącym zgodnie z systemowymi ustawieniami dźwięku (§13) |
 | `takeShare` | → `{ share? }` — oczekująca zawartość z menu udostępniania Androida, czyszczona po odczycie |
 | `setAutoUpdate` | `{ enabled }` — Android: zapisuje ustawienie i planuje / anuluje zadanie aktualizacji w tle (§10) |
-| `checkPermissions` / `requestPermissions` | aliasy `bluetooth`, `wifi`, `notifications`, `microphone` (Android `RECORD_AUDIO`, pytane jawnie razem z pozostałymi i jeszcze raz przed połączeniem, niewymagane do wejścia do aplikacji); wynik zawiera też `battery` (`granted`, gdy aplikacja jest zwolniona z optymalizacji baterii, tylko Android; nie blokuje przejścia dalej) |
+| `checkPermissions` / `requestPermissions` | → `{ bluetooth, wifi, notifications, microphone, battery, fullscreen? }` z wartościami `granted` lub `prompt` (oraz innymi, jak zgłasza platforma). `microphone` to Android `RECORD_AUDIO`, pytane jawnie razem z pozostałymi i jeszcze raz przed połączeniem, niewymagane do wejścia do aplikacji; `battery` to `granted`, gdy aplikacja jest zwolniona z optymalizacji baterii (tylko Android; nie blokuje przejścia dalej); `fullscreen` jest na Androidzie 14+ |
+| `dbPut` / `dbPutMany` | `{ store, key, idx?, value }` / `{ rows: [{ store, key, idx?, value }] }` → `{ count }` — zapis zaszyfrowanych rekordów (§12.1); most Dart używa tylko `dbPut` |
+| `dbGet` / `dbDel` | `{ store, key }` → `{ value }` (`null`, gdy brak) / – |
+| `dbKeys` | `{ store, prefix? }` → `{ keys }` |
+| `dbAll` / `dbByIdx` | `{ store }` / `{ store, idx }` → `{ rows: [{ key, value }] }` |
+| `dbCount` | → `{ count }` — liczba wierszy w bazie |
+| `authAvailable` | → `{ biometric, deviceCredential }` |
+| `authenticate` | `{ reason }` → `{ ok }` — systemowe okno biometrii / poświadczeń urządzenia (§12.3) |
+| `setSecure` | `{ on }` — Android `FLAG_SECURE` na oknie, ukrywa zawartość w przełączniku aplikacji |
+| `backupStatus` | → `{ enabled, lastAt, folder }` (`folder` to nazwa wyświetlana lub `null`) |
+| `backupEnable` | → `{ code }` — tworzy kod odzyskiwania (§12.2) |
+| `backupShowCode` / `backupDisable` | po uwierzytelnieniu: → `{ code }` / –. Odrzucają `auth_failed` |
+| `backupChooseFolder` | → `{ folder }` — systemowy wybór folderu dla kopii automatycznych |
+| `backupCreate` | `{ mode: pick / now / auto, meta }` → opis zapisanego pliku albo `{ skipped: true }` dla `auto` w ciągu 24 h od ostatniej kopii. Odrzuca `not_enabled`, `no_folder`, `cancelled` |
+| `backupRestore` | `{ code }` → `{ meta }` — systemowy wybór pliku, potem weryfikacja, wyczyszczenie i przywrócenie (§12.2). Odrzuca `bad_code`, `cancelled` i błędy formatu kopii |
+| `notify` | `{ title, body, chatId? }` — pokazuje lokalne powiadomienie (stuknięcie otwiera czat) |
 | `signalInit` | → `{ bundle, ik }` — creates the identity on first call, then returns the same bundle (§1) |
 | `signalAddContact` | `{ bundle }` → `{ tag }` — verifies both prekey signatures, runs `processPreKeyBundle` (PQXDH), saves the identity |
 | `signalSeal` | `{ tag, plaintext }` → `{ payload }` — Signal-encrypt for `hex(tag)` then seal (§2); `payload` is the sealed bytes, used directly as the DATA payload (its leading `0x01` is the DATA kind) |
@@ -447,30 +483,41 @@ Wartości binarne to ciągi base64 (standardowego); tagi węzłów to małe lite
 Wszystkie wywołania `signal*` działają na jednej kolejce szeregowej w natywnym `SignalCore`. Błędy odrzucają z kodem:
 `bad_bundle`, `no_session`, `bad_message`, `untrusted_identity`.
 
-Zdarzenia (`addListener`): `packet` `{ packet, from }` (from = węzeł w hex, `"self"` dla dostarczeń
-ruchu pochodzącego z JS), `neighbor` `{ node, up, medium, kbps }`, `updateProgress` `{ progress }`, `share` `{}` (nadeszło udostępnienie, wywołaj `takeShare`).
+Zdarzenia (`MeshBridge.on(event, callback)` filtruje jeden wspólny strumień kopert `{ event, data }`): `packet` `{ packet, from }` (from = węzeł w hex, `"self"` dla dostarczeń
+ruchu pochodzącego z aplikacji; most dekoduje `packet` do bajtów), `neighbor` `{ node, up, medium, kbps }`, `updateProgress` `{ progress }`,
+`share` `{}` (nadeszło udostępnienie, wywołaj `takeShare`), `open` `{}` (czeka stuknięcie powiadomienia lub odebranie połączenia, wywołaj `takeOpen`), `opened` (rekord odszyfrowany
+natywnie, gdy aplikacja była podpięta, w tym samym kształcie co element `opened` z `drainInbox`), `devStage` `{ medium, node, stage, detail, at }` (etapy łączenia dla dewelopera).
+Strona natywna emituje `open` i `share` ponownie, gdy podpina się słuchacz, a któreś nadal czeka.
 
 Cel udostępniania (Android): `MainActivity` przyjmuje `ACTION_SEND` dla `text/plain`, `image/*`, `video/*`, `audio/*`. Plugin
 czyta go przy starcie i w `onNewIntent`, przyjmuje tylko URI `content://` innych aplikacji (nigdy `file://` ani własnego
 providera Ripplo), kopiuje strumień (≤ 20 MiB) do `cache/share` i trzyma jedno oczekujące udostępnienie;
-`takeShare` → `{ share?: { kind: text|image|video|voice, text | mime + path } }` zwraca je i czyści. JS pokazuje
-„Wyślij do…” (czaty i grupy, bez oczekujących próśb) po odblokowaniu aplikacji; wybór czatu od razu wysyła tekst lub
+`takeShare` → `{ share?: { kind: text|image|video|voice, text | mime + path } }` zwraca je i czyści. Aplikacja pokazuje
+„Wyślij do…” (czaty i grupy, bez oczekujących próśb) po odblokowaniu; wybór czatu od razu wysyła tekst lub
 załącznik i otwiera ten czat. Bez tego wyboru nic nie jest wysyłane. iOS nie ma jeszcze rozszerzenia udostępniania.
 
-Gdy nie ma podłączonego listenera JS, silnik trzyma pakiety dla siebie w trwałej skrzynce (inbox, maks. 2000)
-i pokazuje pozbawione treści powiadomienie *„Nowa wiadomość”* dla payloadów `0x01`.
+Gdy strona Dart nie jest podpięta, silnik trzyma pakiety dla siebie w trwałej skrzynce (inbox, maks. 2000)
+i pokazuje pozbawione treści powiadomienie *„Nowa wiadomość”* dla payloadów `0x01` (albo sam je otwiera, §14).
+
+### 9.1 Kanały dźwięku połączeń
+
+`MethodChannel('ripplo/audio')` (kodek standardowy) i `EventChannel('ripplo/audio/pcm')`, zaimplementowane w `CallAudio.kt` i `CallAudio.swift` i używane przez
+`MethodChannelCallAudio` w `lib/core/call_audio.dart`. Metody: `audioStart` `{ raw }` (otwiera nagrywanie i odtwarzanie, PCM 48 kHz mono 16-bit; `raw` = zwykłe źródło
+mikrofonu bez przetwarzania głosu), `audioPlay` `{ pcm }` (kolejkuje zdekodowane PCM do odtworzenia), `audioMute` `{ on }`, `audioFallback` (restartuje nagrywanie bez przetwarzania
+głosu), `audioStop`. Strumień zdarzeń dostarcza nagrane PCM jako tablice bajtów. Kodowanie i dekodowanie Opus odbywa się w Dart (§13).
 
 ## 10. Aktualizacje i integralność
 
-- CI (`.github/workflows/build.yml`) buduje na tagach `v*` i publikuje `Ripplo-vX.Y.Z.apk`,
-  `Ripplo-vX.Y.Z-unsigned.ipa` oraz `SHA256SUMS` w wydaniu na GitHubie.
+- CI (`.github/workflows/build.yml`) uruchamia `flutter analyze`, `flutter test` i natywne testy jednostkowe Signal, a potem buduje na tagach `v*` i przy pushach do gałęzi
+  `flutter`. Tag publikuje `Ripplo-vX.Y.Z.apk`, `Ripplo-vX.Y.Z-play.aab`, `Ripplo-vX.Y.Z-beta-unsigned-for_developers.ipa` oraz `SHA256SUMS` w wydaniu na GitHubie;
+  push do `flutter` buduje tylko testowy APK (wersja `vX.Y.Z-dev<run>`), trzymany jako artefakt przebiegu `android-test` przez 14 dni i nigdy niewydawany (§15).
 - Aplikacja (gdy jest internet) odczytuje `api.github.com/repos/Nahida4479/Ripplo/releases/latest`; nowszy
   semver pokazuje plakietkę aktualizacji. Android z włączoną automatyczną aktualizacją: warstwa natywna pobiera APK, sprawdza jego
   SHA-256 względem skrótu wydania oraz jego certyfikat podpisu względem zainstalowanego, a następnie instaluje
   przez `PackageInstaller` (po cichu od drugiej samoaktualizacji, Android 12+).
 - Skróty wydania pochodzą z pola `digest` zasobu w odpowiedzi API (zapasowo: blok `SHA256SUMS` w opisie wydania);
-  `SHA256SUMS` nie jest pobierany z WebView, bo przekierowania pobierania z github.com nie mają nagłówków CORS.
-  Obecna wersja to natywne `versionName` (`App.getInfo()`), a nie wersja z `package.json`.
+  `SHA256SUMS` sam nie jest pobierany przez aplikację.
+  Obecna wersja to to, co zgłasza platforma (`PackageInfo.fromPlatform()` w `lib/services/updater.dart`, natywne `versionName` ustawiane przez `--build-name`), a nie wartość wpisana w kodzie Dart.
 - Aktualizacje w tle (Android, ustawienie „Aktualizuj automatycznie”, domyślnie włączone): `UpdateJobService`
   (`JobScheduler`, co 6 h, sieć bez limitu, bateria nie niska, przetrwa restart; ponownie planowany przez
   `UpdatedReceiver`) uruchamia `UpdateEngine.background` w kodzie natywnym także przy zamkniętej aplikacji. Pomija
@@ -481,8 +528,8 @@ i pokazuje pozbawione treści powiadomienie *„Nowa wiadomość”* dla payload
   Otwórz aplikację, aby zaktualizować.” (raz na wersję). Jeśli system prosi o potwierdzenie
   (`STATUS_PENDING_USER_ACTION`), a nie ma UI, `InstallReceiver` pokazuje „Aktualizacja gotowa. Dotknij, aby
   zainstalować.”, którego dotknięcie otwiera systemowe potwierdzenie.
-- Wersja Google Play (`./gradlew bundlePlay`, job CI `play`): `src/play/AndroidManifest.xml` usuwa `REQUEST_INSTALL_PACKAGES`. Gdy `fromPlay` jest true, aplikacja nie łączy się z GitHubem po aktualizacje ani integralność i ukrywa w Aktualizacjach wszystko poza obecną wersją; aktualizacje dostarcza Play.
-- W aplikacji: przy starcie i wznowieniu (najwyżej co 10 min) JS sprawdza wydanie; gdy jest nowsze, pokazuje okno
+- Wersja Google Play (`flutter build appbundle --release --flavor play`, job CI `play`): `android/app/src/play/AndroidManifest.xml` usuwa `REQUEST_INSTALL_PACKAGES`. Gdy `fromPlay` jest true, aplikacja nie łączy się z GitHubem po aktualizacje ani integralność i ukrywa w Aktualizacjach wszystko poza obecną wersją; aktualizacje dostarcza Play.
+- W aplikacji: przy starcie i wznowieniu (najwyżej co 10 min) aplikacja sprawdza wydanie; gdy jest nowsze, pokazuje okno
   „Dostępna aktualizacja X. Zaktualizować teraz? / Później” (najwyżej raz na 6 h), niezależnie od ustawienia
   automatycznej aktualizacji. Android instaluje z okna; pozostałe platformy otwierają stronę wydania.
 - Po samoaktualizacji system zamyka aplikację. `UpdatedReceiver` (`MY_PACKAGE_REPLACED`) uruchamia ponownie
@@ -492,7 +539,7 @@ i pokazuje pozbawione treści powiadomienie *„Nowa wiadomość”* dla payload
 - Naraz działa tylko jedna instalacja: warstwa natywna odrzuca drugie `installUpdate` jako `busy`, a UI blokuje
   Zainstaluj podczas sprawdzania i instalacji (dwa równoległe pobrania współdzieliły `update.apk` i skakał pasek).
 - API GitHuba pozwala tylko na 60 niezalogowanych zapytań na godzinę z jednego IP, wspólnych dla wszystkich telefonów w tej samej sieci, więc aplikacja
-  trzyma każdą odpowiedź w `localStorage` (`gh:<url>`, świeża przez 30 min; „Sprawdź teraz” akceptuje odpowiedź sprzed minuty; sprawdzenie integralności jest
+  trzyma każdą odpowiedź w `shared_preferences` (`gh:<url>`, świeża przez 30 min; „Sprawdź teraz” akceptuje odpowiedź sprzed minuty; sprawdzenie integralności jest
   świeże przez dobę) i odświeża nieświeże przez `If-None-Match` (304 nie liczy się do limitu). Przy 403 lub 429 zapisuje przerwę do `x-ratelimit-reset` (co najmniej
   minutę), w międzyczasie podaje odpowiedź z pamięci, a gdy jej nie ma, pokazuje „GitHub ogranicza liczbę zapytań z tej sieci. Spróbuj ponownie po GG:MM.” zamiast
   samego kodu.
@@ -501,31 +548,134 @@ i pokazuje pozbawione treści powiadomienie *„Nowa wiadomość”* dla payload
   wydania odpowiadającego jej wersji — więc kopie udostępnione przez Nearby Share / Quick Share są również weryfikowane.
   Wynik widoczny w Ustawienia → Bezpieczeństwo.
 
-## 11. Moduły JS
+## 11. Moduły Dart
+
+Wszystkie w `lib/`; pakiet nazywa się `ripplo`.
 
 ```
-src/lib/bytes.js            b64/b64url/hex/utf8/concat/random/base32
-src/crypto/vault.js         DB key + record seal/open
-src/crypto/db.js            IndexedDB (idb) with encrypted values
-src/crypto/signalStore.js   libsignal StorageType backed by db
-src/crypto/identity.js      identity, card, tag/ripploId, invite link encode/decode
-src/crypto/sealed.js        sealed-sender layer
-src/crypto/safety.js        safety number, nearby proof (challenge/answer/check)
-src/crypto/attachment.js    file encrypt/decrypt + chunk split
-src/mesh/packet.js          encode/decode packets, constants
-src/mesh/router.js          reference router (web fallback + tests)
-src/mesh/bridge.js          RipploMesh plugin, or web fallback over BroadcastChannel
-src/core/state.js           reactive app state
-src/core/api.js             facade used by the UI (see below)
-src/services/*              updater, notifications, permissions, scheduler, theme
+main.dart, app.dart, router.dart   start (wybiera MeshBridge lub DevMesh), powłoka aplikacji i motyw, stan nawigacji zakładek / czatu
+i18n.dart                          teksty interfejsu (en, pl), `t(key)`
+contributors.dart                  loginy współtwórców dla karty O aplikacji
+util/bytes.dart                    b64 / b64url / hex / utf8 / concat / random / base32
+util/js.dart                       drobne funkcje zachowujące semantykę JavaScriptu (prawdziwość, zegar `now`, `cut`, int32), by przeportowana logika pasowała do dawnej implementacji
+util/avatar.dart, qrparts.dart, schedule.dart, link_label.dart, github_cache.dart
+                                   odcień i inicjały awatara, składanie kawałków animowanego QR, sloty odświeżania Ludzi (§7), etykieta medium łącza, pamięć odpowiedzi GitHuba (§10)
+crypto/vault.dart                  szyfrowanie / odszyfrowanie rekordów AES-GCM kluczem bazy
+crypto/db.dart                     RawStore (NativeRawStore przez most, FileRawStore, MemoryRawStore) i szyfrowany magazyn rekordów
+crypto/identity.dart               wizytówka tożsamości, tag / ripploId, kodowanie / dekodowanie linku zaproszenia (§1)
+crypto/attachment.dart             szyfrowanie / odszyfrowanie pliku + podział na fragmenty (§2)
+crypto/call_frame.dart             szyfrowanie / odszyfrowanie ramek połączenia, okno powtórzeń (§13)
+mesh/packet.dart                   kodowanie / dekodowanie pakietów, stałe (§3)
+mesh/router.dart                   router w Dart (§3.1)
+mesh/bridge.dart                   interfejs `Mesh` i `MeshBridge` na MethodChannel (§9)
+mesh/dev_mesh.dart, dev_signal.dart  symulator desktopowy: Mesh przez UDP loopback, jawny zamiennik Signal (§15)
+core/state.dart, obs.dart          reaktywny stan aplikacji (`ObsMap`, `ObsList`)
+core/messenger.dart, messenger_contacts.dart, messenger_msgs.dart
+                                   `Core`: profil, kontakty i weryfikacja, Ludzie, wiadomości, załączniki, grupy, przywracanie kopii
+core/calls.dart, call_audio.dart   sygnalizacja i silnik połączeń, Opus na natywnych kanałach dźwięku (§13, §9.1)
+core/api.dart                      fasada używana przez UI (zob. niżej)
+core/diag.dart                     dziennik diagnostyczny, przekazywany do `usbLog`
+services/                          updater, notifications, open_intent, deep_link, share, permissions, scheduler, range_refresh, lock, backup,
+                                   ringtone, theme, prefs (motyw i język w shared_preferences), media_files (§12.5)
+ui/tokens.dart, widgets.dart       tokeny projektu i wspólne widgety (docs/DESIGN.pl.md)
+ui/icons.dart, avatar.dart, qr.dart, ui_state.dart
+                                   ikony Lucide, widget awatara, koder i rysownik QR, stan toastów / arkuszy
+components/                        arkusze, nakładki i karty (dodawanie kontaktu, nowy czat, udostępnianie, potwierdzenie, połączenie, blokada, kopia, skaner QR)
+views/                             Czaty, Czat, Ludzie, Kontakt, Ustawienia, Gate (uprawnienia), Onboarding
 ```
 
-`core/api.js` (kontrakt UI):
-`init()`, `createProfile(name)`, `myInviteLink()`, `addContactFromLink(text, via)`,
-`addPerson(person)`, `verifyNearby(id)`, `verifyByQr(id, scanned)`, `markVerified(id)`,
-`safetyNumber(id)`, `sendText(chatId, text)`, `sendAttachment(chatId, file, kind)`,
-`retry(msgId)`, `loadMessages(chatId)`, `markRead(chatId)`, `createGroup(name, memberIds)`,
-`refreshPeople()`, `deleteChat(chatId)`, `deleteContact(id)`.
+`core/api.dart` (kontrakt UI), funkcje najwyższego poziomu nad jednym wspólnym `Core` i `RipploState`:
+`init`, `createProfile(name)`, `setName`, `setAvatar`, `myInviteLink`, `addContactFromLink(text, via)`,
+`invite`, `acceptRequest`, `declineRequest`, `verifyNearby(id)`, `verifyByQr(id, scanned)`, `markVerified(id)`,
+`safetyNumber(id)`, `sendText(chatId, text)`, `sendAttachment(chatId, file, kind, ...)`, `sendTyping`,
+`retry(msgId)`, `unsendMessage`, `loadMessages(chatId)`, `markRead(chatId)`, `createGroup(name, memberIds)`,
+`refreshPeople()`, `searchPeople`, `startCall`, `acceptCall`, `hangUp`, `setMuted`, `deleteChat(chatId)`, `deleteContact(id)`,
+`saveSettings`, `restoreBackup`, `sendDevLog`, `deleteDevLog`, `nodeOf`.
+
+## 12. Lokalny magazyn, kopia zapasowa i blokada aplikacji
+
+### 12.1 Magazyn natywny
+
+Jedna baza SQLite na aplikację (Android `android.database.sqlite`, iOS systemowy `libsqlite3`), plik
+`ripplo.db` w prywatnej pamięci aplikacji (iOS: Application Support, ochrona pliku
+`completeUntilFirstUserAuthentication`, wyłączony z kopii iCloud):
+
+```sql
+CREATE TABLE rows (store TEXT NOT NULL, key TEXT NOT NULL, idx TEXT, value BLOB NOT NULL,
+                   PRIMARY KEY (store, key));
+CREATE INDEX rows_idx ON rows (store, idx);
+```
+
+`value` to dokładnie to, co zapisuje Dart: już zaszyfrowane AES-GCM przez `lib/crypto/vault.dart` kluczem bazy
+(AAD `store/key`). Warstwa natywna nigdy nie widzi treści czatów. `lib/crypto/db.dart` sięga do niej przez `RawStore`: `NativeRawStore` wywołuje
+`dbPut` / `dbGet` / `dbDel` / `dbKeys` / `dbAll` / `dbByIdx` (§9); `FileRawStore` (plik JSON) obsługuje desktopową sieć deweloperską, a `MemoryRawStore` testy.
+
+IndexedDB z WebView dawnej aplikacji Vue i jego jednorazowe kopiowanie do tego magazynu już nie istnieją: aplikacja Flutter czyta tylko `ripplo.db`, a
+`localStorage` też nie jest czytany (motyw i język resetują się raz, §15). Każda przyszła zmiana magazynu wychodzi z migracją — aktualizacja nigdy nie może zgubić
+danych.
+
+### 12.2 Kopia zapasowa
+
+Kod odzyskiwania: 30 losowych cyfr (≈ 100 bitów), pokazanych jako 6 grup po 5, generowany natywnie.
+`codeKey = PBKDF2-HMAC-SHA256(cyfry kodu jako ASCII, salt(16), 600000, 32)`.
+Opcjonalny drugi czynnik (§12.4): `backupKey = HKDF-SHA256(ikm = codeKey | prf(32), salt, "ripplo-backup-v1", 32)`,
+w przeciwnym razie `backupKey = codeKey`. `backupKey`, `salt` i opis czynnika są trzymane na urządzeniu, opakowane niebiometrycznym kluczem Keystore / Keychain,
+aby kopie automatyczne działały bez nadzoru; kod też jest trzymany (opakowany), aby użytkownik mógł go zobaczyć ponownie po uwierzytelnieniu.
+
+Plik `Ripplo-backup-YYYYMMDD-HHMM.rbk`:
+
+```
+"RIPPLOBK" | ver u8 = 1 | flags u8 (bit0 = drugi czynnik) | iterations u32 | salt(16)
+[if bit0: credIdLen u16 | credId | prfSalt(32)]
+frames: u32 frameLen | nonce(12) | AES-256-GCM(backupKey, plaintext ≤ 1 MiB, AAD = SHA-256(header) | index u64 | last u8)
+```
+
+Strumień jawny to rekordy `type u8 | len u32 | bytes`:
+`1` meta JSON `{ "app": version, "created": ms, "ripploId" }`, `2` klucz bazy (32), `3` rekord magazynu Signal
+(`keyLen u16 | key | wartość jawna`), `4` wiersz magazynu (`store | key | idx` jako UTF-8 z prefiksem długości,
+potem zaszyfrowana wartość). Plik z brakującą lub nieuwierzytelnioną ostatnią ramką jest odrzucany.
+
+Miejsca docelowe: ręcznie = systemowe „Zapisz jako” (Android `ACTION_CREATE_DOCUMENT`, iOS document picker) —
+użytkownik może wybrać Dysk Google, iCloud Drive, Proton Drive, pendrive. Automatycznie = folder wybrany
+raz (Android `ACTION_OPEN_DOCUMENT_TREE` z trwałym uprawnieniem, iOS zakładka security-scoped), zapisywany najwyżej raz na 24 h przy otwarciu aplikacji. Zarówno kopia automatyczna, jak i „Utwórz kopię teraz” (gdy folder jest ustawiony) zapisują
+jeden plik `Ripplo-backup.rbk` i zastępują poprzedni: nowa kopia trafia najpierw do `Ripplo-backup.rbk.tmp`,
+potem stary plik jest usuwany, a plik tymczasowy przemianowywany (iOS: `replaceItemAt`), więc nieudany zapis nigdy
+nie niszczy ostatniej dobrej kopii. Bez folderu „Utwórz kopię teraz” otwiera „Zapisz jako” i tworzy plik ze znacznikiem czasu.
+Pliki ze znacznikiem czasu z dawnych wersji są pozostawiane w spokoju.
+
+Przywracanie (onboarding → „Przywróć z kopii”): wybór pliku → wpisanie kodu → [drugi czynnik] → warstwa natywna
+czyści lokalny stan, zapisuje klucz bazy, rekordy Signal i wiersze, a aplikacja inicjalizuje stan od nowa. Ponieważ stan ratchetu Signal w kopii jest starszy niż u rozmówców, aplikacja potem odtwarza każdą sesję z zapisanej
+karty kontaktu (`signalForget` + `signalAddContact`) i wysyła `{ "t": "reset" }`. Wiadomość od znanego kontaktu,
+której nie da się odszyfrować, wywołuje to samo resetowanie i pokazuje „Nie udało się odszyfrować wiadomości od X — poproś o ponowne wysłanie”. Każda wiadomość aplikacji do kontaktu niesie `c` = własną kartę (b64),
+dopóki kontakt nie potwierdzi jej odbioru, więc każdy kontakt ma kartę, z której można zresetować sesję.
+
+### 12.3 Blokada aplikacji (opcjonalna)
+
+Domyślnie wyłączona. Po włączeniu: Android `BiometricPrompt` (`BIOMETRIC_STRONG | DEVICE_CREDENTIAL`), iOS
+`LAContext.evaluatePolicy(.deviceOwnerAuthentication)` przy starcie i po 30 s w tle;
+`FLAG_SECURE` / rozmyty zrzut ukrywa zawartość w przełączniku aplikacji. Podgląd kodu odzyskiwania,
+ręczna kopia, przywracanie i wyłączenie blokady zawsze wymagają uwierzytelnienia, gdy istnieje blokada lub
+poświadczenie urządzenia. Dane biometryczne nigdy nie opuszczają bezpiecznego sprzętu telefonu i nie są
+synchronizowane; nowy telefon można przywrócić tylko kodem (i drugim czynnikiem).
+
+### 12.4 Drugi czynnik (opcjonalny, jeszcze niezaimplementowany)
+
+Zaplanowany; obecna wersja nie tworzy drugiego czynnika. Kopie nigdy nie ustawiają `bit0`, a przywracanie odrzuca plik, który go ma, kodem `need_factor`
+(interfejs mówi, że drugi czynnik nie jest jeszcze obsługiwany w tej wersji). Decyzja dla pierwszej wersji to wyłącznie YubiKey (CTAP2 `hmac-secret`
+przez `yubikit-android`); klucze dostępu (passkeys) odłożono. Poniższy tekst to projekt.
+
+Klucz dostępu (passkey) lub klucz bezpieczeństwa obsługujący rozszerzenie WebAuthn PRF (CTAP2 `hmac-secret`): Menedżer haseł Google,
+menedżer haseł działający jako dostawca poświadczeń (np. Proton Pass) albo YubiKey.
+Jego wynik PRF dla `prfSalt` jest mieszany do `backupKey` (§12.2). Tworzony przy włączaniu kopii z opcją „pomiń”; system pyta, gdzie go zapisać.
+Szczegóły zależą od obsługi przez dostawcę (zob. README).
+
+### 12.5 Odszyfrowane multimedia na dysku
+
+Obrazy są odszyfrowywane tylko w pamięci (`Image.memory`) i nigdy nie trafiają na dysk. Wideo i głos wymagają pliku dla systemowych odtwarzaczy
+(`video_player`, `just_audio`), więc odszyfrowana kopia jest zapisywana w `cache/att/` (`lib/services/media_files.dart`; prywatna pamięć podręczna aplikacji, losowa 16-bajtowa nazwa hex,
+rozszerzenie z typu mime) tylko na czas odtwarzania i usuwana po jego zakończeniu lub zamknięciu widoku. Nagranie głosowe też tam ląduje (jawnie,
+bo nagrywarka potrzebuje pliku), dopóki nie zostanie odczytane do zaszyfrowania i wysłane, po czym jest usuwane. `wipeMediaCache()` usuwa cały katalog przy każdym starcie aplikacji,
+więc awaria nie zostawia odszyfrowanych multimediów.
 
 
 ## 13. Połączenia głosowe (tylko łącza bezpośrednie, najpierw Android)
@@ -547,17 +697,18 @@ gdzie `role` 0 = dzwoniący, 1 = odbierający (więc dwa kierunki nigdy nie uży
 partnera, potem przyjmuje każde `seq` raz w oknie 64 pakietów; wszystko nieuwierzytelnione, z innej rozmowy, powtórzone lub
 zniekształcone jest po cichu odrzucane.
 
-Audio (JS, WebCodecs): mikrofon z usuwaniem echa, redukcją szumu i AGC przy 48 kHz, `AudioWorklet`
-(`public/call-worklet.js`) tnie 20 ms ramki, `AudioEncoder` Opus 16 kb/s, trzy ramki na pakiet (około 17
-pakietów i 4,5 kB/s w każdą stronę), `AudioDecoder` i bufor jitter 100 ms po stronie odtwarzania; ramki, które
-stałyby w kolejce dalej niż 400 ms, są porzucane. Raz na sekundę silnik połączenia raportuje szczytowy poziom nagranego i zdekodowanego dźwięku. Przy 4 s ciszy na lokalnym mikrofonie
+Audio: nagrywanie i odtwarzanie są natywne (`ripplo/audio`, §9.1), PCM 48 kHz mono; na Androidzie `AudioRecord` ze źródłem `VOICE_COMMUNICATION` oraz
+`AcousticEchoCanceler` i `NoiseSuppressor`, jeśli telefon je ma, a do odtwarzania `AudioTrack`. W Dart `OpusCallAudio` (`lib/core/call_audio.dart`, `opus_dart`
+przez FFI z biblioteką `opus_flutter`) tnie 20 ms ramki, koduje Opus 16 kb/s, trzy ramki na pakiet (około 17
+pakietów i 4,5 kB/s w każdą stronę), dekoduje po stronie odtwarzania i trzyma bufor jitter 100 ms; ramki, które
+stałyby w kolejce dalej niż 400 ms, są porzucane. Wersja desktopowa na Linuksie nie ma dźwięku połączeń. Raz na sekundę silnik połączenia raportuje szczytowy poziom nagranego i zdekodowanego dźwięku. Przy 4 s ciszy na lokalnym mikrofonie
 (gdy nie jest wyciszony) ekran ostrzega „twój mikrofon wydaje się milczeć”; ramki, które przychodzą, ale dekodują się do ciszy, dają „dźwięk
 dochodzi, ale jest cichy”; brak jakiejkolwiek ramki przez 4 s po uruchomieniu rozmowy daje „nie dotarł jeszcze żaden dźwięk”. Rozpoczęcie
-lub odebranie połączenia najpierw sprawdza uprawnienie do mikrofonu i prosi o nie natywnie, bo WebView może inaczej oddać cichy strumień.
+lub odebranie połączenia najpierw sprawdza uprawnienie do mikrofonu i prosi o nie natywnie, zanim ruszy nagrywanie.
 Koder i dekoder są odbudowywane po błędzie, a format PCM jest czytany tak, jak przyszedł, więc jedna zła ramka nie wycisza rozmowy na stałe; ekran połączenia pokazuje
 liczby ramek wysłanych / odebranych / odtworzonych / błędów do diagnozy. Jeśli mikrofon milczy przez 4 s, silnik najpierw raz ponawia próbę bez przetwarzania głosu (bez usuwania echa, redukcji szumu i automatycznego
 wzmocnienia), częstej przyczyny cichego nagrywania na niektórych telefonach, i dopiero potem pokazuje ostrzeżenie. Wiersz statystyk pokazuje też stan ścieżki,
-stan kontekstu audio i liczbę przechwyconych ramek. Wyciszenie wyłącza ścieżkę, więc cisza jest nadal wysyłana i podtrzymuje łącze.
+stan silnika audio i liczbę przechwyconych ramek. Wyciszenie wyłącza ścieżkę, więc cisza jest nadal wysyłana i podtrzymuje łącze.
 Rozmowa kończy się `lost` po 6 s bez uwierzytelnionej ramki (30 s przed pierwszą, gdy u rozmówcy może być otwarte pytanie o
 mikrofon) albo gdy przez 8 s nie ma żadnego sąsiada dla połączenia. Sąsiad jest znajdowany po karcie z hello, po węźle, z którego przyszły
 uwierzytelnione ramki połączenia (wiązanym przy pierwszej ramce), albo po węźle zapamiętanym przy kontakcie (`contact.node`, zapisywanym, gdy dochodzi karta hello),
@@ -565,16 +716,16 @@ więc połączenie odebrane tuż po ponownym otwarciu aplikacji, zanim wymienion
 
 Dzwonienie (Android, `Ringer`) idzie za ustawieniami samego telefonu, a nie za głośnością aplikacji: tryb dzwonka normalny = domyślny
 dzwonek na strumieniu dzwonka (`USAGE_NOTIFICATION_RINGTONE`, w pętli) plus wibracja; tryb wibracji = tylko wibracja; tryb cichy albo Nie
-przeszkadzać / każdy filtr przerw inny niż „wszystko” = ani dźwięku, ani wibracji, tylko ekran połączenia. Inne platformy używają zapasowo
-tonu WebAudio.
+przeszkadzać / każdy filtr przerw inny niż „wszystko” = ani dźwięku, ani wibracji, tylko ekran połączenia. Inne platformy, a także nieudane natywne dzwonienie, używają zapasowo
+systemowego dźwięku alertu z wibracją co 2,5 s (`lib/services/ringtone.dart`).
 
-Jeszcze nie: dzwonienie przy zamkniętej aplikacji, rozmowy przez kilka telefonów, iOS (ścieżka WebCodecs nietestowana).
+Jeszcze nie: dzwonienie przy zamkniętej aplikacji, rozmowy przez kilka telefonów, iOS (natywna ścieżka dźwięku istnieje, ale jest nietestowana).
 iOS nigdy nie zadzwoni do zamkniętej aplikacji bez pusha od Apple, a on wymaga serwera.
 
 
 ## 14. Powiadomienia i połączenia przy zamkniętej aplikacji (Android)
 
-Pakiet DATA dla tego telefonu, który dochodzi, gdy JS nie jest podpięty (aplikacja zamknięta lub ekran zgaszony), był dotąd zapisywany surowy
+Pakiet DATA dla tego telefonu, który dochodzi, gdy strona Dart nie jest podpięta (aplikacja zamknięta lub ekran zgaszony), był dotąd zapisywany surowy
 i pokazywany jako ogólne „Nowa wiadomość”. Teraz silnik sam go otwiera (`Opener`, wspólny dla procesu `SignalCore` z `Shared`, te same klucze
 w Keystore co w aplikacji), więc może pokazać, kto i co napisał, albo zadzwonić przy połączeniu. Odszyfrowana wiadomość jest zużyta z ratchetu,
 więc trafia do skrzynki jako rekord zaszyfrowany kluczem bazy (AES-GCM, AAD `inbox`), element `~<callId>`; aplikacja dostaje go jako `{ opened }`
@@ -611,3 +762,41 @@ bazy w pamięci, dostarcza rekordy do aplikacji poza głównym wątkiem (rekord 
 własne reguły aplikacji (brak multimediów od obcych, kontrole id i długości, usuwanie znaków sterujących i dwukierunkowych, nazwa z karty nadawcy tylko gdy jego
 klucz daje skrót nadawcy, jedno powiadomienie o zaproszeniu od nadawcy na dobę), więc nie pokazuje się nic, co aplikacja by odrzuciła. iOS nie ma odpowiednika:
 bez pusha od Apple, który wymaga serwera, zamknięta aplikacja na iOS nie może zadzwonić.
+
+
+## 15. Budowanie, uruchamianie, testy i CI
+
+Flutter 3.50.1 (Dart ^3.9; wersja przypięta w CI). Polecenia z katalogu głównego repozytorium:
+
+| polecenie | co robi |
+|-----------|---------|
+| `flutter pub get` | pobiera zależności |
+| `flutter analyze` | analiza statyczna z `flutter_lints` (CI ją uruchamia) |
+| `TZ=Europe/Warsaw flutter test` | wszystkie testy jednostkowe, widgetów i golden (CI uruchamia `flutter test`). Testy wektorowe porównują Dart z `test/vectors/js_vectors.json`, wygenerowanym z dawnej implementacji JavaScript, a wektory harmonogramu są pomijane, gdy strefa czasowa to nie `Europe/Warsaw` |
+| `flutter run -d linux --dart-define=RIPPLO_PROFILE=<nazwa>` | symulator desktopowy: uruchom dwie lub więcej instancji z różnymi `<nazwa>`, by zobaczyć dwa telefony. `--dart-define=RIPPLO_SOLO=true` izoluje jedną |
+| `flutter build apk --release --flavor full` | APK (wydanie na GitHubie, F-Droid, sideload) |
+| `flutter build appbundle --release --flavor play` | pakiet Google Play, bez `REQUEST_INSTALL_PACKAGES` |
+| `cd android && ./gradlew testFullReleaseUnitTest` | natywne testy jednostkowe kryptografii Signal (CI) |
+| `dart run tool/parity.dart [goldens] [ref] [out] [prefiksy]` | zgodność zrzutów ekranu, zob. niżej |
+
+**Symulator desktopowy.** `main.dart` używa `MeshBridge` na Androidzie, iOS i w każdej wersji release; w buildach debug i profile na pulpicie używa `DevMesh`
+(`lib/mesh/dev_mesh.dart`). Każda instancja zajmuje port UDP na `127.0.0.1` z zakresu 47700-47731 (32 sloty, slot początkowy to skrót z `RIPPLO_PROFILE`, brany jest następny
+wolny), ogłasza się hello co 2 s, odrzuca sąsiada po 5 s ciszy i uruchamia `lib/mesh/router.dart` na wirtualnym łączu `lan` 20 000 kbps.
+Ramki to datagramy `type(1) | from(32) | to(32) | payload`. Signal to jawny zamiennik `lib/mesh/dev_signal.dart` (§2), magazyn to plik
+`ripplo-dev-<profil>/db.json` w systemowym katalogu tymczasowym, a każde uprawnienie wygląda na przyznane. Transporty, połączenia, aktualizacje, kopia zapasowa i blokada aplikacji nie są symulowane.
+
+**Testy golden.** Każdy ekran i arkusz ma testy golden w `test/views/` i `test/components/` (rozmiar urządzenia 412 × 915, jasny i ciemny; czcionki z
+`test/support/fonts.dart`); obrazy leżą w `test/goldens/` i są nadpisywane przez `flutter test --update-goldens`. Zrzuty ekranu aplikacji Vue są trzymane w
+`test/goldens/ref/` jako wzorzec. `tool/parity.dart` porównuje każdy golden z Fluttera z jego wzorcem: piksel różni się, gdy dowolny kanał różni się o więcej niż 16, odsetek
+różniących się pikseli nie może przekroczyć 1,5 % na obraz, brak wzorca lub golden to porażka, a kod wyjścia jest niezerowy przy każdej porażce. Dla każdej pary zapisuje
+różnicę z czerwoną nakładką w `build/parity/`. `test/support/parity_test.dart` testuje samo narzędzie.
+
+**CI** (`.github/workflows/build.yml`). Na tagu `v*` lub przy pushu do gałęzi `flutter` (oraz ręcznie): job `android` uruchamia `flutter pub get`, `flutter analyze`, `flutter test`,
+natywne testy jednostkowe i `flutter build apk --release --flavor full`, a potem weryfikuje podpis. Push do gałęzi wysyła APK jako artefakt `android-test` (14 dni) i nic więcej;
+tag wysyła artefakt `android`. Tagi uruchamiają też job `ios` (`flutter build ios --release --no-codesign`, niepodpisany IPA), job `play` (podpisany AAB, sprawdzany pod kątem braku
+`REQUEST_INSTALL_PACKAGES`), potem `release` (wydanie na GitHubie z `SHA256SUMS`, potem workflow repozytorium F-Droid) i `google-play` (wysyłka na ścieżkę alpha jako
+wersja robocza, tylko gdy istnieje sekret konta usługi). Materiał podpisujący pochodzi wyłącznie z sekretów GitHuba, a build tagu odmawia pracy bez keystore.
+
+**Aktualizacja z wersji Vue.** Czaty, kontakty, stan Signal i ustawienia kopii leżą w magazynie natywnym i plikach keystore i zostają zachowane. Motyw, akcent, gradient
+i język były trzymane w `localStorage` WebView, którego Flutter nie czyta, więc resetują się do domyślnych raz, przy pierwszym starcie wersji Flutter. Pamięć odpowiedzi GitHuba
+odbuduje się przy następnym sprawdzeniu.

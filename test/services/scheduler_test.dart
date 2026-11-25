@@ -24,7 +24,8 @@ void main() {
     },
   );
 
-  RipploState profiled({String tag = '00000000'}) => RipploState()..profile = {'tag': tag, 'ripploId': 'r', 'name': 'n'};
+  RipploState profiled({String tag = '00000000'}) =>
+      RipploState()..profile = {'tag': tag, 'ripploId': 'r', 'name': 'n'};
 
   test('refreshes people when the profile slot is due', () {
     build(profiled()).tick();

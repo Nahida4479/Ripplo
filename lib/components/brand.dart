@@ -61,5 +61,16 @@ class Narrow extends StatelessWidget {
   );
 }
 
+class Nudge extends StatelessWidget {
+  const Nudge(this.dy, {super.key, required this.child});
+
+  final double dy;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) =>
+      Transform.translate(offset: Offset(0, dy), child: child);
+}
+
 TextStyle brandH1(BuildContext context) =>
     rs(context, RipploText.h1.copyWith(fontSize: 30));
