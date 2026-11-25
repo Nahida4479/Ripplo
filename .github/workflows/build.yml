@@ -3,7 +3,6 @@ name: Build
 on:
   push:
     tags: ['v*']
-    branches: [flutter]
   workflow_dispatch:
 
 permissions:
@@ -77,7 +76,6 @@ jobs:
 
       - name: Signal crypto unit tests
         working-directory: android
-        continue-on-error: ${{ github.ref_type != 'tag' }}
         run: |
           ./gradlew :app:tasks --all -q | grep -i unittest || true
           T=$(./gradlew :app:tasks --all -q | grep -oE '^test[A-Za-z]*ReleaseUnitTest' | head -1)
@@ -89,7 +87,6 @@ jobs:
         env:
           VER_NAME: ${{ steps.ver.outputs.name }}
           VER_CODE: ${{ steps.ver.outputs.code }}
-          RIPPLO_DEV_BUILD: ${{ github.ref_type == 'branch' && github.event_name == 'push' }}
         run: |
           set -euo pipefail
           for i in 1 2 3 4; do
@@ -120,12 +117,6 @@ jobs:
           name: android
           path: out/*
 
-      - uses: actions/upload-artifact@v7
-        if: github.ref_type == 'branch' && github.event_name == 'push'
-        with:
-          name: android-test
-          path: out/*
-          retention-days: 14
 
   ios:
     if: github.ref_type == 'tag' || github.event_name == 'workflow_dispatch'

@@ -1209,15 +1209,12 @@ class _Seg extends StatelessWidget {
                       color: on ? c.accent : null,
                       borderRadius: BorderRadius.circular(kRadiusPill),
                     ),
-                    child: Transform.translate(
-                      offset: const Offset(0, -2),
-                      child: Text(
-                        label,
-                        style: rs(
-                          context,
-                          on ? RipploText.segOn : RipploText.seg,
-                          on ? c.onAccent : c.text2,
-                        ),
+                    child: Text(
+                      label,
+                      style: rs(
+                        context,
+                        on ? RipploText.segOn : RipploText.seg,
+                        on ? c.onAccent : c.text2,
                       ),
                     ),
                   );
