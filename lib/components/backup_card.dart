@@ -4,6 +4,7 @@ import '../i18n.dart';
 import '../mesh/bridge.dart' as bridge;
 import '../ui/ui_state.dart';
 import '../ui/widgets.dart';
+import 'settings_parts.dart';
 
 String localeDateTime(int ms, [String? loc]) {
   final d = DateTime.fromMillisecondsSinceEpoch(ms);
@@ -220,7 +221,11 @@ class _BackupCardState extends State<BackupCard> {
       return [
         Padding(
           padding: const EdgeInsets.symmetric(vertical: 8),
-          child: _hint(t('backupWeb')),
+          child: FracText(
+            t('backupWeb'),
+            rs(context, RipploText.rowHint, context.rc.text2),
+            dy: -2,
+          ),
         ),
       ];
     }
@@ -356,7 +361,7 @@ class _BackupCardState extends State<BackupCard> {
     listenable: locale,
     builder: (context, _) => RBlock(
       children: [
-        RSection(t('backup')),
+        SectionHead(t('backup')),
         RCard(
           pad: true,
           children: [

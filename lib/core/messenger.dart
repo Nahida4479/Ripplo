@@ -109,7 +109,15 @@ Future<Vault> createVault(Mesh mesh) async {
 Map<String, Object?> _obj(Object? v) => Map<String, Object?>.from(v as Map);
 
 class Me {
-  Me({required this.ik, required this.tag, required this.id, required this.name, required this.avatar, required this.avVer, required this.card});
+  Me({
+    required this.ik,
+    required this.tag,
+    required this.id,
+    required this.name,
+    required this.avatar,
+    required this.avVer,
+    required this.card,
+  });
 
   final Uint8List ik;
   final Uint8List tag;
@@ -121,7 +129,11 @@ class Me {
 }
 
 class CoreAudio {
-  const CoreAudio({required this.supported, required this.create, this.ensureMic});
+  const CoreAudio({
+    required this.supported,
+    required this.create,
+    this.ensureMic,
+  });
 
   final bool Function() supported;
   final Future<CallAudio> Function() create;
@@ -164,12 +176,19 @@ abstract class _Base {
     this.raw,
   }) : state = state ?? RipploState(),
        timing = {...defaultTiming, ...timing} {
-    this.notifier = notifier ?? (n) => fire(mesh.notify(n.title, n.body, n.chatId));
+    this.notifier =
+        notifier ?? (n) => fire(mesh.notify(n.title, n.body, n.chatId));
     if (mesh.isNative) setDiagSink(mesh.usbLog);
     calls = Calls(
       state: this.state,
       timing: {
-        for (final e in const {'ring': 'callRing', 'silence': 'callSilence', 'hold': 'callHold', 'warn': 'callWarn', 'gone': 'callGone'}.entries)
+        for (final e in const {
+          'ring': 'callRing',
+          'silence': 'callSilence',
+          'hold': 'callHold',
+          'warn': 'callWarn',
+          'gone': 'callGone',
+        }.entries)
           if (timing[e.value] != null) e.key: timing[e.value]!,
       },
       supported: audio.supported,
@@ -192,12 +211,26 @@ abstract class _Base {
         }
       },
       notify: (id) {
-        if (!silentNow) this.notifier((title: contactOf(id)?.name ?? '', body: t('incomingCall'), chatId: null));
+        if (!silentNow)
+          this.notifier((
+            title: contactOf(id)?.name ?? '',
+            body: t('incomingCall'),
+            chatId: null,
+          ));
       },
       log: (id, reason, ms) {
         if (contactOf(id) == null) return;
-        final text = reason == 'ended' ? t('callLog', {'time': fmtDur(ms)}) : t('call_$reason');
-        final m = addMsg({'id': hex(random(16)), 'chatId': id, 'from': 'system', 'ts': now(), 'status': 'received', 'text': text});
+        final text = reason == 'ended'
+            ? t('callLog', {'time': fmtDur(ms)})
+            : t('call_$reason');
+        final m = addMsg({
+          'id': hex(random(16)),
+          'chatId': id,
+          'from': 'system',
+          'ts': now(),
+          'status': 'received',
+          'text': text,
+        });
         touchChat(id, text, m.ts);
       },
     );
@@ -230,7 +263,8 @@ abstract class _Base {
   DiscoverRound? discover;
   final loaded = <String>{};
   final waits = <String, ({Completer<TxResult> done, Timer timer})>{};
-  final proofs = <String, ({String node, void Function(Uint8List mac) resolve})>{};
+  final proofs =
+      <String, ({String node, void Function(Uint8List mac) resolve})>{};
   final running = <String, Future<bool>>{};
   final seenIds = <String>{};
   final lastReset = <String, int>{};
@@ -245,13 +279,17 @@ abstract class _Base {
 
   Contact? contactOf(String? id) => id == null ? null : state.contact(id);
 
-  bool isFrame(Uint8List payload) => payload.isNotEmpty && payload[0] == frameTag;
+  bool isFrame(Uint8List payload) =>
+      payload.isNotEmpty && payload[0] == frameTag;
 
   bool validAvatar(Object? av) => av == '' || isAvatar(av);
 
-  bool chunkFits(Uint8List bytes) => bytes.isNotEmpty && bytes.length <= chunkSize;
+  bool chunkFits(Uint8List bytes) =>
+      bytes.isNotEmpty && bytes.length <= chunkSize;
 
-  Future<Map<String, Object?>> packLog(String text) async => {'z': b64(gzip.encode(utf8(text)))};
+  Future<Map<String, Object?>> packLog(String text) async => {
+    'z': b64(gzip.encode(utf8(text))),
+  };
 
   Future<String?> unpackLog(Map<String, Object?> body) async {
     final raw = body['raw'], z = body['z'];
@@ -294,7 +332,10 @@ abstract class _Base {
     final att = m['att'];
     return db.putMsg({
       ...m,
-      if (att is Map) 'att': {...att}..remove('bytes')..remove('path'),
+      if (att is Map)
+        'att': {...att}
+          ..remove('bytes')
+          ..remove('path'),
     });
   }
 
@@ -305,9 +346,13 @@ abstract class _Base {
     return c != null && truthy(c.ik) ? hex(tagOf(c)) : null;
   }
 
-  Future<void> persistTokens() => db.put('kv', 'tokens', {'pending': tokenPending, 'used': tokenUsed});
+  Future<void> persistTokens() =>
+      db.put('kv', 'tokens', {'pending': tokenPending, 'used': tokenUsed});
 
-  bool consented(Contact? c) => c != null && !truthy(c.request) && (c.addedVia != 'incoming' || truthy(c['cardSent']));
+  bool consented(Contact? c) =>
+      c != null &&
+      !truthy(c.request) &&
+      (c.addedVia != 'incoming' || truthy(c['cardSent']));
 
   bool canCall(Contact? c) => consented(c);
 
@@ -344,14 +389,26 @@ abstract class _Base {
     if (!msg.containsKey('g')) return f;
     final g = msg['g'];
     final chat = g is String ? chatOf(g) : null;
-    return chat != null && chat.type == 'group' && (chat.members ?? const []).contains(f) ? g as String : null;
+    return chat != null &&
+            chat.type == 'group' &&
+            (chat.members ?? const []).contains(f)
+        ? g as String
+        : null;
   }
 
-  String? groupOf(String chatId) => chatOf(chatId)?.type == 'group' ? chatId : null;
+  String? groupOf(String chatId) =>
+      chatOf(chatId)?.type == 'group' ? chatId : null;
 
-  String? captionOf(Object? v) => v is String && v.length <= maxText && v.trim().isNotEmpty ? v : null;
+  String? captionOf(Object? v) =>
+      v is String && v.length <= maxText && v.trim().isNotEmpty ? v : null;
 
-  void touchChat(String chatId, String text, int ts, [int unread = 0, String? lastKind]) {
+  void touchChat(
+    String chatId,
+    String text,
+    int ts, [
+    int unread = 0,
+    String? lastKind,
+  ]) {
     final chat = chatOf(chatId);
     if (chat == null) return;
     chat['lastText'] = text;
@@ -362,10 +419,27 @@ abstract class _Base {
     fire(persistChat(chat));
   }
 
-  Chat ensureChat(String id, String type, String name, [List<String>? members]) {
+  Chat ensureChat(
+    String id,
+    String type,
+    String name, [
+    List<String>? members,
+  ]) {
     var chat = chatOf(id);
     if (chat == null) {
-      state.chats.add(Chat(state.map({'id': id, 'type': type, 'name': name, 'lastText': '', 'lastTs': now(), 'unread': 0, 'members': ?members})));
+      state.chats.add(
+        Chat(
+          state.map({
+            'id': id,
+            'type': type,
+            'name': name,
+            'lastText': '',
+            'lastTs': now(),
+            'unread': 0,
+            'members': ?members,
+          }),
+        ),
+      );
       chat = state.chats.last;
     } else {
       chat.name = name;
@@ -389,9 +463,12 @@ abstract class _Base {
     var chat = chatOf(chatId);
     final peer = contactOf(chatId);
     if (truthy(peer?.request)) throw RipploError('no_chat');
-    if (chat == null && peer != null) chat = ensureChat(chatId, 'direct', peer.name);
+    if (chat == null && peer != null)
+      chat = ensureChat(chatId, 'direct', peer.name);
     if (chat == null) throw RipploError('no_chat');
-    return chat.type == 'group' ? [for (final x in chat.members ?? const []) x as String] : [chatId];
+    return chat.type == 'group'
+        ? [for (final x in chat.members ?? const []) x as String]
+        : [chatId];
   }
 
   void loadMe(String name, [String avatar = '']) {
@@ -402,10 +479,17 @@ abstract class _Base {
       id: ids.ripploId,
       name: name,
       avatar: avatar,
-      avVer: avatar.isNotEmpty ? cut(hex(c.sha256.convert(utf8(avatar)).bytes), 0, 8) : '',
+      avVer: avatar.isNotEmpty
+          ? cut(hex(c.sha256.convert(utf8(avatar)).bytes), 0, 8)
+          : '',
       card: encodeCard(name, own.bundle),
     );
-    state.profile = {'name': name, 'ripploId': ids.ripploId, 'tag': hex(ids.tag), 'avatar': avatar};
+    state.profile = {
+      'name': name,
+      'ripploId': ids.ripploId,
+      'tag': hex(ids.tag),
+      'avatar': avatar,
+    };
   }
 
   Future<void> init() async {
@@ -421,21 +505,37 @@ abstract class _Base {
       }
     }
     state.contacts = {
-      for (final (id, v) in await db.all('contacts')) id: {..._obj(v), 'verifyState': 'idle'},
+      for (final (id, v) in await db.all('contacts'))
+        id: {..._obj(v), 'verifyState': 'idle'},
     };
     state.chats = [for (final (_, v) in await db.all('chats')) v];
     state.chats.sort((a, b) => b.lastTs.compareTo(a.lastTs));
     final p = await db.get('kv', 'pending');
-    pending = p is Map ? {for (final e in p.entries) '${e.key}': _obj(e.value)} : {};
+    pending = p is Map
+        ? {for (final e in p.entries) '${e.key}': _obj(e.value)}
+        : {};
     final tk = await db.get('kv', 'tokens');
-    tokenPending = tk is Map && tk['pending'] is List ? [for (final x in tk['pending'] as List) '$x'] : [];
-    tokenUsed = tk is Map && tk['used'] is Map ? {for (final e in (tk['used'] as Map).entries) '${e.key}': '${e.value}'} : {};
+    tokenPending = tk is Map && tk['pending'] is List
+        ? [for (final x in tk['pending'] as List) '$x']
+        : [];
+    tokenUsed = tk is Map && tk['used'] is Map
+        ? {
+            for (final e in (tk['used'] as Map).entries)
+              '${e.key}': '${e.value}',
+          }
+        : {};
     final us = await db.get('kv', 'unsent');
-    unsent = {if (us is List) for (final x in us) '$x'};
+    unsent = {
+      if (us is List)
+        for (final x in us) '$x',
+    };
     final dl = await db.get('kv', 'devLogs');
     state.devLogs = dl is List ? dl : const [];
     final un = await db.get('kv', 'unsends');
-    unsends = [if (un is List) for (final x in un) _obj(x)];
+    unsends = [
+      if (un is List)
+        for (final x in un) _obj(x),
+    ];
     final pr = await db.get('kv', 'peopleRefreshedAt');
     state.peopleRefreshedAt = pr is num ? pr.toInt() : 0;
     final profile = await db.get('kv', 'profile');
@@ -459,7 +559,12 @@ abstract class _Base {
   }
 
   Future<void> start() async {
-    unsubs.add(mesh.on('packet', (e) => onPacket(e['packet'] as Uint8List, e['from'] as String?)));
+    unsubs.add(
+      mesh.on(
+        'packet',
+        (e) => onPacket(e['packet'] as Uint8List, e['from'] as String?),
+      ),
+    );
     unsubs.add(mesh.on('neighbor', onNeighbor));
     unsubs.add(mesh.on('opened', (rec) => enqueue(() => handleOpened(rec))));
     await mesh.start(me.tag);
@@ -497,7 +602,9 @@ abstract class _Base {
     final node = e['node'] as String;
     final up = e['up'] == true;
     final medium = e['medium'], kbps = e['kbps'], rttMs = e['rttMs'];
-    diagLog('neighbor ${up ? 'up ' : 'down '}${cut(node, 0, 8)} $medium ${kbps}kbps');
+    diagLog(
+      'neighbor ${up ? 'up ' : 'down '}${cut(node, 0, 8)} $medium ${kbps}kbps',
+    );
     final i = state.neighbors.indexWhere((n) => n.node == node);
     if (!up) {
       if (i >= 0) state.neighbors.removeAt(i);
@@ -512,7 +619,16 @@ abstract class _Base {
       n['kbps'] = kbps;
       n['rttMs'] = rttMs;
     } else {
-      state.neighbors.add(Neighbor(state.map({'node': node, 'medium': medium, 'kbps': kbps, 'rttMs': rttMs})));
+      state.neighbors.add(
+        Neighbor(
+          state.map({
+            'node': node,
+            'medium': medium,
+            'kbps': kbps,
+            'rttMs': rttMs,
+          }),
+        ),
+      );
       askCard(node, 0);
       fire(flushUnsends());
     }
@@ -524,11 +640,13 @@ abstract class _Base {
           if (fresh != null) break;
         }
         final cur = state.neighbors.where((n) => n.node == node).firstOrNull;
-        if (fresh?['links'] != null && cur != null) cur['links'] = fresh!['links'];
+        if (fresh?['links'] != null && cur != null)
+          cur['links'] = fresh!['links'];
       }),
     );
     final nb = state.neighbors.firstWhere((n) => n.node == node);
-    if (nb['card'] == null && helloCards.containsKey(node)) nb['card'] = helloCards[node];
+    if (nb['card'] == null && helloCards.containsKey(node))
+      nb['card'] = helloCards[node];
     if (i < 0) sendHello(node, nb['card'] == null);
   }
 
@@ -548,7 +666,8 @@ abstract class _Base {
         if (p.payload.isEmpty) return;
         if (p.payload[0] == 2) {
           enqueue(() => onChunk(p));
-        } else if (p.payload[0] == 1 || (mesh.devCrypto && p.payload[0] == 0xee)) {
+        } else if (p.payload[0] == 1 ||
+            (mesh.devCrypto && p.payload[0] == 0xee)) {
           enqueue(() => onSealed(p.payload));
         }
       case PacketType.ack:
@@ -572,9 +691,14 @@ abstract class _Base {
   Future<TxResult> transmit(Uint8List pkt, [int? ms]) {
     final id = pktId(pkt);
     final done = Completer<TxResult>();
-    final timer = Timer(Duration(milliseconds: ms ?? tm('ack')), () => settle(id, txFail));
+    final timer = Timer(
+      Duration(milliseconds: ms ?? tm('ack')),
+      () => settle(id, txFail),
+    );
     waits[id] = (done: done, timer: timer);
-    mesh.send(pkt).then<void>((_) {}, onError: (Object _) => settle(id, txError));
+    mesh
+        .send(pkt)
+        .then<void>((_) {}, onError: (Object _) => settle(id, txError));
     return done.future;
   }
 
@@ -585,17 +709,26 @@ abstract class _Base {
     w.done.complete(result);
   }
 
-  Future<Uint8List> buildPacket(Contact c, Map<String, Object?> extra, [bool bare = false]) async {
+  Future<Uint8List> buildPacket(
+    Contact c,
+    Map<String, Object?> extra, [
+    bool bare = false,
+  ]) async {
     var obj = extra;
     if (!bare) {
       if (!c.cardAck) {
-        obj = {...extra, 'c': b64(me.card), if (truthy(c['token'])) 'tk': c['token']};
+        obj = {
+          ...extra,
+          'c': b64(me.card),
+          if (truthy(c['token'])) 'tk': c['token'],
+        };
         if (!truthy(c['cardSent'])) {
           c['cardSent'] = now();
           fire(persistContact(c));
         }
       }
-      if ((truthy(me.avatar) || truthy(c['avSent'])) && c['avSent'] != me.avVer) {
+      if ((truthy(me.avatar) || truthy(c['avSent'])) &&
+          c['avSent'] != me.avVer) {
         obj = {...obj, 'av': me.avatar};
         c['avSent'] = me.avVer;
         fire(persistContact(c));
@@ -612,7 +745,11 @@ abstract class _Base {
       }
     }
     final payload = await mesh.signalSeal(hex(tagOf(c)), utf8(jsonEncode(obj)));
-    return encodePacket(type: PacketType.data, dest: tagOf(c), payload: payload);
+    return encodePacket(
+      type: PacketType.data,
+      dest: tagOf(c),
+      payload: payload,
+    );
   }
 
   Future<void> startCall(String id) async {
@@ -630,9 +767,12 @@ abstract class _Base {
     if (!consented(c)) return;
     void failed() => c.vfSent = '?';
     fire(
-      buildPacket(c, {'t': 'profile'}).then((p) => transmit(p)).then<void>((r) {
-        if (!r.ok) failed();
-      }).catchError((Object _) => failed()),
+      buildPacket(c, {'t': 'profile'})
+          .then((p) => transmit(p))
+          .then<void>((r) {
+            if (!r.ok) failed();
+          })
+          .catchError((Object _) => failed()),
     );
   }
 
@@ -686,9 +826,12 @@ abstract class _Base {
       }
 
       fire(
-        buildPacket(c, {'t': 'profile'}).then((p) => transmit(p)).then<void>((r) {
-          if (!r.ok) failed();
-        }).catchError((Object _) => failed()),
+        buildPacket(c, {'t': 'profile'})
+            .then((p) => transmit(p))
+            .then<void>((r) {
+              if (!r.ok) failed();
+            })
+            .catchError((Object _) => failed()),
       );
     }
   }
@@ -712,14 +855,21 @@ abstract class _Base {
   void sendHello(String node, bool ask) {
     if (state.settings.hidden) {
       final nb = state.neighbors.where((n) => n.node == node).firstOrNull;
-      final card = nb == null || !truthy(nb['card']) ? helloCards[node] : nb['card'];
+      final card = nb == null || !truthy(nb['card'])
+          ? helloCards[node]
+          : nb['card'];
       final id = card is Map ? card['id'] : null;
       final c = id is String ? contactOf(id) : null;
       if (!truthy(id) || c == null || truthy(c.request)) return;
     }
     greeted.add(node);
     diagLog('hello out ${cut(node, 0, 8)}${ask ? ' ask' : ''}');
-    fire(mesh.sendApp(node, utf8(jsonEncode({'t': 'hello', 'card': b64(me.card), if (ask) 'r': 1}))));
+    fire(
+      mesh.sendApp(
+        node,
+        utf8(jsonEncode({'t': 'hello', 'card': b64(me.card), if (ask) 'r': 1})),
+      ),
+    );
   }
 
   void askCard(String node, int n) {
@@ -733,7 +883,8 @@ abstract class _Base {
   }
 
   Future<bool> resetSession(Contact c) async {
-    if (!truthy(c.card) || now() - (lastReset[c.id] ?? 0) < resetGap) return false;
+    if (!truthy(c.card) || now() - (lastReset[c.id] ?? 0) < resetGap)
+      return false;
     lastReset[c.id] = now();
     final v = checkCard(unb64(c.card!));
     try {
@@ -755,7 +906,8 @@ abstract class _Base {
   Future<void> deleteChat(String chatId) async {
     for (final m in await db.msgs(chatId)) {
       final att = m['att'];
-      if (att is Map && att['attId'] is String) await db.del('blobs', att['attId'] as String);
+      if (att is Map && att['attId'] is String)
+        await db.del('blobs', att['attId'] as String);
       await db.delMsg(m['id'] as String);
     }
     state.messages.remove(chatId);
@@ -777,7 +929,13 @@ abstract class _Base {
   }
 
   Future<void> saveSettings(Map<String, Object?> patch) async {
-    for (final k in const ['autoUpdate', 'backgroundRelay', 'appLock', 'hidden', 'dev']) {
+    for (final k in const [
+      'autoUpdate',
+      'backgroundRelay',
+      'appLock',
+      'hidden',
+      'dev',
+    ]) {
       if (patch[k] is bool) state.settings[k] = patch[k];
     }
     if (patch['hidden'] == false) {
@@ -789,13 +947,17 @@ abstract class _Base {
       for (final n in state.neighbors.toList()) {
         final card = n['card'];
         final c = card is Map ? contactOf(card['id'] as String?) : null;
-        if (c == null || truthy(c.request)) fire(mesh.sendApp(n.node, utf8('{"t":"bye"}')));
+        if (c == null || truthy(c.request))
+          fire(mesh.sendApp(n.node, utf8('{"t":"bye"}')));
       }
     }
     await db.put('kv', 'settings', {...state.settings});
   }
 
-  ({Msg m, List<String> recips}) newOutgoing(String chatId, Map<String, Object?> extra);
+  ({Msg m, List<String> recips}) newOutgoing(
+    String chatId,
+    Map<String, Object?> extra,
+  );
   Future<void> fanout(Msg m, Map<String, Object?> body, List<String> recips);
   Map<String, Object?> textBody(Msg m, String? group);
   Map<String, Object?>? localRef(String chatId, String localId);
@@ -803,7 +965,15 @@ abstract class _Base {
   Future<({bool ok, int? hops})> sendDevLog(String to, String text);
   void deleteDevLog(String id);
   Future<Msg> sendText(String chatId, Object? text, [String? replyTo]);
-  Future<Msg> sendAttachment(String chatId, AttFile file, String kind, {num? duration, List<Object?>? wave, Object? caption, String? replyTo});
+  Future<Msg> sendAttachment(
+    String chatId,
+    AttFile file,
+    String kind, {
+    num? duration,
+    List<Object?>? wave,
+    Object? caption,
+    String? replyTo,
+  });
   Future<void> runAttachment(Msg m, Uint8List bytes, List<String> recips);
   Future<void> retry(String msgId);
   void resendFor(String id);
@@ -811,7 +981,11 @@ abstract class _Base {
   void onTyping(Contact c, Map<String, Object?> msg);
   Future<void> sendTyping(String chatId);
   Future<void> onAppMessage(String f, Object? msg);
-  Future<void> receive(Map<String, Object?> m, String preview, [String? notifyBody]);
+  Future<void> receive(
+    Map<String, Object?> m,
+    String preview, [
+    String? notifyBody,
+  ]);
   Future<void> onGroup(String f, Map<String, Object?> msg);
   Future<void> removeMessage(String chatId, String localId);
   Future<void> flushUnsends();
@@ -830,7 +1004,15 @@ abstract class _Base {
   Future<void> processOpened(Opened r, bool silent);
   Future<void> processOpenedInner(Opened r);
   Future<void> onOpenFailed(Object e);
-  Future<Contact> addContact({required String id, required String name, required String ik, required String? card, required String addedVia, String? request, String? token});
+  Future<Contact> addContact({
+    required String id,
+    required String name,
+    required String ik,
+    required String? card,
+    required String addedVia,
+    String? request,
+    String? token,
+  });
   Future<Contact> learnCard(ParsedCard v, String via, [String? token]);
   void markConflicts(String name, String id);
   Future<Contact?> addCard(Uint8List raw, String via, [String? token]);
@@ -846,7 +1028,11 @@ abstract class _Base {
   Future<bool> verifyByQr(String id, Object? scanned);
   Future<void> markVerified(String id);
   Future<String> safetyNumber(String id);
-  Future<void> discoverRound({required Map<String, Object?> payload, required int timeout, required int quiet});
+  Future<void> discoverRound({
+    required Map<String, Object?> payload,
+    required int timeout,
+    required int quiet,
+  });
   Future<void> refreshPeople();
   Future<void> searchPeople(Object? raw);
   void onReply(Packet p);
@@ -854,5 +1040,13 @@ abstract class _Base {
 }
 
 class Core extends _Base with _Msgs, _Contacts {
-  Core({required super.mesh, super.dbName, super.state, super.notifier, super.timing, super.audio, super.raw});
+  Core({
+    required super.mesh,
+    super.dbName,
+    super.state,
+    super.notifier,
+    super.timing,
+    super.audio,
+    super.raw,
+  });
 }

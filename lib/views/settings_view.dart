@@ -9,6 +9,7 @@ import 'package:material_ui/material_ui.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../components/backup_card.dart';
+import '../components/settings_parts.dart';
 import '../contributors.dart';
 import '../core/api.dart' as api;
 import '../core/diag.dart';
@@ -344,31 +345,68 @@ class _SettingsViewState extends State<SettingsView> {
     String label,
     String hint, {
     Color? color,
+    FontWeight? weight,
+    double lift = 0,
   }) => Expanded(
-    child: Text.rich(
-      TextSpan(
-        children: [
-          TextSpan(text: label, style: rs(context, RipploText.rowLabel, color)),
-          const TextSpan(text: '\n'),
-          TextSpan(
-            text: hint,
-            style: rs(context, RipploText.rowHint, context.rc.text2),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Transform.translate(
+          offset: Offset(0, -1 - lift),
+          child: Text(
+            label,
+            style: rs(
+              context,
+              RipploText.rowLabel.copyWith(fontWeight: weight),
+              color,
+            ),
+            strutStyle: _strut,
           ),
-        ],
-      ),
-      strutStyle: _strut,
+        ),
+        Transform.translate(
+          offset: Offset(0, -1 - lift),
+          child: Text(
+            hint,
+            style: rs(context, RipploText.rowHint, context.rc.text2),
+            strutStyle: _strut,
+          ),
+        ),
+      ],
     ),
+  );
+
+  Widget _hint(String text, {double extra = 0, double dy = -2}) => FracText(
+    text,
+    rs(context, RipploText.rowHint, context.rc.text2),
+    dy: dy,
+    extra: extra,
   );
 
   Widget _sm(String text, VoidCallback? onTap, {bool ghost = false}) =>
       IntrinsicWidth(
         child: RBtn(
-          text: text,
           sm: true,
           kind: ghost ? RBtnKind.ghost : RBtnKind.primary,
           onTap: onTap,
+          child: Transform.translate(
+            offset: const Offset(0, -1.5),
+            child: Text(
+              text,
+              style: rs(
+                context,
+                RipploText.btnSm,
+                ghost ? context.rc.text : context.rc.onAccent,
+              ),
+            ),
+          ),
         ),
       );
+
+  Widget _lbl(String text) =>
+      Transform.translate(offset: const Offset(0, -1), child: RLabel(text));
+
+  Widget _val(String text) =>
+      Transform.translate(offset: const Offset(0, -1), child: RVal(text));
 
   Widget _acts(List<Widget> kids) => Expanded(
     child: Wrap(
@@ -379,8 +417,13 @@ class _SettingsViewState extends State<SettingsView> {
     ),
   );
 
-  Widget _hintRow(String text) =>
-      RRow(children: [Expanded(child: RHint(text))]);
+  Widget _hintRow(String text, {double extra = 0}) => RRow(
+    children: [
+      Expanded(
+        child: _hint(text, extra: extra, dy: extra > 0 ? -2 : -1),
+      ),
+    ],
+  );
 
   Widget _toggle(
     String label,
@@ -429,33 +472,36 @@ class _SettingsViewState extends State<SettingsView> {
                       }),
                       builder: (_, _) => SizedBox(
                         height: 44,
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            SizedBox(
-                              height: 18,
-                              child: Text(
-                                p?.name ?? '',
-                                style: rs(
-                                  context,
-                                  RipploText.rowLabel.copyWith(height: 1.2),
+                        child: Transform.translate(
+                          offset: const Offset(0, -1),
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              SizedBox(
+                                height: 18,
+                                child: Text(
+                                  p?.name ?? '',
+                                  style: rs(
+                                    context,
+                                    RipploText.rowLabel.copyWith(height: 1.2),
+                                  ),
                                 ),
                               ),
-                            ),
-                            const SizedBox(height: 2),
-                            SizedBox(
-                              height: 15.6,
-                              child: Text(
-                                p?.ripploId ?? '',
-                                style: monoStyle(
-                                  context,
-                                  RipploText.rowHint.copyWith(height: 1.2),
-                                  c.text2,
+                              const SizedBox(height: 2),
+                              SizedBox(
+                                height: 15.6,
+                                child: Text(
+                                  p?.ripploId ?? '',
+                                  style: monoStyle(
+                                    context,
+                                    RipploText.rowHint.copyWith(height: 1.2),
+                                    c.text2,
+                                  ),
                                 ),
                               ),
-                            ),
-                          ],
+                            ],
+                          ),
                         ),
                       ),
                     )
@@ -482,7 +528,7 @@ class _SettingsViewState extends State<SettingsView> {
               ]),
             ],
           ),
-        _hintRow(t('photoHint')),
+        _hintRow(t('photoHint'), extra: .6),
         _toggle(
           t('discoverable'),
           t('discoverableHint'),
@@ -493,7 +539,7 @@ class _SettingsViewState extends State<SettingsView> {
           onTap: widget.onMyCode ?? () => ui.add = const AddRequest(),
           children: [
             Lucide(LucideIcons.qrCode, size: 22, strokeWidth: 1.75),
-            Expanded(child: RLabel(t('myCode'))),
+            Expanded(child: _lbl(t('myCode'))),
           ],
         ),
       ],
@@ -510,7 +556,7 @@ class _SettingsViewState extends State<SettingsView> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: gapped(
             [
-              RSeg<String>(
+              _Seg(
                 options: [
                   for (final m in const ['system', 'dark', 'light'])
                     (m, t('mode_$m')),
@@ -521,7 +567,7 @@ class _SettingsViewState extends State<SettingsView> {
               Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  RHint(t('accent')),
+                  _hint(t('accent')),
                   RSwatches(
                     children: [
                       for (final a in kAccents)
@@ -544,7 +590,7 @@ class _SettingsViewState extends State<SettingsView> {
               Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  RHint(t('background')),
+                  _hint(t('background')),
                   RSwatches(
                     children: [
                       for (final g in kGradients)
@@ -565,7 +611,7 @@ class _SettingsViewState extends State<SettingsView> {
                   ),
                 ],
               ),
-              RSeg<String>(
+              _Seg(
                 options: const [('en', 'English'), ('pl', 'Polski')],
                 value: locale.value,
                 onChanged: setLocale,
@@ -596,9 +642,9 @@ class _SettingsViewState extends State<SettingsView> {
                 }.join(' + ')} · ${_kbps(n)}',
               ),
               if (js.truthy(n['unsupported']))
-                RChip(t('updateNeeded'))
+                _Chip(t('updateNeeded'))
               else
-                RChip(t('connected'), kind: RChipKind.ok),
+                _Chip(t('connected'), kind: RChipKind.ok),
             ],
           ),
           if (_openNode == n.node)
@@ -634,12 +680,38 @@ class _SettingsViewState extends State<SettingsView> {
     };
     return RCard(
       children: [
-        if (s.devCrypto) RDevWarnRow(t('devCryptoWarn')),
-        RRow(
-          children: [
-            Lucide(icon, size: 22, strokeWidth: 1.75),
-            _twoLine(context, t('integrity'), t(hint)),
-          ],
+        if (s.devCrypto)
+          RRow(
+            color: c.danger,
+            children: [
+              Lucide(
+                LucideIcons.triangleAlert,
+                size: kIconSize,
+                color: c.danger,
+              ),
+              Expanded(
+                child: Transform.translate(
+                  offset: const Offset(0, -1),
+                  child: Text(
+                    t('devCryptoWarn'),
+                    style: rs(
+                      context,
+                      RipploText.body.copyWith(fontWeight: FontWeight.w600),
+                      c.danger,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ConstrainedBox(
+          constraints: const BoxConstraints(minHeight: 60),
+          child: RRow(
+            children: [
+              Lucide(icon, size: 22, strokeWidth: 1.75),
+              _twoLine(context, t('integrity'), t(hint), lift: 1),
+            ],
+          ),
         ),
         RRow(
           color: s.insecureStorage ? c.warn : null,
@@ -696,8 +768,8 @@ class _SettingsViewState extends State<SettingsView> {
             tooltip: t('holdToSendLogs'),
             child: RRow(
               children: [
-                Expanded(child: RLabel(t('currentVersion'))),
-                RVal(u.current.isEmpty ? '–' : u.current),
+                Expanded(child: _lbl(t('currentVersion'))),
+                _val(u.current.isEmpty ? '–' : u.current),
               ],
             ),
           ),
@@ -705,8 +777,8 @@ class _SettingsViewState extends State<SettingsView> {
         if (!fromPlay)
           RRow(
             children: [
-              Expanded(child: RLabel(t('latestVersion'))),
-              RVal((u.latest ?? '').isEmpty ? '–' : u.latest!),
+              Expanded(child: _lbl(t('latestVersion'))),
+              _val((u.latest ?? '').isEmpty ? '–' : u.latest!),
             ],
           ),
         if (!fromPlay && js.truthy(u.error)) _hintRow(u.error!),
@@ -769,7 +841,7 @@ class _SettingsViewState extends State<SettingsView> {
 
   Widget _toggle2(String label, bool value, ValueChanged<bool> on) => RRow(
     children: [
-      Expanded(child: RLabel(label)),
+      Expanded(child: _lbl(label)),
       RSwitch(value: value, onChanged: on, label: label),
     ],
   );
@@ -780,19 +852,19 @@ class _SettingsViewState extends State<SettingsView> {
       children: [
         RRow(
           onTap: _aboutTap,
-          children: [_twoLine(context, 'Ripplo', t('tagline')), RVal(cur)],
+          children: [_twoLine(context, 'Ripplo', t('tagline')), _val(cur)],
         ),
         RRow(
           onTap: () => _open(_repo),
           children: [
-            const Expanded(child: RLabel('GitHub')),
+            Expanded(child: _lbl('GitHub')),
             Lucide(LucideIcons.externalLink, size: 18),
           ],
         ),
         RRow(
           children: [
-            Expanded(child: RLabel(t('license'))),
-            const RVal('AGPL-3.0'),
+            Expanded(child: _lbl(t('license'))),
+            _val('AGPL-3.0'),
           ],
         ),
       ],
@@ -817,8 +889,8 @@ class _SettingsViewState extends State<SettingsView> {
         for (final x in _devTransports)
           RRow(
             children: [
-              Expanded(child: RLabel('${x['name']}')),
-              RChip(
+              Expanded(child: _lbl('${x['name']}')),
+              _Chip(
                 js.truthy(x['running'])
                     ? 'running'
                     : js.truthy(x['unsupported'])
@@ -834,8 +906,8 @@ class _SettingsViewState extends State<SettingsView> {
           ),
         RRow(
           children: [
-            const Expanded(child: RLabel('ble coded')),
-            RChip(
+            Expanded(child: _lbl('ble coded')),
+            _Chip(
               caps ? 'supported' : 'unsupported',
               kind: caps ? RChipKind.ok : RChipKind.bad,
             ),
@@ -933,7 +1005,7 @@ class _SettingsViewState extends State<SettingsView> {
         for (final n in s.neighbors)
           RRow(
             children: [
-              Expanded(child: RLabel(_nodeName(n))),
+              Expanded(child: _lbl(_nodeName(n))),
               SizedBox(
                 width: 120,
                 child: _Select(
@@ -987,8 +1059,7 @@ class _SettingsViewState extends State<SettingsView> {
         ),
       ),
     );
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
+    return _Tap(
       onTap: () => _open('https://github.com/$login'),
       child: RCard(
         pad: true,
@@ -1047,30 +1118,148 @@ class _SettingsViewState extends State<SettingsView> {
     listenable: Listenable.merge([_state, locale, widget.theme]),
     builder: (context, _) {
       final s = _state;
-      return RPage(
-        controller: widget.controller,
-        children: [
-          RHdr(children: [RHdrTitle(t('settings'))]),
-          RSection(t('profile')),
-          _profile(s),
-          RSection(t('appearance')),
-          _appearance(),
-          RSection(t('network')),
-          _network(s),
-          RSection(t('security')),
-          _security(s),
-          BackupCard(mesh: widget.mesh, backupMeta: widget.backupMeta),
-          RSection(t('updates')),
-          _updates(s),
-          RSection(t('about')),
-          _about(s),
-          if (s.settings.dev) ...[RSection(t('developer')), _developer(s)],
-          RSection(t('contributors')),
-          for (final c in contributors) _contributor(c['login']!),
-        ],
-      );
+      final kids = <Widget>[
+        RHdr(
+          children: [
+            Expanded(
+              child: Transform.translate(
+                offset: const Offset(0, -.5),
+                child: Text(t('settings'), style: rs(context, RipploText.h1)),
+              ),
+            ),
+          ],
+        ),
+        SectionHead(t('profile')),
+        _profile(s),
+        SectionHead(t('appearance')),
+        _appearance(),
+        SectionHead(t('network')),
+        _network(s),
+        SectionHead(t('security')),
+        _security(s),
+        BackupCard(mesh: widget.mesh, backupMeta: widget.backupMeta),
+        SectionHead(t('updates')),
+        _updates(s),
+        SectionHead(t('about')),
+        _about(s),
+        if (s.settings.dev) ...[SectionHead(t('developer')), _developer(s)],
+        SectionHead(t('contributors')),
+        for (final c in contributors) _contributor(c['login']!),
+      ];
+      return RPage(controller: widget.controller, children: kids);
     },
   );
+}
+
+class _Tap extends StatelessWidget implements Margined {
+  const _Tap({required this.onTap, required this.child});
+
+  final VoidCallback onTap;
+  final Widget child;
+
+  @override
+  double get marginTop => 0;
+
+  @override
+  double get marginBottom => kCardMarginBottom;
+
+  @override
+  Widget build(BuildContext context) => GestureDetector(
+    behavior: HitTestBehavior.opaque,
+    onTap: onTap,
+    child: child,
+  );
+}
+
+class _Seg extends StatelessWidget {
+  const _Seg({
+    required this.options,
+    required this.value,
+    required this.onChanged,
+  });
+
+  final List<(String, String)> options;
+  final String value;
+  final ValueChanged<String> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.rc;
+    return Container(
+      padding: const EdgeInsets.all(kSegPad),
+      decoration: BoxDecoration(
+        color: c.surface2,
+        borderRadius: BorderRadius.circular(kRadiusPill),
+      ),
+      child: Row(
+        children: [
+          for (final (v, label) in options)
+            Expanded(
+              child: Pressable(
+                radius: kRadiusPill,
+                selected: v == value,
+                label: label,
+                onTap: () => onChanged(v),
+                builder: (context, _) {
+                  final on = v == value;
+                  return Container(
+                    constraints: const BoxConstraints(minHeight: kSegBtnMin),
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color: on ? c.accent : null,
+                      borderRadius: BorderRadius.circular(kRadiusPill),
+                    ),
+                    child: Transform.translate(
+                      offset: const Offset(0, -2),
+                      child: Text(
+                        label,
+                        style: rs(
+                          context,
+                          on ? RipploText.segOn : RipploText.seg,
+                          on ? c.onAccent : c.text2,
+                        ),
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _Chip extends StatelessWidget {
+  const _Chip(this.text, {this.kind = RChipKind.plain});
+
+  final String text;
+  final RChipKind kind;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.rc;
+    final fg = switch (kind) {
+      RChipKind.plain => c.text2,
+      RChipKind.ok => c.ok,
+      RChipKind.bad => c.danger,
+      RChipKind.warn => c.warn,
+    };
+    return Container(
+      padding: const EdgeInsets.symmetric(
+        horizontal: kChipPadX,
+        vertical: kChipPadY,
+      ),
+      decoration: BoxDecoration(
+        color: c.surface2,
+        borderRadius: BorderRadius.circular(kRadiusPill),
+      ),
+      child: Transform.translate(
+        offset: const Offset(0, -1.5),
+        child: Text(text, style: rs(context, RipploText.chip, fg)),
+      ),
+    );
+  }
 }
 
 class _Select extends StatelessWidget {
@@ -1112,7 +1301,7 @@ class _Select extends StatelessWidget {
                 overflow: TextOverflow.ellipsis,
               ),
             ),
-            CustomPaint(size: const Size(10, 6), painter: _Chevron(c.text)),
+            CustomPaint(size: const Size(9, 5), painter: _Chevron(c.text)),
           ],
         ),
       ),

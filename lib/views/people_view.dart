@@ -298,7 +298,7 @@ class _PeopleViewState extends State<PeopleView> {
     VoidCallback? add,
   }) {
     final req = _request(id);
-    if (contact)
+    if (contact) {
       return Lucide(
         LucideIcons.check,
         size: 22,
@@ -306,17 +306,24 @@ class _PeopleViewState extends State<PeopleView> {
         color: context.rc.ok,
         semanticLabel: t('inContacts'),
       );
-    if (req == 'in')
+    }
+    if (req == 'in') {
       return IntrinsicWidth(
-        child: RBtn(text: t('accept'), sm: true, onTap: () => _accept(id)),
+        child: RBtn(
+          sm: true,
+          onTap: () => _accept(id),
+          child: _Up(1.5, Text(t('accept'))),
+        ),
       );
-    if (req == 'out' && !(_state.contact(id)?.inviteFailed ?? false))
+    }
+    if (req == 'out' && !(_state.contact(id)?.inviteFailed ?? false)) {
       return RChip(t('invited'));
+    }
     return IntrinsicWidth(
       child: RBtn(
-        text: req != null ? t('retry') : t('invite'),
         sm: true,
         onTap: add,
+        child: _Up(1.5, Text(req != null ? t('retry') : t('invite'))),
       ),
     );
   }
@@ -472,7 +479,7 @@ class _PeopleViewState extends State<PeopleView> {
                 child: Align(
                   alignment: Alignment.topLeft,
                   child: Padding(
-                    padding: const EdgeInsets.only(top: 1),
+                    padding: const EdgeInsets.only(top: 0.5),
                     child: Row(
                       crossAxisAlignment: CrossAxisAlignment.baseline,
                       textBaseline: TextBaseline.alphabetic,
@@ -508,7 +515,16 @@ class _PeopleViewState extends State<PeopleView> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             _Up(1.75, RLabel(p.name)),
-            RHint(t('hops', {'n': p.hops})),
+            SizedBox(
+              height: 21.7,
+              child: Align(
+                alignment: Alignment.topLeft,
+                child: Padding(
+                  padding: const EdgeInsets.only(top: 0.6),
+                  child: RHint(t('hops', {'n': p.hops})),
+                ),
+              ),
+            ),
           ],
         ),
       ),

@@ -58,11 +58,9 @@ typedef _MallocC = Pointer<Void> Function(IntPtr);
 typedef _MallocD = Pointer<Void> Function(int);
 typedef _FreeC = Void Function(Pointer<Void>);
 typedef _FreeD = void Function(Pointer<Void>);
-typedef _CreateC =
-    Pointer<Void> Function(Int32, Int32, Int32, Pointer<Int32>);
+typedef _CreateC = Pointer<Void> Function(Int32, Int32, Int32, Pointer<Int32>);
 typedef _CreateD = Pointer<Void> Function(int, int, int, Pointer<Int32>);
-typedef _CtlC =
-    Int32 Function(Pointer<Void>, Int32, VarArgs<(Int32,)>);
+typedef _CtlC = Int32 Function(Pointer<Void>, Int32, VarArgs<(Int32,)>);
 typedef _CtlD = int Function(Pointer<Void>, int, int);
 typedef _EncodeC =
     Int32 Function(Pointer<Void>, Pointer<Int16>, Int32, Pointer<Uint8>, Int32);
@@ -207,12 +205,9 @@ double _peak(Int16List s) {
 }
 
 class OpusCallAudio implements CallAudio {
-  OpusCallAudio(
-    this._backend, {
-    OpusCodecs? codecs,
-    int Function()? clockMs,
-  }) : _codecs = codecs ?? _loadedOrThrow(),
-       _clockMs = clockMs ?? (() => DateTime.now().millisecondsSinceEpoch);
+  OpusCallAudio(this._backend, {OpusCodecs? codecs, int Function()? clockMs})
+    : _codecs = codecs ?? _loadedOrThrow(),
+      _clockMs = clockMs ?? (() => DateTime.now().millisecondsSinceEpoch);
 
   static OpusCodecs _loadedOrThrow() {
     final c = _loaded;

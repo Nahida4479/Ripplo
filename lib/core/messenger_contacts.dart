@@ -4,7 +4,9 @@ final _jsSpace = RegExp(r'[\s   -     　﻿]+');
 final _digits60 = RegExp(r'^\d{60}$');
 
 mixin _Contacts on _Base {
-  Iterable<Contact> get _allContacts => [for (final v in state.contacts.values) Contact(v as ObsMap)];
+  Iterable<Contact> get _allContacts => [
+    for (final v in state.contacts.values) Contact(v as ObsMap),
+  ];
 
   @override
   Future<void> onSealed(Uint8List payload) async {
@@ -21,7 +23,11 @@ mixin _Contacts on _Base {
   Future<void> handleOpened(Map<String, Object?> rec) async {
     Opened r;
     try {
-      r = (tag: '${rec['tag']}', ik: unb64(rec['ik'] as String), plaintext: unb64(rec['plaintext'] as String));
+      r = (
+        tag: '${rec['tag']}',
+        ik: unb64(rec['ik'] as String),
+        plaintext: unb64(rec['plaintext'] as String),
+      );
     } catch (_) {
       return;
     }
@@ -54,7 +60,14 @@ mixin _Contacts on _Base {
       final asking = m?['t'] == 'invite';
       if (asking && state.settings.hidden) return;
       final known = knownName(f);
-      await addContact(id: f, name: truthy(known) ? known! : 'Ripplo ${cut(f, 0, 4)}', ik: b64(r.ik), card: null, addedVia: 'incoming', request: asking ? 'in' : null);
+      await addContact(
+        id: f,
+        name: truthy(known) ? known! : 'Ripplo ${cut(f, 0, 4)}',
+        ik: b64(r.ik),
+        card: null,
+        addedVia: 'incoming',
+        request: asking ? 'in' : null,
+      );
     }
     final c = contactOf(f)!;
     final fresh = c.request == 'in' && !truthy(c['notified']);
@@ -84,7 +97,9 @@ mixin _Contacts on _Base {
       tellVerified(c);
     }
     final vf = m?['vf'];
-    if (vf is String && const ['nearby', 'qr', 'manual'].contains(vf) && c.peerVerified?['level'] != vf) {
+    if (vf is String &&
+        const ['nearby', 'qr', 'manual'].contains(vf) &&
+        c.peerVerified?['level'] != vf) {
       c.peerVerified = {'level': vf, 'at': now()};
       await persistContact(c);
     }
@@ -101,7 +116,12 @@ mixin _Contacts on _Base {
       if (fresh) {
         c['notified'] = true;
         await persistContact(c);
-        if (!silentNow) notifier((title: t('inviteNotifyTitle'), body: t('inviteNotifyBody', {'name': c.name}), chatId: null));
+        if (!silentNow)
+          notifier((
+            title: t('inviteNotifyTitle'),
+            body: t('inviteNotifyBody', {'name': c.name}),
+            chatId: null,
+          ));
       }
       return;
     }
@@ -111,7 +131,8 @@ mixin _Contacts on _Base {
         return;
       }
       await becomeContact(c, 'people');
-      if (m?['t'] == 'invite') fire(buildPacket(c, {'t': 'accept'}).then((p) => transmit(p)));
+      if (m?['t'] == 'invite')
+        fire(buildPacket(c, {'t': 'accept'}).then((p) => transmit(p)));
     }
     await onAppMessage(f, msg);
   }
@@ -122,7 +143,8 @@ mixin _Contacts on _Base {
     final data = e.data;
     final raw = data is Map ? data['tag'] : null;
     final tag = raw is String ? raw : null;
-    if (!const ['bad_message', 'no_session'].contains(e.code) || !truthy(tag)) return;
+    if (!const ['bad_message', 'no_session'].contains(e.code) || !truthy(tag))
+      return;
     Contact? c;
     for (final x in _allContacts) {
       if (hex(tagOf(x)) == tag) {
@@ -132,12 +154,27 @@ mixin _Contacts on _Base {
     }
     if (c == null || !(await resetSession(c))) return;
     final text = t('undecryptable', {'name': c.name});
-    final m = addMsg({'id': hex(random(16)), 'chatId': c.id, 'from': 'system', 'ts': now(), 'status': 'received', 'text': text});
+    final m = addMsg({
+      'id': hex(random(16)),
+      'chatId': c.id,
+      'from': 'system',
+      'ts': now(),
+      'status': 'received',
+      'text': text,
+    });
     touchChat(c.id, text, m.ts);
   }
 
   @override
-  Future<Contact> addContact({required String id, required String name, required String ik, required String? card, required String addedVia, String? request, String? token}) async {
+  Future<Contact> addContact({
+    required String id,
+    required String name,
+    required String ik,
+    required String? card,
+    required String addedVia,
+    String? request,
+    String? token,
+  }) async {
     state.contacts[id] = {
       'id': id,
       'name': name,
@@ -170,7 +207,14 @@ mixin _Contacts on _Base {
       } catch (_) {
         throw RipploError('bad_link', 'invalid prekey bundle');
       }
-      return addContact(id: v.id, name: v.name, ik: ik, card: card, addedVia: via, token: token);
+      return addContact(
+        id: v.id,
+        name: v.name,
+        ik: ik,
+        card: card,
+        addedVia: via,
+        token: token,
+      );
     }
     if (truthy(token) && !c.cardAck && !truthy(c.token)) {
       c.token = token;
@@ -189,7 +233,9 @@ mixin _Contacts on _Base {
   @override
   void markConflicts(String name, String id) {
     final key = jsLowerCase(name);
-    final same = _allContacts.where((c) => c.id != id && jsLowerCase(c.name) == key).toList();
+    final same = _allContacts
+        .where((c) => c.id != id && jsLowerCase(c.name) == key)
+        .toList();
     if (same.isEmpty) return;
     for (final c in same) {
       c.conflict = true;
@@ -228,7 +274,10 @@ mixin _Contacts on _Base {
   }
 
   @override
-  Future<Contact?> addContactFromLink(String text, [String via = 'link']) async {
+  Future<Contact?> addContactFromLink(
+    String text, [
+    String via = 'link',
+  ]) async {
     final v = parseLink(text);
     if (v.id == me.id) throw RipploError('self');
     return addCard(v.card, via, v.token);
@@ -262,7 +311,14 @@ mixin _Contacts on _Base {
       } catch (_) {
         throw RipploError('bad_link', 'invalid prekey bundle');
       }
-      c = await addContact(id: v.id, name: v.name, ik: b64(v.ik), card: b64(v.card), addedVia: 'people', request: 'out');
+      c = await addContact(
+        id: v.id,
+        name: v.name,
+        ik: b64(v.ik),
+        card: b64(v.card),
+        addedVia: 'people',
+        request: 'out',
+      );
     }
     final target = c;
     target.inviteFailed = false;
@@ -322,11 +378,19 @@ mixin _Contacts on _Base {
         if (nb != null) nb['unsupported'] = true;
         return;
       }
-      diagLog('hello in ${cut(from, 0, 8)} ${v.name}${nb != null ? '' : ' (no neighbor)'}');
+      diagLog(
+        'hello in ${cut(from, 0, 8)} ${v.name}${nb != null ? '' : ' (no neighbor)'}',
+      );
       if (nb != null) nb['unsupported'] = false;
       if (v.id == me.id) return;
-      final card = <String, Object?>{'id': v.id, 'name': v.name, 'ik': b64(v.ik), 'card': b64(v.card)};
-      if (helloCards.length >= maxHellos && !helloCards.containsKey(from)) helloCards.remove(helloCards.keys.first);
+      final card = <String, Object?>{
+        'id': v.id,
+        'name': v.name,
+        'ik': b64(v.ik),
+        'card': b64(v.card),
+      };
+      if (helloCards.length >= maxHellos && !helloCards.containsKey(from))
+        helloCards.remove(helloCards.keys.first);
       helloCards[from] = card;
       byed.remove(from);
       if (nb != null) nb['card'] = card;
@@ -338,11 +402,17 @@ mixin _Contacts on _Base {
         fire(persistContact(known));
       }
       if (known != null && !truthy(known.request)) resendFor(known.id);
-      if (known != null && !truthy(known.request) && known.verification == 'none' && known.verifyState != 'checking' && now() - ((known['verifyTried'] as num?) ?? 0) > 30000) {
+      if (known != null &&
+          !truthy(known.request) &&
+          known.verification == 'none' &&
+          known.verifyState != 'checking' &&
+          now() - ((known['verifyTried'] as num?) ?? 0) > 30000) {
         known['verifyTried'] = now();
         fire(verifyNearby(v.id));
       }
-      if (truthy(msg['r']) || (state.settings.hidden && !greeted.contains(from))) sendHello(from, false);
+      if (truthy(msg['r']) ||
+          (state.settings.hidden && !greeted.contains(from)))
+        sendHello(from, false);
     } else if (nb == null) {
       return;
     } else if (t == 'bye') {
@@ -364,9 +434,13 @@ mixin _Contacts on _Base {
         final cc = fromId is String ? contactOf(fromId) : null;
         if (cc != null) ik = unb64(cc.ik!);
       }
-      if (n.length != 32 || ik == null || deriveIds(ik).ripploId != fromId) return;
+      if (n.length != 32 || ik == null || deriveIds(ik).ripploId != fromId)
+        return;
       final mac = await mesh.signalProof(ik, n, deriveIds(ik).tag, me.tag);
-      await mesh.sendApp(from, utf8(jsonEncode({'t': 'proof', 'n': msg['n'], 'mac': b64(mac)})));
+      await mesh.sendApp(
+        from,
+        utf8(jsonEncode({'t': 'proof', 'n': msg['n'], 'mac': b64(mac)})),
+      );
     } else if (t == 'proof') {
       final w = proofs['${msg['n']}'];
       if (w == null || w.node != from) return;
@@ -392,14 +466,19 @@ mixin _Contacts on _Base {
       },
     );
     try {
-      await mesh.sendApp(node, utf8(jsonEncode({'t': 'challenge', 'n': key, 'from': me.id})));
+      await mesh.sendApp(
+        node,
+        utf8(jsonEncode({'t': 'challenge', 'n': key, 'from': me.id})),
+      );
     } catch (_) {
       return 'timeout';
     }
     final mac = await answer.future;
     if (mac == null) return 'timeout';
     final ik = unb64(c.ik!);
-    return equal(mac, await mesh.signalProof(ik, n, me.tag, deriveIds(ik).tag)) ? 'ok' : 'bad';
+    return equal(mac, await mesh.signalProof(ik, n, me.tag, deriveIds(ik).tag))
+        ? 'ok'
+        : 'bad';
   }
 
   Future<bool> _verifyJob(String id) async {
@@ -429,7 +508,8 @@ mixin _Contacts on _Base {
     final cur = contactOf(id);
     if (cur == null) return false;
     if (ok) {
-      if (cur.verification == 'none' || cur.verification == 'nearby') cur.verification = cur.addedVia == 'qr' ? 'qr' : 'nearby';
+      if (cur.verification == 'none' || cur.verification == 'nearby')
+        cur.verification = cur.addedVia == 'qr' ? 'qr' : 'nearby';
       cur.verifiedAt = now();
       cur.verifyState = 'idle';
     } else {
@@ -469,7 +549,8 @@ mixin _Contacts on _Base {
     if (c == null) return false;
     final text = '$scanned';
     final digits = text.replaceAll(_jsSpace, '');
-    if (_digits60.hasMatch(digits)) return digits == await safetyNumber(id) && await setVerified(id, 'qr');
+    if (_digits60.hasMatch(digits))
+      return digits == await safetyNumber(id) && await setVerified(id, 'qr');
     try {
       final v = parseLink(text);
       return b64(v.ik) == c.ik && await setVerified(id, 'qr');
@@ -491,7 +572,11 @@ mixin _Contacts on _Base {
   }
 
   @override
-  Future<void> discoverRound({required Map<String, Object?> payload, required int timeout, required int quiet}) {
+  Future<void> discoverRound({
+    required Map<String, Object?> payload,
+    required int timeout,
+    required int quiet,
+  }) {
     final done = Completer<void>();
     final id = newId();
     Timer? timer;
@@ -506,9 +591,17 @@ mixin _Contacts on _Base {
     d = DiscoverRound(hex(id), quiet, finish);
     timer = Timer(Duration(milliseconds: timeout), finish);
     discover = d;
-    mesh.send(encodePacket(type: PacketType.discover, id: id, payload: utf8(jsonEncode(payload)))).then<void>((r) {
-      if (r == 0) finish();
-    }, onError: (Object _) => finish());
+    mesh
+        .send(
+          encodePacket(
+            type: PacketType.discover,
+            id: id,
+            payload: utf8(jsonEncode(payload)),
+          ),
+        )
+        .then<void>((r) {
+          if (r == 0) finish();
+        }, onError: (Object _) => finish());
     return done.future;
   }
 
@@ -558,7 +651,11 @@ mixin _Contacts on _Base {
     state.people = <Object?>[];
     state.peopleRefreshing = true;
     try {
-      await discoverRound(payload: {'t': 'who', 'q': findKey(text)}, timeout: tm('discover'), quiet: tm('quiet'));
+      await discoverRound(
+        payload: {'t': 'who', 'q': findKey(text)},
+        timeout: tm('discover'),
+        quiet: tm('quiet'),
+      );
     } finally {
       state.peopleRefreshing = false;
     }
@@ -577,7 +674,16 @@ mixin _Contacts on _Base {
     if (v.id == me.id) return;
     if (searchText.isNotEmpty && !matchesQuery(searchText, v.name)) return;
     markConflicts(v.name, v.id);
-    Person mk() => Person(state.map({'id': v.id, 'name': v.name, 'card': b64(v.card), 'hops': p.hops, 'seenAt': now(), 'isContact': contactOf(v.id) != null}));
+    Person mk() => Person(
+      state.map({
+        'id': v.id,
+        'name': v.name,
+        'card': b64(v.card),
+        'hops': p.hops,
+        'seenAt': now(),
+        'isContact': contactOf(v.id) != null,
+      }),
+    );
     final person = mk();
     final limit = searchText.isNotEmpty ? maxSearch : maxScan;
     final list = state.people;
@@ -614,6 +720,10 @@ mixin _Contacts on _Base {
     if (isFiniteNum(h) && d > (h as num)) return;
     if (isFiniteNum(lo) && d <= (lo as num)) return;
     if (q.containsKey('q') && q['q'] != findHash(normName(me.name))) return;
-    fire(mesh.send(encodePacket(type: PacketType.reply, dest: p.id, payload: me.card)));
+    fire(
+      mesh.send(
+        encodePacket(type: PacketType.reply, dest: p.id, payload: me.card),
+      ),
+    );
   }
 }

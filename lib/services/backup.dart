@@ -28,7 +28,13 @@ Future<void> autoBackup(Mesh mesh, RipploState state, String appVersion) async {
   } catch (_) {}
 }
 
-AppLifecycleListener startBackup(Mesh mesh, RipploState state, String appVersion) {
+AppLifecycleListener startBackup(
+  Mesh mesh,
+  RipploState state,
+  String appVersion,
+) {
   js.fire(autoBackup(mesh, state, appVersion));
-  return AppLifecycleListener(onResume: () => js.fire(autoBackup(mesh, state, appVersion)));
+  return AppLifecycleListener(
+    onResume: () => js.fire(autoBackup(mesh, state, appVersion)),
+  );
 }

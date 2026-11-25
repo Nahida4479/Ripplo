@@ -7,7 +7,10 @@ final _msgWaveRe = RegExp(r'^[A-Za-z0-9+/]*={0,2}$');
 
 bool _msgWireId(Object? v) => v is String && wireIdRe.hasMatch(v);
 
-num _msgNum(num v) => v is double && v.isFinite && v == v.truncateToDouble() && v.abs() < 1e15 ? v.toInt() : v;
+num _msgNum(num v) =>
+    v is double && v.isFinite && v == v.truncateToDouble() && v.abs() < 1e15
+    ? v.toInt()
+    : v;
 
 mixin _Msgs on _Base {
   Iterable<Msg> _msgAll() sync* {
@@ -25,7 +28,10 @@ mixin _Msgs on _Base {
   }
 
   @override
-  ({Msg m, List<String> recips}) newOutgoing(String chatId, Map<String, Object?> extra) {
+  ({Msg m, List<String> recips}) newOutgoing(
+    String chatId,
+    Map<String, Object?> extra,
+  ) {
     final recips = recipientsOf(chatId);
     final m = addMsg({
       'id': hex(random(16)),
@@ -42,7 +48,11 @@ mixin _Msgs on _Base {
   }
 
   @override
-  Future<void> fanout(Msg m, Map<String, Object?> body, List<String> recips) async {
+  Future<void> fanout(
+    Msg m,
+    Map<String, Object?> body,
+    List<String> recips,
+  ) async {
     m.status = 'sending';
     fire(persistMsg(m));
     await Future.wait([
@@ -56,7 +66,8 @@ mixin _Msgs on _Base {
           }
           if (r.ok) {
             m.undelivered = [
-              for (final x in m.undelivered ?? const []) if (x != rid) x,
+              for (final x in m.undelivered ?? const [])
+                if (x != rid) x,
             ];
             m.delivered = m.total - (m.undelivered?.length ?? 0);
             m.put('hops', r.hops);
@@ -114,9 +125,17 @@ mixin _Msgs on _Base {
 
   @override
   Map<String, Object?>? parseRe(Object? raw) {
-    if (raw is! Map || !_msgWireId(raw['id']) || raw['who'] is! String || !idRe.hasMatch(raw['who'] as String)) return null;
+    if (raw is! Map ||
+        !_msgWireId(raw['id']) ||
+        raw['who'] is! String ||
+        !idRe.hasMatch(raw['who'] as String))
+      return null;
     final id = raw['id'] as String, who = raw['who'] as String;
-    final out = <String, Object?>{'id': id, 'who': who, 'mid': who == me.id ? id : '$who.$id'};
+    final out = <String, Object?>{
+      'id': id,
+      'who': who,
+      'mid': who == me.id ? id : '$who.$id',
+    };
     final text = raw['text'];
     if (text is String) out['text'] = cut(text, 0, reText);
     if (kinds.contains(raw['kind'])) out['kind'] = raw['kind'];
@@ -127,7 +146,12 @@ mixin _Msgs on _Base {
   Future<({bool ok, int? hops})> sendDevLog(String to, String text) async {
     final c = contactOf(to);
     if (c == null || truthy(c.request)) throw RipploError('no_chat');
-    final body = <String, Object?>{'t': 'dlog', 'id': hex(random(16)), 'ts': now(), ...await packLog(text)};
+    final body = <String, Object?>{
+      't': 'dlog',
+      'id': hex(random(16)),
+      'ts': now(),
+      ...await packLog(text),
+    };
     final z = body['z'];
     if (z is String && z.length > dlogBodyMax) throw RipploError('too_big');
     final r = await transmit(await buildPacket(c, body));
@@ -137,7 +161,11 @@ mixin _Msgs on _Base {
   @override
   void deleteDevLog(String id) {
     state.devLogs = state.devLogs.where((x) => x.id != id).toList();
-    fire(db.put('kv', 'devLogs', [for (final x in state.devLogs) {...x}]));
+    fire(
+      db.put('kv', 'devLogs', [
+        for (final x in state.devLogs) {...x},
+      ]),
+    );
   }
 
   @override
@@ -152,31 +180,61 @@ mixin _Msgs on _Base {
   }
 
   @override
-  Future<Msg> sendAttachment(String chatId, AttFile file, String kind, {num? duration, List<Object?>? wave, Object? caption, String? replyTo}) async {
+  Future<Msg> sendAttachment(
+    String chatId,
+    AttFile file,
+    String kind, {
+    num? duration,
+    List<Object?>? wave,
+    Object? caption,
+    String? replyTo,
+  }) async {
     if (!kinds.contains(kind)) throw RipploError('bad_kind');
     if (file.bytes.length > maxFile) throw RipploError('too_big');
     final peer = contactOf(chatId);
-    if (peer != null && peer.addedVia != 'incoming' && !peer.cardAck) throw RipploError('media_locked');
+    if (peer != null && peer.addedVia != 'incoming' && !peer.cardAck)
+      throw RipploError('media_locked');
     final bytes = file.bytes;
     final attId = hex(random(16));
     await db.putBin('blobs', attId, bytes);
-    final att = <String, Object?>{'kind': kind, 'mime': safeMime(file.type), 'size': bytes.length, 'attId': attId, 'bytes': bytes};
+    final att = <String, Object?>{
+      'kind': kind,
+      'mime': safeMime(file.type),
+      'size': bytes.length,
+      'attId': attId,
+      'bytes': bytes,
+    };
     final dur = duration ?? file.duration;
-    if (dur != null && isFiniteNum(dur) && dur > 0) att['duration'] = _msgNum(dur > 3600 ? 3600 : dur);
+    if (dur != null && isFiniteNum(dur) && dur > 0)
+      att['duration'] = _msgNum(dur > 3600 ? 3600 : dur);
     if (wave != null && wave.length <= maxWave) {
       att['wave'] = [for (final v in wave) toInt32(v).clamp(0, 255)];
     }
-    if (truthy(caption) && captionOf(caption) == null) throw RipploError('too_long');
+    if (truthy(caption) && captionOf(caption) == null)
+      throw RipploError('too_long');
     final cap = captionOf(caption);
     final re = truthy(replyTo) ? localRef(chatId, replyTo!) : null;
-    final o = newOutgoing(chatId, {'att': att, 'progress': 0, 'text': ?cap, 're': ?re});
+    final o = newOutgoing(chatId, {
+      'att': att,
+      'progress': 0,
+      'text': ?cap,
+      're': ?re,
+    });
     touchChat(chatId, cap ?? '', o.m.ts, 0, kind);
-    runAttachment(o.m, bytes, o.recips).then<void>((_) {}, onError: (Object _) => _msgFailed(o.m));
+    runAttachment(
+      o.m,
+      bytes,
+      o.recips,
+    ).then<void>((_) {}, onError: (Object _) => _msgFailed(o.m));
     return o.m;
   }
 
   @override
-  Future<void> runAttachment(Msg m, Uint8List bytes, List<String> recips) async {
+  Future<void> runAttachment(
+    Msg m,
+    Uint8List bytes,
+    List<String> recips,
+  ) async {
     m.status = 'encrypting';
     m.progress = 0;
     final enc = await encryptFile(bytes);
@@ -195,7 +253,14 @@ mixin _Msgs on _Base {
           var failed = false;
           Future<bool> sendChunk(int i) async {
             for (var k = 0; k < tm('tries'); k++) {
-              final r = await transmit(encodePacket(type: PacketType.data, dest: dest, payload: chunkPayload(attId, ct, i, total)), tm('chunkAck'));
+              final r = await transmit(
+                encodePacket(
+                  type: PacketType.data,
+                  dest: dest,
+                  payload: chunkPayload(attId, ct, i, total),
+                ),
+                tm('chunkAck'),
+              );
               if (r.ok) return true;
               if (k + 1 < tm('tries')) await sleep(tm('retry'));
             }
@@ -214,7 +279,14 @@ mixin _Msgs on _Base {
             }
           }
 
-          await Future.wait([for (var w = 0; w < (total < chunkWindow ? total : chunkWindow); w++) worker()]);
+          await Future.wait([
+            for (
+              var w = 0;
+              w < (total < chunkWindow ? total : chunkWindow);
+              w++
+            )
+              worker(),
+          ]);
           if (!failed) okRecips.add(rid);
         }(),
     ]);
@@ -236,7 +308,10 @@ mixin _Msgs on _Base {
       'ts': m.ts,
       'g': ?g,
       if (truthy(dur)) 'duration': dur,
-      if (aw != null) 'wave': b64(Uint8List.fromList([for (final v in aw) (v as num).toInt()])),
+      if (aw != null)
+        'wave': b64(
+          Uint8List.fromList([for (final v in aw) (v as num).toInt()]),
+        ),
       if (truthy(m.text)) 'text': m.text,
       if (re != null) 're': wireRe(re),
     };
@@ -252,9 +327,14 @@ mixin _Msgs on _Base {
         break;
       }
     }
-    if (m == null || m.from != 'me' || !const ['out_of_range', 'failed'].contains(m.status)) return;
+    if (m == null ||
+        m.from != 'me' ||
+        !const ['out_of_range', 'failed'].contains(m.status))
+      return;
     final un = m.undelivered ?? const [];
-    final recips = un.isNotEmpty ? [for (final x in un) x as String] : recipientsOf(m.chatId);
+    final recips = un.isNotEmpty
+        ? [for (final x in un) x as String]
+        : recipientsOf(m.chatId);
     m.errored = false;
     final att = m.att;
     if (att == null) {
@@ -267,7 +347,11 @@ mixin _Msgs on _Base {
       _msgFailed(target);
       return;
     }
-    runAttachment(target, bytes, recips).then<void>((_) {}, onError: (Object _) => _msgFailed(target));
+    runAttachment(
+      target,
+      bytes,
+      recips,
+    ).then<void>((_) {}, onError: (Object _) => _msgFailed(target));
   }
 
   @override
@@ -275,7 +359,9 @@ mixin _Msgs on _Base {
     if (now() - (lastResend[id] ?? 0) < tm('resend')) return;
     lastResend[id] = now();
     for (final m in _msgAll()) {
-      if (m.from == 'me' && const ['out_of_range', 'failed'].contains(m.status) && (m.undelivered?.contains(id) ?? false)) {
+      if (m.from == 'me' &&
+          const ['out_of_range', 'failed'].contains(m.status) &&
+          (m.undelivered?.contains(id) ?? false)) {
         fire(retry(m.id));
       }
     }
@@ -289,7 +375,10 @@ mixin _Msgs on _Base {
     if (l is List && l.contains(from)) {
       state.typing = {
         ...state.typing,
-        chatId: [for (final x in l) if (x != from) x],
+        chatId: [
+          for (final x in l)
+            if (x != from) x,
+        ],
       };
     }
   }
@@ -310,7 +399,10 @@ mixin _Msgs on _Base {
         chatId: [...list, c.id],
       };
     }
-    typingTimers[k] = Timer(Duration(milliseconds: tm('typingTtl')), () => clearTyping(chatId, c.id));
+    typingTimers[k] = Timer(
+      Duration(milliseconds: tm('typingTtl')),
+      () => clearTyping(chatId, c.id),
+    );
   }
 
   @override
@@ -328,10 +420,18 @@ mixin _Msgs on _Base {
     final body = utf8(jsonEncode({'t': 'typing', 'ts': ts, 'g': ?g}));
     for (final rid in recips) {
       final c = contactOf(rid);
-      final nb = c != null && c.cardAck && !truthy(c.request) ? neighborOf(rid, c['node'] as String?) : null;
+      final nb = c != null && c.cardAck && !truthy(c.request)
+          ? neighborOf(rid, c['node'] as String?)
+          : null;
       if (nb == null) continue;
       try {
-        await mesh.sendApp(nb.node, concat([Uint8List.fromList([typingTag]), await mesh.signalSeal(hex(tagOf(c!)), body)]));
+        await mesh.sendApp(
+          nb.node,
+          concat([
+            Uint8List.fromList([typingTag]),
+            await mesh.signalSeal(hex(tagOf(c!)), body),
+          ]),
+        );
       } catch (_) {}
     }
   }
@@ -348,14 +448,42 @@ mixin _Msgs on _Base {
         final chatId = routeChat(f, m);
         if (chatId == null) return;
         final re = parseRe(m['re']);
-        await receive({'id': '$f.$id', 'chatId': chatId, 'from': f, 'text': text, 're': ?re}, text);
+        await receive({
+          'id': '$f.$id',
+          'chatId': chatId,
+          'from': f,
+          'text': text,
+          're': ?re,
+        }, text);
       case 'att':
         final sender = contactOf(f);
-        if (sender != null && sender.addedVia == 'incoming' && !truthy(sender['cardSent'])) return;
-        final aid = m['attId'], sha = m['sha256'], size = m['size'], chunks = m['chunks'], key = m['key'];
-        if (!_msgWireId(id) || aid is! String || !_msgAttIdRe.hasMatch(aid) || !kinds.contains(m['kind']) || sha is! String || !_msgShaRe.hasMatch(sha)) return;
-        if (!isInt(size) || (size as num) < 0 || size > maxFile || !isInt(chunks) || (chunks as num) < 1 || chunks > maxChunks) return;
-        if (key is! String || unb64(key).length != 32 || routeChat(f, m) == null) return;
+        if (sender != null &&
+            sender.addedVia == 'incoming' &&
+            !truthy(sender['cardSent']))
+          return;
+        final aid = m['attId'],
+            sha = m['sha256'],
+            size = m['size'],
+            chunks = m['chunks'],
+            key = m['key'];
+        if (!_msgWireId(id) ||
+            aid is! String ||
+            !_msgAttIdRe.hasMatch(aid) ||
+            !kinds.contains(m['kind']) ||
+            sha is! String ||
+            !_msgShaRe.hasMatch(sha))
+          return;
+        if (!isInt(size) ||
+            (size as num) < 0 ||
+            size > maxFile ||
+            !isInt(chunks) ||
+            (chunks as num) < 1 ||
+            chunks > maxChunks)
+          return;
+        if (key is! String ||
+            unb64(key).length != 32 ||
+            routeChat(f, m) == null)
+          return;
         await db.put('kv', 'ptr/$aid', {'f': f, 'msg': m, 'silent': silentNow});
         await tryFinish(aid);
       case 'unsend':
@@ -369,7 +497,11 @@ mixin _Msgs on _Base {
         await removeMessage(chatId, localId);
       case 'dlog':
         final sender = contactOf(f);
-        if (sender == null || truthy(sender.request) || id is! String || id.length > 64) return;
+        if (sender == null ||
+            truthy(sender.request) ||
+            id is! String ||
+            id.length > 64)
+          return;
         String? text;
         try {
           text = await unpackLog(m);
@@ -379,9 +511,14 @@ mixin _Msgs on _Base {
         if (text == null || text.length > 400000) return;
         state.devLogs = [
           {'id': id, 'from': f, 'name': sender.name, 'ts': now(), 'text': text},
-          for (final x in state.devLogs) if (x.id != id) x,
+          for (final x in state.devLogs)
+            if (x.id != id) x,
         ].take(100).toList();
-        fire(db.put('kv', 'devLogs', [for (final x in state.devLogs) {...x}]));
+        fire(
+          db.put('kv', 'devLogs', [
+            for (final x in state.devLogs) {...x},
+          ]),
+        );
       case 'group':
         await onGroup(f, m);
       case 'call':
@@ -390,25 +527,44 @@ mixin _Msgs on _Base {
   }
 
   @override
-  Future<void> receive(Map<String, Object?> m, String preview, [String? notifyBody]) async {
+  Future<void> receive(
+    Map<String, Object?> m,
+    String preview, [
+    String? notifyBody,
+  ]) async {
     final mid = m['id'] as String;
     if (unsent.contains(mid) || await db.hasMsg(mid)) return;
     final msg = addMsg({...m, 'ts': now(), 'status': 'received'});
     final chatId = m['chatId'] as String, from = m['from'] as String;
     clearTyping(chatId, from);
     final att = m['att'];
-    touchChat(chatId, preview, msg.ts, 1, att is Map ? att['kind'] as String? : null);
+    touchChat(
+      chatId,
+      preview,
+      msg.ts,
+      1,
+      att is Map ? att['kind'] as String? : null,
+    );
     final chat = chatOf(chatId);
     if (!silentNow) {
       final who = contactOf(from)?.name ?? '';
-      notifier((title: chat?.type == 'group' ? '${chat!.name}: $who' : who, body: notifyBody ?? preview, chatId: chatId));
+      notifier((
+        title: chat?.type == 'group' ? '${chat!.name}: $who' : who,
+        body: notifyBody ?? preview,
+        chatId: chatId,
+      ));
     }
   }
 
   @override
   Future<void> onGroup(String f, Map<String, Object?> msg) async {
     final g = msg['g'], members = msg['members'];
-    if (g is! String || !_msgGroupRe.hasMatch(g) || members is! List || members.length < 2 || members.length > maxGroup + 1) return;
+    if (g is! String ||
+        !_msgGroupRe.hasMatch(g) ||
+        members is! List ||
+        members.length < 2 ||
+        members.length > maxGroup + 1)
+      return;
     final name = cleanName(msg['name']);
     if (name.isEmpty) return;
     List<ParsedCard> cards;
@@ -420,11 +576,17 @@ mixin _Msgs on _Base {
     final ids = [for (final x in cards) x.id];
     if (!ids.contains(f) || !ids.contains(me.id)) return;
     final existing = chatOf(g);
-    if (existing != null && (existing.type != 'group' || !(existing.members ?? const []).contains(f))) return;
+    if (existing != null &&
+        (existing.type != 'group' ||
+            !(existing.members ?? const []).contains(f)))
+      return;
     for (final v in cards) {
       if (v.id != me.id) await learnCard(v, 'group');
     }
-    ensureChat(g, 'group', name, [for (final i in ids) if (i != me.id) i]);
+    ensureChat(g, 'group', name, [
+      for (final i in ids)
+        if (i != me.id) i,
+    ]);
   }
 
   @override
@@ -445,11 +607,14 @@ mixin _Msgs on _Base {
     if (m != null) m['unsent'] = true;
     if (i >= 0) list!.removeAt(i);
     final att = m?['att'];
-    if (att is Map && att['attId'] is String) await db.del('blobs', att['attId'] as String);
+    if (att is Map && att['attId'] is String)
+      await db.del('blobs', att['attId'] as String);
     await db.delMsg(localId);
     for (final x in (list ?? const <Msg>[]).toList()) {
       final re = x.re;
-      if (re != null && re['mid'] == localId && (truthy(re['text']) || truthy(re['kind']))) {
+      if (re != null &&
+          re['mid'] == localId &&
+          (truthy(re['text']) || truthy(re['kind']))) {
         re.remove('text');
         re.remove('kind');
         fire(persistMsg(x));
@@ -457,12 +622,17 @@ mixin _Msgs on _Base {
     }
     final chat = chatOf(chatId);
     if (chat != null) {
-      final List<Map<String, Object?>> remaining = state.msgs(chatId) ?? await db.msgs(chatId);
+      final List<Map<String, Object?>> remaining =
+          state.msgs(chatId) ?? await db.msgs(chatId);
       final last = remaining.isEmpty ? null : remaining.last;
       final lastAtt = last?['att'];
       chat.lastText = truthy(last?['text']) ? last!['text'] as String : '';
-      chat.lastKind = lastAtt is Map && truthy(lastAtt['kind']) ? lastAtt['kind'] as String : null;
-      chat.lastTs = truthy(last?['ts']) ? (last!['ts'] as num).toInt() : chat.lastTs;
+      chat.lastKind = lastAtt is Map && truthy(lastAtt['kind'])
+          ? lastAtt['kind'] as String
+          : null;
+      chat.lastTs = truthy(last?['ts'])
+          ? (last!['ts'] as num).toInt()
+          : chat.lastTs;
       fire(persistChat(chat));
     }
   }
@@ -483,7 +653,13 @@ mixin _Msgs on _Base {
           }
           TxResult r;
           try {
-            r = await transmit(await buildPacket(c, {'t': 'unsend', 'id': u['id'], if (truthy(u['g'])) 'g': u['g']}));
+            r = await transmit(
+              await buildPacket(c, {
+                't': 'unsend',
+                'id': u['id'],
+                if (truthy(u['g'])) 'g': u['g'],
+              }),
+            );
           } catch (_) {
             r = txFail;
           }
@@ -510,7 +686,11 @@ mixin _Msgs on _Base {
     final recips = recipientsOf(chatId);
     final g = groupOf(chatId);
     await removeMessage(chatId, localId);
-    unsends.add({'id': localId, 'g': ?g, 'to': [...recips]});
+    unsends.add({
+      'id': localId,
+      'g': ?g,
+      'to': [...recips],
+    });
     await db.put('kv', 'unsends', unsends);
     fire(flushUnsends());
   }
@@ -518,7 +698,8 @@ mixin _Msgs on _Base {
   @override
   Future<ObsList<Msg>> loadMessages(String chatId) async {
     if (loaded.contains(chatId)) {
-      if (state.msgs(chatId) == null) state.messages[chatId] = state.list<Msg>();
+      if (state.msgs(chatId) == null)
+        state.messages[chatId] = state.list<Msg>();
       return state.msgs(chatId)!;
     }
     loaded.add(chatId);
@@ -526,11 +707,17 @@ mixin _Msgs on _Base {
     final rows = await db.msgs(chatId);
     for (final r in rows) {
       final att = r['att'];
-      if (mem.containsKey(r['id']) || att is! Map || att['bytes'] != null || att['attId'] is! String) continue;
+      if (mem.containsKey(r['id']) ||
+          att is! Map ||
+          att['bytes'] != null ||
+          att['attId'] is! String)
+        continue;
       final bytes = await db.getBin('blobs', att['attId'] as String);
       if (bytes != null) att['bytes'] = bytes;
     }
-    state.messages[chatId] = state.list<Msg>([for (final r in rows) mem[r['id']] ?? r]);
+    state.messages[chatId] = state.list<Msg>([
+      for (final r in rows) mem[r['id']] ?? r,
+    ]);
     return state.msgs(chatId)!;
   }
 
@@ -592,7 +779,8 @@ mixin _Msgs on _Base {
   }
 
   @override
-  int pendingBytes() => pending.values.fold<int>(0, (n, x) => n + (x['bytes'] as num).toInt());
+  int pendingBytes() =>
+      pending.values.fold<int>(0, (n, x) => n + (x['bytes'] as num).toInt());
 
   @override
   Future<void> onChunk(Packet p) async {
@@ -604,11 +792,20 @@ mixin _Msgs on _Base {
     }
     final index = ch.index, total = ch.total, bytes = ch.bytes;
     final aid = hex(ch.attId);
-    if (total < 1 || total > maxChunks || index >= total || bytes.isEmpty || bytes.length > chunkSize) return;
+    if (total < 1 ||
+        total > maxChunks ||
+        index >= total ||
+        bytes.isEmpty ||
+        bytes.length > chunkSize)
+      return;
     await dropExpired();
-    final meta = pending[aid] ?? {'ts': now(), 'total': total, 'count': 0, 'bytes': 0};
+    final meta =
+        pending[aid] ?? {'ts': now(), 'total': total, 'count': 0, 'bytes': 0};
     final key = '$aid/$index';
-    if (meta['total'] != total || await db.has('chunks', key) || pendingBytes() + bytes.length > maxPending) return;
+    if (meta['total'] != total ||
+        await db.has('chunks', key) ||
+        pendingBytes() + bytes.length > maxPending)
+      return;
     await db.putBin('chunks', key, bytes);
     meta['count'] = (meta['count'] as int) + 1;
     meta['bytes'] = (meta['bytes'] as int) + bytes.length;
@@ -621,7 +818,10 @@ mixin _Msgs on _Base {
   Future<void> tryFinish(String aid) async {
     final ptr = await db.get('kv', 'ptr/$aid');
     final meta = pending[aid];
-    if (ptr is! Map || meta == null || (meta['count'] as num) < (meta['total'] as num)) return;
+    if (ptr is! Map ||
+        meta == null ||
+        (meta['count'] as num) < (meta['total'] as num))
+      return;
     final f = ptr['f'] as String;
     final msg = Map<String, Object?>.from(ptr['msg'] as Map);
     final silent = ptr['silent'];
@@ -632,16 +832,25 @@ mixin _Msgs on _Base {
         parts.add((await db.getBin('chunks', '$aid/$i'))!);
       }
       final ct = concat(parts);
-      if (!equal(c.sha256.convert(ct).bytes, unhex(msg['sha256'] as String))) throw StateError('hash');
+      if (!equal(c.sha256.convert(ct).bytes, unhex(msg['sha256'] as String)))
+        throw StateError('hash');
       final plain = await decryptFile(ct, unb64(msg['key'] as String));
       if (plain.length != msg['size']) throw StateError('size');
       final mime = safeMime(msg['mime']);
       await db.putBin('blobs', aid, plain);
-      final att = <String, Object?>{'kind': msg['kind'], 'mime': mime, 'size': plain.length, 'attId': aid, 'bytes': plain};
+      final att = <String, Object?>{
+        'kind': msg['kind'],
+        'mime': mime,
+        'size': plain.length,
+        'attId': aid,
+        'bytes': plain,
+      };
       final dur = msg['duration'];
-      if (isFiniteNum(dur) && (dur as num) > 0) att['duration'] = _msgNum(dur > 3600 ? 3600 : dur);
+      if (isFiniteNum(dur) && (dur as num) > 0)
+        att['duration'] = _msgNum(dur > 3600 ? 3600 : dur);
       final wave = msg['wave'];
-      if (wave is String && wave.length <= 96 && _msgWaveRe.hasMatch(wave)) att['wave'] = unb64(wave).toList();
+      if (wave is String && wave.length <= 96 && _msgWaveRe.hasMatch(wave))
+        att['wave'] = unb64(wave).toList();
       final caption = captionOf(msg['text']);
       final re = parseRe(msg['re']);
       silentNow = truthy(silent);

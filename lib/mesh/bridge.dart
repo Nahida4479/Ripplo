@@ -40,8 +40,15 @@ abstract interface class Mesh {
   Future<({Uint8List bundle, Uint8List ik})> signalInit();
   Future<String> signalAddContact(Uint8List bundle);
   Future<Uint8List> signalSeal(String tag, Uint8List plaintext);
-  Future<({String tag, Uint8List ik, Uint8List plaintext})> signalOpen(Uint8List payload);
-  Future<Uint8List> signalProof(Uint8List ik, Uint8List n, Uint8List challengerTag, Uint8List proverTag);
+  Future<({String tag, Uint8List ik, Uint8List plaintext})> signalOpen(
+    Uint8List payload,
+  );
+  Future<Uint8List> signalProof(
+    Uint8List ik,
+    Uint8List n,
+    Uint8List challengerTag,
+    Uint8List proverTag,
+  );
   Future<String> signalSafetyNumber(Uint8List ik);
   Future<void> signalForget(String tag);
   Future<String> start(Uint8List selfTag);
@@ -87,7 +94,10 @@ abstract interface class Mesh {
   Future<String> backupShowCode();
   Future<void> backupDisable();
   Future<String> backupChooseFolder();
-  Future<Map<String, Object?>> backupCreate(String mode, Map<String, Object?> meta);
+  Future<Map<String, Object?>> backupCreate(
+    String mode,
+    Map<String, Object?> meta,
+  );
   Future<Map<String, Object?>> backupRestore(String code);
   Future<void> notify(String title, String body, String? chatId);
   Unsub on(String event, void Function(Map<String, Object?> data) cb);
@@ -97,15 +107,20 @@ Map<String, Object?> _map(Object? v) => Map<String, Object?>.from(v as Map);
 
 List<Map<String, Object?>> _maps(Object? v) => (v as List).map(_map).toList();
 
-List<(String, Uint8List)> _rows(Object? v) =>
-    (v as List).map((r) => ((r as Map)['key'] as String, unb64(r['value'] as String))).toList();
+List<(String, Uint8List)> _rows(Object? v) => (v as List)
+    .map((r) => ((r as Map)['key'] as String, unb64(r['value'] as String)))
+    .toList();
 
-Map<String, Object?> _inbound(Map<String, Object?> e) => {'packet': unb64(e['packet'] as String), 'from': e['from']};
+Map<String, Object?> _inbound(Map<String, Object?> e) => {
+  'packet': unb64(e['packet'] as String),
+  'from': e['from'],
+};
 
 class MeshBridge implements Mesh {
   MeshBridge({MethodChannel? channel, EventChannel? events})
-      : _ch = channel ?? const MethodChannel('ripplo/mesh', JSONMethodCodec()),
-        _events = events ?? const EventChannel('ripplo/mesh/events', JSONMethodCodec());
+    : _ch = channel ?? const MethodChannel('ripplo/mesh', JSONMethodCodec()),
+      _events =
+          events ?? const EventChannel('ripplo/mesh/events', JSONMethodCodec());
 
   final MethodChannel _ch;
   final EventChannel _events;
@@ -119,7 +134,10 @@ class MeshBridge implements Mesh {
 
   Future<Object?> _call(String method, [Map<String, Object?>? args]) async {
     try {
-      return await _ch.invokeMethod<Object?>(method, args ?? <String, Object?>{});
+      return await _ch.invokeMethod<Object?>(
+        method,
+        args ?? <String, Object?>{},
+      );
     } on PlatformException catch (e) {
       throw MeshError(e.code, e.message ?? e.code, e.details);
     }
@@ -133,7 +151,10 @@ class MeshBridge implements Mesh {
     }
   }
 
-  Future<void> _unlessMissing(String method, [Map<String, Object?>? args]) async {
+  Future<void> _unlessMissing(
+    String method, [
+    Map<String, Object?>? args,
+  ]) async {
     try {
       await _call(method, args);
     } on MissingPluginException {
@@ -149,20 +170,36 @@ class MeshBridge implements Mesh {
 
   @override
   Future<String> signalAddContact(Uint8List bundle) async =>
-      _map(await _call('signalAddContact', {'bundle': b64(bundle)}))['tag'] as String;
+      _map(await _call('signalAddContact', {'bundle': b64(bundle)}))['tag']
+          as String;
 
   @override
-  Future<Uint8List> signalSeal(String tag, Uint8List plaintext) async =>
-      unb64(_map(await _call('signalSeal', {'tag': tag, 'plaintext': b64(plaintext)}))['payload'] as String);
+  Future<Uint8List> signalSeal(String tag, Uint8List plaintext) async => unb64(
+    _map(
+          await _call('signalSeal', {'tag': tag, 'plaintext': b64(plaintext)}),
+        )['payload']
+        as String,
+  );
 
   @override
-  Future<({String tag, Uint8List ik, Uint8List plaintext})> signalOpen(Uint8List payload) async {
+  Future<({String tag, Uint8List ik, Uint8List plaintext})> signalOpen(
+    Uint8List payload,
+  ) async {
     final r = _map(await _call('signalOpen', {'payload': b64(payload)}));
-    return (tag: r['tag'] as String, ik: unb64(r['ik'] as String), plaintext: unb64(r['plaintext'] as String));
+    return (
+      tag: r['tag'] as String,
+      ik: unb64(r['ik'] as String),
+      plaintext: unb64(r['plaintext'] as String),
+    );
   }
 
   @override
-  Future<Uint8List> signalProof(Uint8List ik, Uint8List n, Uint8List challengerTag, Uint8List proverTag) async {
+  Future<Uint8List> signalProof(
+    Uint8List ik,
+    Uint8List n,
+    Uint8List challengerTag,
+    Uint8List proverTag,
+  ) async {
     final r = await _call('signalProof', {
       'ik': b64(ik),
       'n': b64(n),
@@ -174,7 +211,8 @@ class MeshBridge implements Mesh {
 
   @override
   Future<String> signalSafetyNumber(Uint8List ik) async =>
-      _map(await _call('signalSafetyNumber', {'ik': b64(ik)}))['digits'] as String;
+      _map(await _call('signalSafetyNumber', {'ik': b64(ik)}))['digits']
+          as String;
 
   @override
   Future<void> signalForget(String tag) async {
@@ -183,11 +221,13 @@ class MeshBridge implements Mesh {
 
   @override
   Future<String> start(Uint8List selfTag) async =>
-      _map(await _call('start', {'selfTag': b64(selfTag)}))['nodeTag'] as String;
+      _map(await _call('start', {'selfTag': b64(selfTag)}))['nodeTag']
+          as String;
 
   @override
   Future<int> send(Uint8List packet) async =>
-      (_map(await _call('send', {'packet': b64(packet)}))['neighbors'] as num).toInt();
+      (_map(await _call('send', {'packet': b64(packet)}))['neighbors'] as num)
+          .toInt();
 
   @override
   Future<void> sendApp(String node, Uint8List payload) async {
@@ -195,7 +235,8 @@ class MeshBridge implements Mesh {
   }
 
   @override
-  Future<List<Map<String, Object?>>> getNeighbors() async => _maps(_map(await _call('getNeighbors'))['neighbors']);
+  Future<List<Map<String, Object?>>> getNeighbors() async =>
+      _maps(_map(await _call('getNeighbors'))['neighbors']);
 
   @override
   Future<String> getDiag() async {
@@ -230,14 +271,18 @@ class MeshBridge implements Mesh {
   @override
   Future<bool> devConnect(String node, String spec) async {
     try {
-      return _map(await _call('devConnect', {'node': node, 'spec': spec}))['started'] == true;
+      return _map(
+            await _call('devConnect', {'node': node, 'spec': spec}),
+          )['started'] ==
+          true;
     } catch (_) {
       return false;
     }
   }
 
   @override
-  Future<void> devDisconnect(String node, String medium) => _ignore('devDisconnect', {'node': node, 'medium': medium});
+  Future<void> devDisconnect(String node, String medium) =>
+      _ignore('devDisconnect', {'node': node, 'medium': medium});
 
   @override
   Future<String> getDeviceInfo() async {
@@ -295,11 +340,14 @@ class MeshBridge implements Mesh {
   }
 
   @override
-  Future<({Uint8List key, bool insecure})> getDbKey() async =>
-      (key: unb64(_map(await _call('getDbKey'))['key'] as String), insecure: false);
+  Future<({Uint8List key, bool insecure})> getDbKey() async => (
+    key: unb64(_map(await _call('getDbKey'))['key'] as String),
+    insecure: false,
+  );
 
   @override
-  Future<String?> selfHash() async => _map(await _call('selfHash'))['sha256'] as String?;
+  Future<String?> selfHash() async =>
+      _map(await _call('selfHash'))['sha256'] as String?;
 
   @override
   Future<bool> fromPlay() async {
@@ -312,7 +360,11 @@ class MeshBridge implements Mesh {
 
   @override
   Future<void> installUpdate(String url, String sha256, bool prompt) async {
-    await _call('installUpdate', {'url': url, 'sha256': sha256, 'prompt': prompt});
+    await _call('installUpdate', {
+      'url': url,
+      'sha256': sha256,
+      'prompt': prompt,
+    });
   }
 
   @override
@@ -321,7 +373,8 @@ class MeshBridge implements Mesh {
   }
 
   @override
-  Future<void> setAutoUpdate(bool enabled) => _unlessMissing('setAutoUpdate', {'enabled': enabled});
+  Future<void> setAutoUpdate(bool enabled) =>
+      _unlessMissing('setAutoUpdate', {'enabled': enabled});
 
   @override
   Future<void> requestFullScreen() => _unlessMissing('requestFullScreen');
@@ -343,15 +396,26 @@ class MeshBridge implements Mesh {
   }
 
   @override
-  Future<Map<String, String>> checkPermissions() async => Map<String, String>.from(_map(await _call('checkPermissions')));
+  Future<Map<String, String>> checkPermissions() async =>
+      Map<String, String>.from(_map(await _call('checkPermissions')));
 
   @override
   Future<Map<String, String>> requestPermissions() async =>
       Map<String, String>.from(_map(await _call('requestPermissions')));
 
   @override
-  Future<void> dbPut(String store, String key, String? idx, Uint8List value) async {
-    await _call('dbPut', {'store': store, 'key': key, 'idx': ?idx, 'value': b64(value)});
+  Future<void> dbPut(
+    String store,
+    String key,
+    String? idx,
+    Uint8List value,
+  ) async {
+    await _call('dbPut', {
+      'store': store,
+      'key': key,
+      'idx': ?idx,
+      'value': b64(value),
+    });
   }
 
   @override
@@ -382,7 +446,10 @@ class MeshBridge implements Mesh {
   @override
   Future<({bool biometric, bool deviceCredential})> authAvailable() async {
     final r = _map(await _call('authAvailable'));
-    return (biometric: r['biometric'] == true, deviceCredential: r['deviceCredential'] == true);
+    return (
+      biometric: r['biometric'] == true,
+      deviceCredential: r['deviceCredential'] == true,
+    );
   }
 
   @override
@@ -395,13 +462,16 @@ class MeshBridge implements Mesh {
   }
 
   @override
-  Future<Map<String, Object?>> backupStatus() async => _map(await _call('backupStatus'));
+  Future<Map<String, Object?>> backupStatus() async =>
+      _map(await _call('backupStatus'));
 
   @override
-  Future<String> backupEnable() async => _map(await _call('backupEnable'))['code'] as String;
+  Future<String> backupEnable() async =>
+      _map(await _call('backupEnable'))['code'] as String;
 
   @override
-  Future<String> backupShowCode() async => _map(await _call('backupShowCode'))['code'] as String;
+  Future<String> backupShowCode() async =>
+      _map(await _call('backupShowCode'))['code'] as String;
 
   @override
   Future<void> backupDisable() async {
@@ -409,11 +479,14 @@ class MeshBridge implements Mesh {
   }
 
   @override
-  Future<String> backupChooseFolder() async => _map(await _call('backupChooseFolder'))['folder'] as String;
+  Future<String> backupChooseFolder() async =>
+      _map(await _call('backupChooseFolder'))['folder'] as String;
 
   @override
-  Future<Map<String, Object?>> backupCreate(String mode, Map<String, Object?> meta) async =>
-      _map(await _call('backupCreate', {'mode': mode, 'meta': meta}));
+  Future<Map<String, Object?>> backupCreate(
+    String mode,
+    Map<String, Object?> meta,
+  ) async => _map(await _call('backupCreate', {'mode': mode, 'meta': meta}));
 
   @override
   Future<Map<String, Object?>> backupRestore(String code) async =>

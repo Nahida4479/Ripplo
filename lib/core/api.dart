@@ -8,7 +8,13 @@ const _devProfile = String.fromEnvironment('RIPPLO_PROFILE');
 
 final state = RipploState();
 
-final core = Core(mesh: mesh, state: state, dbName: !mesh.isNative && _devProfile.isNotEmpty ? 'ripplo-$_devProfile' : 'ripplo');
+final core = Core(
+  mesh: mesh,
+  state: state,
+  dbName: !mesh.isNative && _devProfile.isNotEmpty
+      ? 'ripplo-$_devProfile'
+      : 'ripplo',
+);
 
 final init = core.init;
 final createProfile = core.createProfile;

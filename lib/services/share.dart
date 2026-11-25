@@ -19,7 +19,9 @@ Future<void> checkShare(Mesh mesh, UiState ui) async {
 void Function() startShare(Mesh mesh, UiState ui) {
   js.fire(checkShare(mesh, ui));
   final unsub = mesh.on('share', (_) => js.fire(checkShare(mesh, ui)));
-  final lifecycle = AppLifecycleListener(onResume: () => js.fire(checkShare(mesh, ui)));
+  final lifecycle = AppLifecycleListener(
+    onResume: () => js.fire(checkShare(mesh, ui)),
+  );
   return () {
     unsub();
     lifecycle.dispose();

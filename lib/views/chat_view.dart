@@ -26,12 +26,35 @@ const int _maxStaged = 10;
 const int _waveBars = 40;
 const double _swipe = 56;
 
-Widget _u(double dy, Widget w) => Transform.translate(offset: Offset(0, -dy), child: w);
+Widget _u(double dy, Widget w) =>
+    Transform.translate(offset: Offset(0, -dy), child: w);
 
-TextStyle _s(BuildContext cx, double size, Color color, {FontWeight? w, double h = 1.4}) =>
-    rs(cx, TextStyle(fontSize: size, height: h, fontWeight: w, leadingDistribution: _even), color);
+TextStyle _s(
+  BuildContext cx,
+  double size,
+  Color color, {
+  FontWeight? w,
+  double h = 1.4,
+}) => rs(
+  cx,
+  TextStyle(
+    fontSize: size,
+    height: h,
+    fontWeight: w,
+    leadingDistribution: _even,
+  ),
+  color,
+);
 
-const List<String> _enDays = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+const List<String> _enDays = [
+  'Monday',
+  'Tuesday',
+  'Wednesday',
+  'Thursday',
+  'Friday',
+  'Saturday',
+  'Sunday',
+];
 const List<String> _enMonths = [
   'January',
   'February',
@@ -46,7 +69,15 @@ const List<String> _enMonths = [
   'November',
   'December',
 ];
-const List<String> _plDays = ['poniedziałek', 'wtorek', 'środa', 'czwartek', 'piątek', 'sobota', 'niedziela'];
+const List<String> _plDays = [
+  'poniedziałek',
+  'wtorek',
+  'środa',
+  'czwartek',
+  'piątek',
+  'sobota',
+  'niedziela',
+];
 const List<String> _plMonths = [
   'stycznia',
   'lutego',
@@ -92,10 +123,15 @@ String dur(num? s) {
 List<double> voiceBars(Msg m) {
   final wave = m.att?.wave;
   if (wave != null && wave.isNotEmpty) {
-    return [for (final v in wave) 4 + ((v as num) / 255 * 22).round().toDouble()];
+    return [
+      for (final v in wave) 4 + ((v as num) / 255 * 22).round().toDouble(),
+    ];
   }
   final units = m.id.codeUnits;
-  return [for (var i = 0; i < units.length; i++) 6 + ((units[i] * (i + 3)) % 18).toDouble()].take(28).toList();
+  return [
+    for (var i = 0; i < units.length; i++)
+      6 + ((units[i] * (i + 3)) % 18).toDouble(),
+  ].take(28).toList();
 }
 
 ({double? peak, List<int>? wave}) summarizeSamples(List<double> samples) {
@@ -105,7 +141,10 @@ List<double> voiceBars(Msg m) {
   final step = math.max(size, 1);
   final wave = List<int>.generate(math.min(_waveBars, samples.length), (i) {
     final start = (i * step).floor();
-    final end = math.min(math.max(((i + 1) * step).floor(), start + 1), samples.length);
+    final end = math.min(
+      math.max(((i + 1) * step).floor(), start + 1),
+      samples.length,
+    );
     final part = samples.sublist(start, end);
     return (part.reduce(math.max) / (peak == 0 ? 1 : peak) * 255).round();
   });
@@ -216,7 +255,10 @@ class ChatViewState extends State<ChatView> {
 
   bool get canCall {
     final c = contact;
-    return !isGroup && c != null && !js.truthy(c.request) && (c.addedVia != 'incoming' || js.truthy(c.cardSent));
+    return !isGroup &&
+        c != null &&
+        !js.truthy(c.request) &&
+        (c.addedVia != 'incoming' || js.truthy(c.cardSent));
   }
 
   List<Msg> get msgs => st.msgs(id) ?? const <Msg>[];
@@ -270,20 +312,25 @@ class ChatViewState extends State<ChatView> {
   double lastExtent = 0;
 
   bool _onScroll(ScrollNotification n) {
-    if (n is ScrollUpdateNotification || n is ScrollEndNotification) pinned = n.metrics.extentAfter < 2;
+    if (n is ScrollUpdateNotification || n is ScrollEndNotification)
+      pinned = n.metrics.extentAfter < 2;
     return false;
   }
 
   bool _onMetrics(ScrollMetricsNotification n) {
     final m = n.metrics;
-    if (pinned && m.viewportDimension == lastViewport && m.maxScrollExtent > lastExtent + .5) _jump();
+    if (pinned &&
+        m.viewportDimension == lastViewport &&
+        m.maxScrollExtent > lastExtent + .5)
+      _jump();
     lastViewport = m.viewportDimension;
     lastExtent = m.maxScrollExtent;
     return false;
   }
 
   void _jump() {
-    if (mounted && scroll.hasClients) scroll.jumpTo(scroll.position.maxScrollExtent);
+    if (mounted && scroll.hasClients)
+      scroll.jumpTo(scroll.position.maxScrollExtent);
   }
 
   void _toBottom() {
@@ -322,7 +369,8 @@ class ChatViewState extends State<ChatView> {
 
   void replyToMessage(Msg m) => setState(() => replyTo = m);
 
-  void stageMedia(List<StagedMedia> items) => setState(() => staged = [...staged, ...items]);
+  void stageMedia(List<StagedMedia> items) =>
+      setState(() => staged = [...staged, ...items]);
 
   void fail(Object e) {
     if (e is RipploError) {
@@ -341,24 +389,32 @@ class ChatViewState extends State<ChatView> {
     for (final x in st.neighbors) {
       final card = x['card'];
       final xn = x['node'];
-      if ((card is Map && card['id'] == cid) || (node != null && xn == node) || (known != null && xn == known)) {
+      if ((card is Map && card['id'] == cid) ||
+          (node != null && xn == node) ||
+          (known != null && xn == known)) {
         hit = x;
         break;
       }
     }
     if (hit != null) {
       final links = hit['links'];
-      final list = links is List && links.isNotEmpty ? links.cast<Object?>() : <Object?>[hit];
+      final list = links is List && links.isNotEmpty
+          ? links.cast<Object?>()
+          : <Object?>[hit];
       final out = <String>[];
       for (final l in list) {
-        final s = isCodedLink(l) ? 'BLE Coded' : '${l is Map ? l['medium'] : null}'.toUpperCase();
+        final s = isCodedLink(l)
+            ? 'BLE Coded'
+            : '${l is Map ? l['medium'] : null}'.toUpperCase();
         if (!out.contains(s)) out.add(s);
       }
       return out.join(' + ');
     }
     for (final p in st.people) {
       if (p.id == cid) {
-        return js.now() - p.seenAt < 10 * 60000 ? t('hops', {'n': p.hops}) : null;
+        return js.now() - p.seenAt < 10 * 60000
+            ? t('hops', {'n': p.hops})
+            : null;
       }
     }
     return null;
@@ -394,7 +450,9 @@ class ChatViewState extends State<ChatView> {
     }
   }
 
-  String authorOf(Msg m) => m.from == 'me' ? t('you') : (st.contact(m.from)?.name ?? '').ifEmpty('Ripplo');
+  String authorOf(Msg m) => m.from == 'me'
+      ? t('you')
+      : (st.contact(m.from)?.name ?? '').ifEmpty('Ripplo');
 
   String whoName(Object? who) {
     if (who == st.profile?.ripploId) return t('you');
@@ -413,7 +471,9 @@ class ChatViewState extends State<ChatView> {
 
   String statusLabel(Msg m) {
     final hops = (m['hops'] as num?) ?? 0;
-    return m.status == 'delivered' && hops > 1 ? t('viaPhones', {'n': hops - 1}) : t('status_${m.status}');
+    return m.status == 'delivered' && hops > 1
+        ? t('viaPhones', {'n': hops - 1})
+        : t('status_${m.status}');
   }
 
   void confirmUnsend(Msg m) {
@@ -507,15 +567,27 @@ class ChatViewState extends State<ChatView> {
         toast(t('fileTooBig'));
         continue;
       }
-      final ext = f.path.contains('.') ? f.path.split('.').last.toLowerCase() : '';
-      final mime = f.mimeType ?? _videoExt[ext] ?? (ext == 'png' ? 'image/png' : 'image/jpeg');
-      next.add(StagedMedia(path: f.path, kind: mime.startsWith('video') ? 'video' : 'image', type: mime));
+      final ext = f.path.contains('.')
+          ? f.path.split('.').last.toLowerCase()
+          : '';
+      final mime =
+          f.mimeType ??
+          _videoExt[ext] ??
+          (ext == 'png' ? 'image/png' : 'image/jpeg');
+      next.add(
+        StagedMedia(
+          path: f.path,
+          kind: mime.startsWith('video') ? 'video' : 'image',
+          type: mime,
+        ),
+      );
     }
     if (mounted) setState(() => staged = next);
   }
 
   void onDown(PointerDownEvent e, Msg m) {
-    if (e.kind == PointerDeviceKind.mouse && e.buttons != kPrimaryButton) return;
+    if (e.kind == PointerDeviceKind.mouse && e.buttons != kPrimaryButton)
+      return;
     swiped = false;
     final d = SwipeDrag(m, e.position.dx, e.position.dy);
     drag = d;
@@ -584,7 +656,12 @@ class ChatViewState extends State<ChatView> {
   void jump(Object? mid) {
     final cx = keys['$mid']?.currentContext;
     if (cx == null) return;
-    Scrollable.ensureVisible(cx, alignment: .5, duration: const Duration(milliseconds: 300), curve: Curves.ease);
+    Scrollable.ensureVisible(
+      cx,
+      alignment: .5,
+      duration: const Duration(milliseconds: 300),
+      curve: Curves.ease,
+    );
     setState(() {
       flashId = '$mid';
       flashSeq++;
@@ -624,7 +701,8 @@ class ChatViewState extends State<ChatView> {
       audioFile = path;
       await p.setFilePath(path);
       p.processingStateStream.listen((s) {
-        if (s == ProcessingState.completed && identical(audio, p)) fire(stopAudio());
+        if (s == ProcessingState.completed && identical(audio, p))
+          fire(stopAudio());
       });
       await p.play();
     } catch (_) {
@@ -647,18 +725,24 @@ class ChatViewState extends State<ChatView> {
         return;
       }
       final path = await newMediaPath('.m4a');
-      await r.start(const RecordConfig(encoder: AudioEncoder.aacLc), path: path);
+      await r.start(
+        const RecordConfig(encoder: AudioEncoder.aacLc),
+        path: path,
+      );
       recorder = r;
       recPath = path;
       samples.clear();
       startedAt = js.now();
       amp = r.onAmplitudeChanged(const Duration(milliseconds: 100)).listen((a) {
-        final peak = a.current.isFinite ? math.pow(10, a.current / 20).toDouble().clamp(0.0, 1.0) : 0.0;
+        final peak = a.current.isFinite
+            ? math.pow(10, a.current / 20).toDouble().clamp(0.0, 1.0)
+            : 0.0;
         samples.add(peak);
         if (!mounted) return;
         setState(() {
           liveBars = [...liveBars, 3 + (math.min(1, peak * 2.5) * 22).round()];
-          if (liveBars.length > 32) liveBars = liveBars.sublist(liveBars.length - 32);
+          if (liveBars.length > 32)
+            liveBars = liveBars.sublist(liveBars.length - 32);
         });
       });
       tick = Timer.periodic(const Duration(seconds: 1), (_) {
@@ -745,7 +829,10 @@ class ChatViewState extends State<ChatView> {
         _composer(context, c),
       ],
     );
-    return Stack(fit: StackFit.expand, children: [page, if (viewer != null) _viewer(context, pad)]);
+    return Stack(
+      fit: StackFit.expand,
+      children: [page, if (viewer != null) _viewer(context, pad)],
+    );
   }
 
   Widget _header(BuildContext context, RipploColors c) {
@@ -760,14 +847,25 @@ class ChatViewState extends State<ChatView> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            Avatar(name: name, photo: contact?.avatar, size: 38, group: isGroup),
+            Avatar(
+              name: name,
+              photo: contact?.avatar,
+              size: 38,
+              group: isGroup,
+            ),
             const SizedBox(width: 10),
             Flexible(
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _u(1, Text(name, style: _s(context, 15, c.text, w: FontWeight.w700))),
+                  _u(
+                    1,
+                    Text(
+                      name,
+                      style: _s(context, 15, c.text, w: FontWeight.w700),
+                    ),
+                  ),
                   Text(subLine(), style: _s(context, 12, c.text2, h: 1.75)),
                 ],
               ),
@@ -783,7 +881,13 @@ class ChatViewState extends State<ChatView> {
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            RIconBtn(icon: LucideIcons.chevronLeft, size: 24, stroke: 2, label: t('back'), onTap: widget.onBack),
+            RIconBtn(
+              icon: LucideIcons.chevronLeft,
+              size: 24,
+              stroke: 2,
+              label: t('back'),
+              onTap: widget.onBack,
+            ),
             const SizedBox(width: 8),
             Expanded(
               child: Align(alignment: Alignment.centerLeft, child: who),
@@ -821,12 +925,21 @@ class ChatViewState extends State<ChatView> {
     final btn = _s(context, 13, c.text, w: FontWeight.w600);
     final texts = [
       kind == 'red' ? t('conflictWarning') : t('unverifiedWarning'),
-      if (pv != null) t('peerVerified', {'name': contact!.name, 'method': t('method_${pv['level']}')}),
+      if (pv != null)
+        t('peerVerified', {
+          'name': contact!.name,
+          'method': t('method_${pv['level']}'),
+        }),
     ];
-    final labels = [t('verifyQr'), t('retryMesh'), if (kind == 'amber') t('imSure')];
+    final labels = [
+      t('verifyQr'),
+      t('retryMesh'),
+      if (kind == 'amber') t('imSure'),
+    ];
     final double basis = math.max(
       texts.map((x) => _w(x, p)).reduce(math.max),
-      labels.map((x) => 24 + _w(x, btn)).reduce((x, y) => x + y) + 6 * (labels.length - 1),
+      labels.map((x) => 24 + _w(x, btn)).reduce((x, y) => x + y) +
+          6 * (labels.length - 1),
     );
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
@@ -834,11 +947,15 @@ class ChatViewState extends State<ChatView> {
         liveRegion: true,
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-          decoration: BoxDecoration(color: col.withValues(alpha: .16), borderRadius: BorderRadius.circular(14)),
+          decoration: BoxDecoration(
+            color: col.withValues(alpha: .16),
+            borderRadius: BorderRadius.circular(14),
+          ),
           child: LayoutBuilder(
             builder: (context, bc) {
               final avail = bc.maxWidth - 10;
-              final iconW = (20 * math.min(1.0, avail / (20 + basis))).toDouble();
+              final iconW = (20 * math.min(1.0, avail / (20 + basis)))
+                  .toDouble();
               return Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -846,7 +963,11 @@ class ChatViewState extends State<ChatView> {
                     width: iconW,
                     height: 20,
                     child: Center(
-                      child: Lucide(LucideIcons.shieldAlert, size: iconW, color: col),
+                      child: Lucide(
+                        LucideIcons.shieldAlert,
+                        size: iconW,
+                        color: col,
+                      ),
                     ),
                   ),
                   const SizedBox(width: 10),
@@ -855,7 +976,10 @@ class ChatViewState extends State<ChatView> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         for (final x in texts)
-                          Padding(padding: const EdgeInsets.only(bottom: 8), child: _FracText(x, p, 18.2, dy: -.5)),
+                          Padding(
+                            padding: const EdgeInsets.only(bottom: 8),
+                            child: _FracText(x, p, 18.2, dy: -.5),
+                          ),
                         Wrap(
                           spacing: 6,
                           runSpacing: 6,
@@ -865,7 +989,8 @@ class ChatViewState extends State<ChatView> {
                                 text: labels[0],
                                 sm: true,
                                 kind: RBtnKind.ghost,
-                                onTap: () => ui.add = AddRequest(mode: 'verify', id: id),
+                                onTap: () =>
+                                    ui.add = AddRequest(mode: 'verify', id: id),
                               ),
                             ),
                             IntrinsicWidth(
@@ -878,7 +1003,12 @@ class ChatViewState extends State<ChatView> {
                             ),
                             if (kind == 'amber')
                               IntrinsicWidth(
-                                child: RBtn(text: labels[2], sm: true, kind: RBtnKind.ghost, onTap: sure),
+                                child: RBtn(
+                                  text: labels[2],
+                                  sm: true,
+                                  kind: RBtnKind.ghost,
+                                  onTap: sure,
+                                ),
                               ),
                           ],
                         ),
@@ -913,9 +1043,15 @@ class ChatViewState extends State<ChatView> {
                     WidgetSpan(
                       alignment: PlaceholderAlignment.baseline,
                       baseline: TextBaseline.alphabetic,
-                      child: Lucide(dev ? LucideIcons.shieldAlert : LucideIcons.lock, size: 13, color: color),
+                      child: Lucide(
+                        dev ? LucideIcons.shieldAlert : LucideIcons.lock,
+                        size: 13,
+                        color: color,
+                      ),
                     ),
-                    TextSpan(text: ' ${dev ? t('devCryptoWarn') : t('encryptedLine')}'),
+                    TextSpan(
+                      text: ' ${dev ? t('devCryptoWarn') : t('encryptedLine')}',
+                    ),
                   ],
                 ),
                 textAlign: TextAlign.center,
@@ -943,8 +1079,17 @@ class ChatViewState extends State<ChatView> {
               child: Container(
                 height: 20,
                 padding: const EdgeInsets.symmetric(horizontal: 10),
-                decoration: BoxDecoration(color: c.surface2, borderRadius: BorderRadius.circular(kRadiusPill)),
-                child: Center(widthFactor: 1, child: _u(1, Text(dayLabel(ts), style: _s(context, 12, c.text2)))),
+                decoration: BoxDecoration(
+                  color: c.surface2,
+                  borderRadius: BorderRadius.circular(kRadiusPill),
+                ),
+                child: Center(
+                  widthFactor: 1,
+                  child: _u(
+                    1,
+                    Text(dayLabel(ts), style: _s(context, 12, c.text2)),
+                  ),
+                ),
               ),
             ),
           ),
@@ -960,14 +1105,21 @@ class ChatViewState extends State<ChatView> {
         final items = <Widget>[_lockLine(context, c)];
         for (var i = 0; i < list.length; i++) {
           final m = list[i];
-          if (i == 0 || !_sameDay(list[i - 1].ts, m.ts)) items.add(_dayChip(context, c, m.ts));
+          if (i == 0 || !_sameDay(list[i - 1].ts, m.ts))
+            items.add(_dayChip(context, c, m.ts));
           if (m.from == 'system') {
             items.add(
               Align(
                 alignment: Alignment.center,
                 child: Padding(
                   padding: const EdgeInsets.symmetric(vertical: 8),
-                  child: _FracText(m.text ?? '', _s(context, 12, c.warn), 16.8, center: true, dy: -.5),
+                  child: _FracText(
+                    m.text ?? '',
+                    _s(context, 12, c.warn),
+                    16.8,
+                    center: true,
+                    dy: -.5,
+                  ),
                 ),
               ),
             );
@@ -1020,7 +1172,10 @@ class ChatViewState extends State<ChatView> {
             bottomLeft: Radius.circular(6),
           ),
         ),
-        child: Center(widthFactor: 1, child: RTypingDots(freeze: widget.typingFreeze)),
+        child: Center(
+          widthFactor: 1,
+          child: RTypingDots(freeze: widget.typingFreeze),
+        ),
       ),
     ),
   );
@@ -1044,9 +1199,16 @@ class ChatViewState extends State<ChatView> {
               Lucide(LucideIcons.cloudOff, size: 14, color: c.danger),
               _u(
                 0.5,
-                Text(status == 'failed' ? t('status_failed') : t('outOfMeshRange'), style: _s(context, 11, c.danger)),
+                Text(
+                  status == 'failed' ? t('status_failed') : t('outOfMeshRange'),
+                  style: _s(context, 11, c.danger),
+                ),
               ),
-              RBtn(text: t('retry'), sm: true, onTap: () => fire(api.retry(m.id))),
+              RBtn(
+                text: t('retry'),
+                sm: true,
+                onTap: () => fire(api.retry(m.id)),
+              ),
             ], 6),
           ),
         ),
@@ -1061,7 +1223,13 @@ class ChatViewState extends State<ChatView> {
             crossAxisAlignment: CrossAxisAlignment.center,
             children: gapped([
               _u(0.5, Text(statusLabel(m), style: _s(context, 11, c.text2))),
-              if (shown == m.id) RBtn(text: t('unsend'), sm: true, kind: RBtnKind.ghost, onTap: () => confirmUnsend(m)),
+              if (shown == m.id)
+                RBtn(
+                  text: t('unsend'),
+                  sm: true,
+                  kind: RBtnKind.ghost,
+                  onTap: () => confirmUnsend(m),
+                ),
             ], 6),
           ),
         ),
@@ -1102,7 +1270,12 @@ class ChatViewState extends State<ChatView> {
           return DecoratedBox(
             decoration: BoxDecoration(
               borderRadius: radius,
-              boxShadow: [BoxShadow(color: c.accent.withValues(alpha: a), spreadRadius: 3)],
+              boxShadow: [
+                BoxShadow(
+                  color: c.accent.withValues(alpha: a),
+                  spreadRadius: 3,
+                ),
+              ],
             ),
             child: child,
           );
@@ -1112,9 +1285,16 @@ class ChatViewState extends State<ChatView> {
     }
     final key = keys.putIfAbsent(m.id, GlobalKey.new);
     final moving = AnimatedContainer(
-      duration: motion(context, restHere ? const Duration(milliseconds: 180) : Duration.zero),
+      duration: motion(
+        context,
+        restHere ? const Duration(milliseconds: 180) : Duration.zero,
+      ),
       curve: Curves.ease,
-      transform: Matrix4.translationValues(offsetId == m.id ? offsetX : 0, 0, 0),
+      transform: Matrix4.translationValues(
+        offsetId == m.id ? offsetX : 0,
+        0,
+        0,
+      ),
       child: Listener(
         onPointerDown: (e) => onDown(e, m),
         onPointerMove: onMove,
@@ -1137,7 +1317,9 @@ class ChatViewState extends State<ChatView> {
             Column(
               key: key,
               mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: out ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+              crossAxisAlignment: out
+                  ? CrossAxisAlignment.end
+                  : CrossAxisAlignment.start,
               children: [moving, ?below],
             ),
             if (swipeHere)
@@ -1159,7 +1341,13 @@ class ChatViewState extends State<ChatView> {
     );
   }
 
-  List<Widget> _bubbleKids(BuildContext context, RipploColors c, Msg m, Color fg, bool out) {
+  List<Widget> _bubbleKids(
+    BuildContext context,
+    RipploColors c,
+    Msg m,
+    Color fg,
+    bool out,
+  ) {
     final kids = <Widget>[];
     final re = m.re;
     if (re != null) {
@@ -1187,12 +1375,19 @@ class ChatViewState extends State<ChatView> {
                             children: [
                               _FracText(
                                 whoName(re['who']),
-                                _s(context, 12, fg.withValues(alpha: .85), w: FontWeight.w700),
+                                _s(
+                                  context,
+                                  12,
+                                  fg.withValues(alpha: .85),
+                                  w: FontWeight.w700,
+                                ),
                                 16.8,
                                 dy: -1,
                               ),
                               _FracText(
-                                rt is String && rt.isNotEmpty ? rt : kindLabel(re['kind']),
+                                rt is String && rt.isNotEmpty
+                                    ? rt
+                                    : kindLabel(re['kind']),
                                 _s(context, 12, fg.withValues(alpha: .75)),
                                 16.8,
                                 maxLines: 2,
@@ -1223,8 +1418,16 @@ class ChatViewState extends State<ChatView> {
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(14),
                 child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 240, maxHeight: 240),
-                  child: Image.memory(att.bytes!, cacheWidth: 720, fit: BoxFit.contain, gaplessPlayback: true),
+                  constraints: const BoxConstraints(
+                    maxWidth: 240,
+                    maxHeight: 240,
+                  ),
+                  child: Image.memory(
+                    att.bytes!,
+                    cacheWidth: 720,
+                    fit: BoxFit.contain,
+                    gaplessPlayback: true,
+                  ),
                 ),
               ),
             ),
@@ -1237,7 +1440,11 @@ class ChatViewState extends State<ChatView> {
           alignment: Alignment.centerLeft,
           child: Padding(
             padding: const EdgeInsets.only(bottom: 4),
-            child: _VideoBubble(key: ValueKey('v-${m.id}'), bytes: att.bytes!, mime: att.mime),
+            child: _VideoBubble(
+              key: ValueKey('v-${m.id}'),
+              bytes: att.bytes!,
+              mime: att.mime,
+            ),
           ),
         ),
       );
@@ -1260,7 +1467,10 @@ class ChatViewState extends State<ChatView> {
                     width: 34,
                     height: 34,
                     alignment: Alignment.center,
-                    decoration: BoxDecoration(color: fg, shape: BoxShape.circle),
+                    decoration: BoxDecoration(
+                      color: fg,
+                      shape: BoxShape.circle,
+                    ),
                     child: Lucide(
                       on ? LucideIcons.pause : LucideIcons.play,
                       size: 18,
@@ -1305,7 +1515,9 @@ class ChatViewState extends State<ChatView> {
     final txt = m.text;
     kids.add(
       _Trail(
-        span: txt != null && txt.isNotEmpty ? TextSpan(text: txt, style: _s(context, 15, fg)) : null,
+        span: txt != null && txt.isNotEmpty
+            ? TextSpan(text: txt, style: _s(context, 15, fg))
+            : null,
         meta: _meta(context, m, fg),
       ),
     );
@@ -1313,7 +1525,9 @@ class ChatViewState extends State<ChatView> {
   }
 
   Widget _meta(BuildContext context, Msg m, Color fg) {
-    final kids = <Widget>[Text('${timeLabel(m.ts)} ', style: _s(context, 11, fg))];
+    final kids = <Widget>[
+      Text('${timeLabel(m.ts)} ', style: _s(context, 11, fg)),
+    ];
     if (m.from == 'me') {
       switch (m.status) {
         case 'encrypting':
@@ -1326,7 +1540,8 @@ class ChatViewState extends State<ChatView> {
               crossAxisAlignment: CrossAxisAlignment.center,
               children: gapped([
                 Lucide(LucideIcons.check, size: 14, color: fg),
-                if (m.att != null && pr != null) Text('${(pr * 100).round()}%', style: _s(context, 11, fg)),
+                if (m.att != null && pr != null)
+                  Text('${(pr * 100).round()}%', style: _s(context, 11, fg)),
               ], 2),
             ),
           );
@@ -1363,11 +1578,20 @@ class ChatViewState extends State<ChatView> {
               onTap: () => setState(() => viewer = null),
               child: Container(
                 color: const Color(0xEB000000),
-                padding: EdgeInsets.fromLTRB(12, pad.top + 56, 12, pad.bottom + 12),
+                padding: EdgeInsets.fromLTRB(
+                  12,
+                  pad.top + 56,
+                  12,
+                  pad.bottom + 12,
+                ),
                 alignment: Alignment.center,
                 child: ClipRRect(
                   borderRadius: BorderRadius.circular(8),
-                  child: Image.memory(bytes, fit: BoxFit.contain, gaplessPlayback: true),
+                  child: Image.memory(
+                    bytes,
+                    fit: BoxFit.contain,
+                    gaplessPlayback: true,
+                  ),
                 ),
               ),
             ),
@@ -1410,7 +1634,13 @@ class ChatViewState extends State<ChatView> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  _u(1, Text(authorOf(r), style: _s(context, 12, c.text, w: FontWeight.w700))),
+                  _u(
+                    1,
+                    Text(
+                      authorOf(r),
+                      style: _s(context, 12, c.text, w: FontWeight.w700),
+                    ),
+                  ),
                   _u(
                     1,
                     Text(
@@ -1472,8 +1702,15 @@ class ChatViewState extends State<ChatView> {
                               width: 20,
                               height: 20,
                               alignment: Alignment.center,
-                              decoration: const BoxDecoration(color: Color(0x99000000), shape: BoxShape.circle),
-                              child: const Lucide(LucideIcons.x, size: 14, color: Color(0xFFFFFFFF)),
+                              decoration: const BoxDecoration(
+                                color: Color(0x99000000),
+                                shape: BoxShape.circle,
+                              ),
+                              child: const Lucide(
+                                LucideIcons.x,
+                                size: 14,
+                                color: Color(0xFFFFFFFF),
+                              ),
                             ),
                           ),
                         ),
@@ -1489,11 +1726,24 @@ class ChatViewState extends State<ChatView> {
   );
 
   Widget _thumb(StagedMedia s) {
-    if (s.kind == 'video') return s.path == null ? const SizedBox.shrink() : _VideoThumb(path: s.path!);
+    if (s.kind == 'video')
+      return s.path == null
+          ? const SizedBox.shrink()
+          : _VideoThumb(path: s.path!);
     final b = s.bytes;
     return b != null
-        ? Image.memory(b, fit: BoxFit.cover, cacheWidth: 192, gaplessPlayback: true)
-        : Image.file(File(s.path!), fit: BoxFit.cover, cacheWidth: 192, gaplessPlayback: true);
+        ? Image.memory(
+            b,
+            fit: BoxFit.cover,
+            cacheWidth: 192,
+            gaplessPlayback: true,
+          )
+        : Image.file(
+            File(s.path!),
+            fit: BoxFit.cover,
+            cacheWidth: 192,
+            gaplessPlayback: true,
+          );
   }
 
   Widget _composer(BuildContext context, RipploColors c) {
@@ -1506,7 +1756,13 @@ class ChatViewState extends State<ChatView> {
       row = Row(
         crossAxisAlignment: CrossAxisAlignment.end,
         children: gapped([
-          RIconBtn(icon: LucideIcons.x, size: 22, stroke: 2, label: t('cancel'), onTap: () => fire(stopRec(true))),
+          RIconBtn(
+            icon: LucideIcons.x,
+            size: 22,
+            stroke: 2,
+            label: t('cancel'),
+            onTap: () => fire(stopRec(true)),
+          ),
           Expanded(
             child: Container(
               constraints: const BoxConstraints(minHeight: 44),
@@ -1517,7 +1773,10 @@ class ChatViewState extends State<ChatView> {
                   Container(
                     width: 10,
                     height: 10,
-                    decoration: BoxDecoration(color: c.danger, shape: BoxShape.circle),
+                    decoration: BoxDecoration(
+                      color: c.danger,
+                      shape: BoxShape.circle,
+                    ),
                   ),
                   Text(dur(recSec), style: _s(context, 15, c.text)),
                   Expanded(
@@ -1532,7 +1791,10 @@ class ChatViewState extends State<ChatView> {
                               Container(
                                 width: 3,
                                 height: h.toDouble(),
-                                decoration: BoxDecoration(color: c.accent, borderRadius: BorderRadius.circular(2)),
+                                decoration: BoxDecoration(
+                                  color: c.accent,
+                                  borderRadius: BorderRadius.circular(2),
+                                ),
                               ),
                           ], 2),
                         ),
@@ -1550,7 +1812,13 @@ class ChatViewState extends State<ChatView> {
       row = Row(
         crossAxisAlignment: CrossAxisAlignment.end,
         children: gapped([
-          RIconBtn(icon: LucideIcons.plus, size: 22, stroke: 2, label: t('attach'), onTap: () => fire(pickFiles())),
+          RIconBtn(
+            icon: LucideIcons.plus,
+            size: 22,
+            stroke: 2,
+            label: t('attach'),
+            onTap: () => fire(pickFiles()),
+          ),
           Expanded(child: _box(context, c, len)),
           if (has)
             _sendBtn(c, () => fire(send()))
@@ -1629,7 +1897,10 @@ class ChatViewState extends State<ChatView> {
           if (len >= 900)
             Padding(
               padding: const EdgeInsets.only(bottom: 10),
-              child: Text('$len/${api.maxText}', style: _s(context, 11, len >= api.maxText ? c.danger : c.text2)),
+              child: Text(
+                '$len/${api.maxText}',
+                style: _s(context, 11, len >= api.maxText ? c.danger : c.text2),
+              ),
             ),
         ], 6),
       ),
@@ -1642,7 +1913,14 @@ extension _Fallback on String {
 }
 
 class _FracText extends LeafRenderObjectWidget {
-  const _FracText(this.text, this.style, this.lineHeight, {this.maxLines, this.center = false, this.dy = 0});
+  const _FracText(
+    this.text,
+    this.style,
+    this.lineHeight, {
+    this.maxLines,
+    this.center = false,
+    this.dy = 0,
+  });
 
   final String text;
   final TextStyle style;
@@ -1652,10 +1930,12 @@ class _FracText extends LeafRenderObjectWidget {
   final double dy;
 
   @override
-  RenderObject createRenderObject(BuildContext context) => _RenderFracText(this, MediaQuery.textScalerOf(context));
+  RenderObject createRenderObject(BuildContext context) =>
+      _RenderFracText(this, MediaQuery.textScalerOf(context));
 
   @override
-  void updateRenderObject(BuildContext context, _RenderFracText r) => r.update(this, MediaQuery.textScalerOf(context));
+  void updateRenderObject(BuildContext context, _RenderFracText r) =>
+      r.update(this, MediaQuery.textScalerOf(context));
 }
 
 class _RenderFracText extends RenderBox {
@@ -1696,13 +1976,18 @@ class _RenderFracText extends RenderBox {
   }
 
   @override
-  double computeMaxIntrinsicHeight(double width) => computeMinIntrinsicHeight(width);
+  double computeMaxIntrinsicHeight(double width) =>
+      computeMinIntrinsicHeight(width);
 
   @override
   Size computeDryLayout(BoxConstraints constraints) {
     _tp.layout(maxWidth: constraints.maxWidth);
-    final w = _w.center || constraints.hasTightWidth ? constraints.maxWidth : _tp.width;
-    return constraints.constrain(Size(w, _tp.computeLineMetrics().length * _w.lineHeight));
+    final w = _w.center || constraints.hasTightWidth
+        ? constraints.maxWidth
+        : _tp.width;
+    return constraints.constrain(
+      Size(w, _tp.computeLineMetrics().length * _w.lineHeight),
+    );
   }
 
   @override
@@ -1734,7 +2019,11 @@ class _RenderFracText extends RenderBox {
 }
 
 class _SnapBox extends SingleChildRenderObjectWidget {
-  const _SnapBox({required this.color, required this.radius, required super.child});
+  const _SnapBox({
+    required this.color,
+    required this.radius,
+    required super.child,
+  });
 
   final Color color;
   final BorderRadius radius;
@@ -1784,7 +2073,12 @@ class _RenderSnapBox extends RenderProxyBox {
     final t = _snap(g.dy);
     final r = _snap(g.dx + size.width);
     final b = _snap(g.dy + size.height);
-    final rect = Rect.fromLTRB(l - g.dx, t - g.dy, r - g.dx, b - g.dy).shift(offset);
+    final rect = Rect.fromLTRB(
+      l - g.dx,
+      t - g.dy,
+      r - g.dx,
+      b - g.dy,
+    ).shift(offset);
     context.canvas.drawRRect(_radius.toRRect(rect), Paint()..color = _color);
     super.paint(context, offset);
   }
@@ -1796,7 +2090,8 @@ class _Trail extends SingleChildRenderObjectWidget {
   final TextSpan? span;
 
   @override
-  RenderObject createRenderObject(BuildContext context) => _RenderTrail(span, MediaQuery.textScalerOf(context));
+  RenderObject createRenderObject(BuildContext context) =>
+      _RenderTrail(span, MediaQuery.textScalerOf(context));
 
   @override
   void updateRenderObject(BuildContext context, _RenderTrail r) => r
@@ -1804,7 +2099,8 @@ class _Trail extends SingleChildRenderObjectWidget {
     ..scaler = MediaQuery.textScalerOf(context);
 }
 
-class _RenderTrail extends RenderBox with RenderObjectWithChildMixin<RenderBox> {
+class _RenderTrail extends RenderBox
+    with RenderObjectWithChildMixin<RenderBox> {
   _RenderTrail(this._span, this._scaler) {
     _rebuild();
   }
@@ -1818,12 +2114,19 @@ class _RenderTrail extends RenderBox with RenderObjectWithChildMixin<RenderBox> 
   late TextPainter _tp;
 
   void _rebuild() {
-    _tp = TextPainter(text: _span, textDirection: TextDirection.ltr, textScaler: _scaler);
+    _tp = TextPainter(
+      text: _span,
+      textDirection: TextDirection.ltr,
+      textScaler: _scaler,
+    );
   }
 
   set span(TextSpan? v) {
     if (v == _span ||
-        (v != null && _span != null && v.toPlainText() == _span!.toPlainText() && v.style == _span!.style)) {
+        (v != null &&
+            _span != null &&
+            v.toPlainText() == _span!.toPlainText() &&
+            v.style == _span!.style)) {
       return;
     }
     _span = v;
@@ -1853,7 +2156,8 @@ class _RenderTrail extends RenderBox with RenderObjectWithChildMixin<RenderBox> 
   }
 
   @override
-  double computeMinIntrinsicWidth(double height) => _m.getMinIntrinsicWidth(double.infinity) + _gap;
+  double computeMinIntrinsicWidth(double height) =>
+      _m.getMinIntrinsicWidth(double.infinity) + _gap;
 
   @override
   double computeMinIntrinsicHeight(double width) {
@@ -1866,11 +2170,14 @@ class _RenderTrail extends RenderBox with RenderObjectWithChildMixin<RenderBox> 
   }
 
   @override
-  double computeMaxIntrinsicHeight(double width) => computeMinIntrinsicHeight(width);
+  double computeMaxIntrinsicHeight(double width) =>
+      computeMinIntrinsicHeight(width);
 
   @override
   Size computeDryLayout(BoxConstraints constraints) {
-    final w = constraints.hasBoundedWidth ? constraints.maxWidth : computeMaxIntrinsicWidth(double.infinity);
+    final w = constraints.hasBoundedWidth
+        ? constraints.maxWidth
+        : computeMaxIntrinsicWidth(double.infinity);
     return constraints.constrain(Size(w, computeMinIntrinsicHeight(w)));
   }
 
@@ -1878,7 +2185,9 @@ class _RenderTrail extends RenderBox with RenderObjectWithChildMixin<RenderBox> 
 
   @override
   void performLayout() {
-    final maxW = constraints.hasBoundedWidth ? constraints.maxWidth : computeMaxIntrinsicWidth(double.infinity);
+    final maxW = constraints.hasBoundedWidth
+        ? constraints.maxWidth
+        : computeMaxIntrinsicWidth(double.infinity);
     _m.layout(BoxConstraints(maxWidth: maxW), parentUsesSize: true);
     final mw = _m.size.width + _gap;
     var th = 0.0;
@@ -1896,10 +2205,14 @@ class _RenderTrail extends RenderBox with RenderObjectWithChildMixin<RenderBox> 
         lineTop = th - last.height;
       }
     }
-    final width = constraints.hasTightWidth ? maxW : constraints.constrainWidth(math.max(textW + (fits ? mw : 0), mw));
+    final width = constraints.hasTightWidth
+        ? maxW
+        : constraints.constrainWidth(math.max(textW + (fits ? mw : 0), mw));
     final base = fits ? lineTop : th;
     _mOffset = Offset(width - _m.size.width, base + _top);
-    size = constraints.constrain(Size(width, math.max(th, base + _top + _m.size.height + _bottom)));
+    size = constraints.constrain(
+      Size(width, math.max(th, base + _top + _m.size.height + _bottom)),
+    );
   }
 
   @override
@@ -1909,11 +2222,12 @@ class _RenderTrail extends RenderBox with RenderObjectWithChildMixin<RenderBox> 
   }
 
   @override
-  bool hitTestChildren(BoxHitTestResult result, {required Offset position}) => result.addWithPaintOffset(
-    offset: _mOffset,
-    position: position,
-    hitTest: (r, p) => _m.hitTest(r, position: p),
-  );
+  bool hitTestChildren(BoxHitTestResult result, {required Offset position}) =>
+      result.addWithPaintOffset(
+        offset: _mOffset,
+        position: position,
+        hitTest: (r, p) => _m.hitTest(r, position: p),
+      );
 
   @override
   void describeSemanticsConfiguration(SemanticsConfiguration config) {
@@ -1962,7 +2276,10 @@ class _VideoBubbleState extends State<_VideoBubble> {
       await c.initialize();
       c.addListener(() {
         final v = c.value;
-        if (v.isInitialized && !v.isPlaying && v.duration > Duration.zero && v.position >= v.duration) {
+        if (v.isInitialized &&
+            !v.isPlaying &&
+            v.duration > Duration.zero &&
+            v.position >= v.duration) {
           fire(release());
         }
       });
@@ -2017,7 +2334,10 @@ class _VideoBubbleState extends State<_VideoBubble> {
     if (c != null && c.value.isInitialized) {
       inner = ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 240, maxHeight: 240),
-        child: AspectRatio(aspectRatio: c.value.aspectRatio == 0 ? 1 : c.value.aspectRatio, child: VideoPlayer(c)),
+        child: AspectRatio(
+          aspectRatio: c.value.aspectRatio == 0 ? 1 : c.value.aspectRatio,
+          child: VideoPlayer(c),
+        ),
       );
     } else {
       inner = Container(
@@ -2029,8 +2349,15 @@ class _VideoBubbleState extends State<_VideoBubble> {
           width: 44,
           height: 44,
           alignment: Alignment.center,
-          decoration: const BoxDecoration(color: Color(0x99000000), shape: BoxShape.circle),
-          child: const Lucide(LucideIcons.play, size: 22, color: Color(0xFFFFFFFF)),
+          decoration: const BoxDecoration(
+            color: Color(0x99000000),
+            shape: BoxShape.circle,
+          ),
+          child: const Lucide(
+            LucideIcons.play,
+            size: 22,
+            color: Color(0xFFFFFFFF),
+          ),
         ),
       );
     }
@@ -2051,7 +2378,9 @@ class _VideoThumb extends StatefulWidget {
 }
 
 class _VideoThumbState extends State<_VideoThumb> {
-  late final VideoPlayerController ctl = VideoPlayerController.file(File(widget.path));
+  late final VideoPlayerController ctl = VideoPlayerController.file(
+    File(widget.path),
+  );
   bool ready = false;
 
   @override
@@ -2073,7 +2402,11 @@ class _VideoThumbState extends State<_VideoThumb> {
       ? FittedBox(
           fit: BoxFit.cover,
           clipBehavior: Clip.hardEdge,
-          child: SizedBox(width: ctl.value.size.width, height: ctl.value.size.height, child: VideoPlayer(ctl)),
+          child: SizedBox(
+            width: ctl.value.size.width,
+            height: ctl.value.size.height,
+            child: VideoPlayer(ctl),
+          ),
         )
       : const SizedBox.shrink();
 }

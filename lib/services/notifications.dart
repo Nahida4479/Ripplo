@@ -5,7 +5,8 @@ import '../mesh/bridge.dart';
 import '../util/js.dart' as js;
 
 class Notifications {
-  Notifications({required this.mesh, bool Function()? visible}) : _visible = visible ?? _foreground;
+  Notifications({required this.mesh, bool Function()? visible})
+    : _visible = visible ?? _foreground;
 
   final Mesh mesh;
   final bool Function() _visible;
@@ -15,7 +16,9 @@ class Notifications {
 
   static bool _foreground() {
     final s = WidgetsBinding.instance.lifecycleState;
-    return s == null || s == AppLifecycleState.resumed || s == AppLifecycleState.inactive;
+    return s == null ||
+        s == AppLifecycleState.resumed ||
+        s == AppLifecycleState.inactive;
   }
 
   void setOpenChat(String? id) => _openChat = id;
@@ -43,7 +46,8 @@ class Notifications {
   }
 
   Future<bool> _ask() async {
-    if ((await mesh.checkPermissions())['notifications'] == 'granted') return true;
+    if ((await mesh.checkPermissions())['notifications'] == 'granted')
+      return true;
     return (await mesh.requestPermissions())['notifications'] == 'granted';
   }
 }

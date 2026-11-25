@@ -15,7 +15,10 @@ class Scheduler {
   AppLifecycleListener? _lifecycle;
 
   void start() {
-    _timer = Timer.periodic(const Duration(milliseconds: slotMs), (_) => tick());
+    _timer = Timer.periodic(
+      const Duration(milliseconds: slotMs),
+      (_) => tick(),
+    );
     _lifecycle = AppLifecycleListener(onResume: tick);
     tick();
   }

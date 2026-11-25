@@ -24,24 +24,29 @@ Future<void> wipeMediaCache() async {
 
 String _random() {
   final r = Random.secure();
-  return [for (var i = 0; i < 16; i++) r.nextInt(256).toRadixString(16).padLeft(2, '0')].join();
+  return [
+    for (var i = 0; i < 16; i++)
+      r.nextInt(256).toRadixString(16).padLeft(2, '0'),
+  ].join();
 }
 
-String extFor(String mime) => switch (mime.split(';').first.trim().toLowerCase()) {
-  'video/mp4' => '.mp4',
-  'video/webm' => '.webm',
-  'video/quicktime' => '.mov',
-  'video/3gpp' => '.3gp',
-  'video/x-matroska' => '.mkv',
-  'audio/mp4' || 'audio/aac' || 'audio/x-m4a' => '.m4a',
-  'audio/webm' => '.webm',
-  'audio/ogg' => '.ogg',
-  'audio/mpeg' => '.mp3',
-  'audio/wav' || 'audio/x-wav' => '.wav',
-  _ => '',
-};
+String extFor(String mime) =>
+    switch (mime.split(';').first.trim().toLowerCase()) {
+      'video/mp4' => '.mp4',
+      'video/webm' => '.webm',
+      'video/quicktime' => '.mov',
+      'video/3gpp' => '.3gp',
+      'video/x-matroska' => '.mkv',
+      'audio/mp4' || 'audio/aac' || 'audio/x-m4a' => '.m4a',
+      'audio/webm' => '.webm',
+      'audio/ogg' => '.ogg',
+      'audio/mpeg' => '.mp3',
+      'audio/wav' || 'audio/x-wav' => '.wav',
+      _ => '',
+    };
 
-Future<String> newMediaPath([String ext = '']) async => '${(await _dir()).path}/${_random()}$ext';
+Future<String> newMediaPath([String ext = '']) async =>
+    '${(await _dir()).path}/${_random()}$ext';
 
 Future<String> writeMedia(Uint8List bytes, String mime) async {
   final path = await newMediaPath(extFor(mime));
