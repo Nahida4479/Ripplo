@@ -1,0 +1,65 @@
+name: Release tag
+
+# Ręczne uruchomienie (GitHub Mobile: Actions -> Release tag -> Run workflow).
+# Bierze najwyższy istniejący tag vX.Y.Z, zwiększa ostatnią liczbę o 1,
+# tworzy nowy tag na aktualnym main i od razu uruchamia Build na tym tagu.
+#
+# Uwaga: tag utworzony przez GITHUB_TOKEN NIE odpala workflow z `on: push: tags`,
+# dlatego Build jest uruchamiany jawnie przez `gh workflow run` (workflow_dispatch).
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Opcjonalnie: dokładny tag zamiast automatycznego, np. v0.63.0 lub v1.0.0"
+        required: false
+        default: ""
+
+permissions:
+  contents: write
+  actions: write
+
+jobs:
+  tag:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: main
+          fetch-depth: 0
+          fetch-tags: true
+
+      - name: Compute next tag
+        id: next
+        env:
+          INPUT_VERSION: ${{ inputs.version }}
+        run: |
+          set -euo pipefail
+          if [[ -n "$INPUT_VERSION" ]]; then
+            next="$INPUT_VERSION"
+            [[ "$next" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "Zły format tagu: $next"; exit 1; }
+          else
+            last=$(git tag -l 'v[0-9]*.[0-9]*.[0-9]*' | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | sort -V | tail -n1)
+            [[ -n "$last" ]] || { echo "Brak istniejących tagów vX.Y.Z"; exit 1; }
+            [[ "$last" =~ ^v([0-9]+)\.([0-9]+)\.([0-9]+)$ ]]
+            next="v${BASH_REMATCH[1]}.${BASH_REMATCH[2]}.$(( BASH_REMATCH[3] + 1 ))"
+            echo "Ostatni tag: $last"
+          fi
+          if git rev-parse -q --verify "refs/tags/$next" >/dev/null; then
+            echo "Tag $next już istnieje"; exit 1
+          fi
+          echo "Nowy tag: $next"
+          echo "tag=$next" >> "$GITHUB_OUTPUT"
+
+      - name: Create tag
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.next.outputs.tag }}
+        run: |
+          gh api "repos/$GITHUB_REPOSITORY/git/refs" \
+            -f ref="refs/tags/$TAG" -f sha="$(git rev-parse HEAD)"
+
+      - name: Start Build on the new tag
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.next.outputs.tag }}
+        run: gh workflow run build.yml --ref "$TAG"
