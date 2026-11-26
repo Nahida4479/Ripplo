@@ -589,7 +589,8 @@ internal class BleTransport(ctx: Context, engine: MeshEngine) : Transport(ctx, e
             override fun onServicesDiscovered(g: BluetoothGatt?, status: Int) {
                 val svc = if (status == BluetoothGatt.GATT_SUCCESS) g!!.getService(SERVICE) else null
                 if (svc == null) {
-                    Diag.i("ble no service ${device.address} status=$status")
+                    val found = if (status == BluetoothGatt.GATT_SUCCESS) g!!.services.joinToString(",") { it.uuid.toString().take(8) } else "-"
+                    Diag.i("ble no service ${device.address} status=$status services=[$found] phy=$note")
                     close()
                     return
                 }
