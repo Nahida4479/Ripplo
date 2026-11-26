@@ -1,16 +1,9 @@
 name: Release tag
-
-# Ręczne uruchomienie (GitHub Mobile: Actions -> Release tag -> Run workflow).
-# Bierze najwyższy istniejący tag vX.Y.Z, zwiększa ostatnią liczbę o 1,
-# tworzy nowy tag na aktualnym main i od razu uruchamia Build na tym tagu.
-#
-# Uwaga: tag utworzony przez GITHUB_TOKEN NIE odpala workflow z `on: push: tags`,
-# dlatego Build jest uruchamiany jawnie przez `gh workflow run` (workflow_dispatch).
 on:
   workflow_dispatch:
     inputs:
       version:
-        description: "Opcjonalnie: dokładny tag zamiast automatycznego, np. v0.63.0 lub v1.0.0"
+        description: ""
         required: false
         default: ""
 
