@@ -40,6 +40,13 @@ internal class WifiDirectTransport(ctx: Context, engine: MeshEngine) : Transport
     private var clientConnecting = false
     private val attempts = HashMap<String, Long>()
     private var busyRetries = 0
+    @Volatile
+    private var localAdded = false
+    @Volatile
+    private var requestAdded = false
+    @Volatile
+    private var setting = false
+    private var svcRetries = 0
     private val devices = ConcurrentHashMap<String, WifiP2pDevice>()
 
     override fun name(): String = "wifi-direct"
@@ -73,34 +80,76 @@ internal class WifiDirectTransport(ctx: Context, engine: MeshEngine) : Transport
         request = WifiP2pDnsSdServiceRequest.newInstance()
         m.clearLocalServices(ch, null)
         m.clearServiceRequests(ch, null)
-        step { manager?.addLocalService(channel!!, localService, stepListener("add local service")) }
+        localAdded = false
+        requestAdded = false
+        setting = true
+        step { setup() }
     }
 
     private fun step(r: Runnable) {
         Handler(Looper.getMainLooper()).postDelayed(r, 400)
     }
 
-    private fun addServiceRequest() {
-        manager?.addServiceRequest(channel!!, request, stepListener("add service request"))
+    private fun setup(n: Int = 0) {
+        val m = manager ?: return
+        val ch = channel ?: return
+        if (!localAdded) {
+            m.addLocalService(ch, localService, setupListener("add local service", n) { localAdded = true })
+        } else if (!requestAdded) {
+            m.addServiceRequest(ch, request, setupListener("add service request", n) { requestAdded = true })
+        } else {
+            setting = false
+            discoverNow()
+        }
     }
 
-    private fun stepListener(what: String) = object : WifiP2pManager.ActionListener {
+    private fun setupListener(what: String, n: Int, ok: () -> Unit) = object : WifiP2pManager.ActionListener {
         override fun onSuccess() {
             Diag.stage("wifi-direct", "", "started", "$what ok")
-            when (what) {
-                "add local service" -> step { addServiceRequest() }
-                "add service request" -> step { discover() }
-            }
+            ok()
+            step { setup() }
         }
 
         override fun onFailure(reason: Int) {
             Diag.stage("wifi-direct", "", "failed", "$what reason=$reason" + reasonText(reason))
-            if (what == "add local service") step { addServiceRequest() } else step { discover() }
+            if (n < 5) Handler(Looper.getMainLooper()).postDelayed({ setup(n + 1) }, 1500L * (n + 1)) else setting = false
         }
     }
 
-    @SuppressLint("MissingPermission")
     private fun discover() {
+        if (localAdded && requestAdded) {
+            discoverNow()
+        } else if (!setting) {
+            setting = true
+            setup()
+        }
+    }
+
+    private fun discoverServices() {
+        val m = manager ?: return
+        val ch = channel ?: return
+        m.discoverServices(ch, object : WifiP2pManager.ActionListener {
+            override fun onSuccess() {
+                svcRetries = 0
+                Diag.stage("wifi-direct", "", "started", "service discovery running")
+            }
+
+            override fun onFailure(reason: Int) {
+                Diag.stage("wifi-direct", "", "failed", "service discovery reason=$reason" + reasonText(reason))
+                if (reason == 3 && ++svcRetries <= 4 && !setting) {
+                    requestAdded = false
+                    setting = true
+                    m.clearServiceRequests(ch, object : WifiP2pManager.ActionListener {
+                        override fun onSuccess() = setup()
+                        override fun onFailure(reason: Int) = setup()
+                    })
+                }
+            }
+        })
+    }
+
+    @SuppressLint("MissingPermission")
+    private fun discoverNow() {
         val m = manager ?: return
         val ch = channel ?: return
         lastDiscover = System.currentTimeMillis()
@@ -109,12 +158,7 @@ internal class WifiDirectTransport(ctx: Context, engine: MeshEngine) : Transport
                 busyRetries = 0
                 log("discover ok")
                 Diag.stage("wifi-direct", "", "started", "discovery running")
-                step {
-                    manager?.discoverServices(channel!!, object : WifiP2pManager.ActionListener {
-                        override fun onSuccess() = Diag.stage("wifi-direct", "", "started", "service discovery running")
-                        override fun onFailure(reason: Int) = Diag.stage("wifi-direct", "", "failed", "service discovery reason=$reason" + reasonText(reason))
-                    })
-                }
+                step { discoverServices() }
             }
 
             override fun onFailure(reason: Int) {
@@ -122,10 +166,10 @@ internal class WifiDirectTransport(ctx: Context, engine: MeshEngine) : Transport
                 Diag.stage("wifi-direct", "", "failed", "discovery reason=$reason" + reasonText(reason))
                 if (reason == WifiP2pManager.BUSY && ++busyRetries <= 5) {
                     try {
-                        m.stopPeerDiscovery(channel!!, null)
+                        m.stopPeerDiscovery(ch, null)
                     } catch (ignored: Exception) {
                     }
-                    Handler(Looper.getMainLooper()).postDelayed({ discover() }, 3000L * busyRetries)
+                    Handler(Looper.getMainLooper()).postDelayed({ discoverNow() }, 3000L * busyRetries)
                 }
             }
         })
@@ -169,10 +213,7 @@ internal class WifiDirectTransport(ctx: Context, engine: MeshEngine) : Transport
                 val now = System.currentTimeMillis()
                 if (now - lastSvc > 4000) {
                     lastSvc = now
-                    try {
-                        manager?.discoverServices(channel!!, null)
-                    } catch (ignored: Exception) {
-                    }
+                    discoverServices()
                 }
                 dev = devices[node]
             }
