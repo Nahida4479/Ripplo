@@ -262,7 +262,9 @@ void main() {
     test('flags a neighbor whose hello card this version cannot read', () async {
       final a = await user('Alice'), b = await user('Bob');
       connect(a.mesh, b.mesh);
-      await waitFor(() => b.state.neighbors.firstOrNull?['card']);
+      // Wait until both sides hold each other's card, so no late genuine hello
+      // (an answer to an ask) can arrive after the bad one and clear the flag.
+      await waitFor(() => a.state.neighbors.firstOrNull?['card'] != null && b.state.neighbors.firstOrNull?['card'] != null);
       await a.mesh.sendApp(b.mesh.node, utf8(jsonEncode({'t': 'hello', 'card': b64([9, 9, 9])})));
       await waitFor(() => b.state.neighbors.first['unsupported'] == true);
     });
