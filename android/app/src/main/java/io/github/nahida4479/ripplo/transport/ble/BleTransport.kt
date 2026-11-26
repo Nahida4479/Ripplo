@@ -315,7 +315,7 @@ internal class BleTransport(ctx: Context, engine: MeshEngine) : Transport(ctx, e
         val f = ScanFilter.Builder().setServiceUuid(ParcelUuid(SERVICE)).build()
         val boost = boostCoded
         val b = ScanSettings.Builder().setScanMode(if (boost) ScanSettings.SCAN_MODE_LOW_LATENCY else ScanSettings.SCAN_MODE_BALANCED)
-        if (codedOn()) b.setLegacy(false).setPhy(BluetoothDevice.PHY_LE_ALL_SUPPORTED)
+        if (Build.VERSION.SDK_INT >= 26 && codedOn()) b.setLegacy(false).setPhy(ScanSettings.PHY_LE_ALL_SUPPORTED)
         sc.startScan(listOf(f), b.build(), scanCb)
         Diag.stage("ble", "", "started", if (codedOn()) "scanning 1M + coded" else "scanning 1M")
     }
