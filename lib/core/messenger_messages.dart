@@ -160,6 +160,52 @@ mixin _Msgs on _Base {
   }
 
   @override
+  int get pendingLogCount => pendingLogs.length;
+
+  @override
+  Future<void> queueDevLog(String to, String text) async {
+    final c = contactOf(to);
+    if (c == null || truthy(c.request)) throw RipploError('no_chat');
+    pendingLogs.add({'id': hex(random(8)), 'to': to, 'ts': now(), 'text': text});
+    await db.put('kv', 'pendingLogs', pendingLogs);
+    fire(flushPendingLogs());
+  }
+
+  @override
+  Future<void> flushPendingLogs() async {
+    if (flushingLogs || pendingLogs.isEmpty) return;
+    flushingLogs = true;
+    try {
+      final keep = <Map<String, Object?>>[];
+      final snap = List.of(pendingLogs);
+      for (final p in snap) {
+        final to = p['to'] as String;
+        final ts = (p['ts'] as num?)?.toInt() ?? 0;
+        if (now() - ts > 12 * 3600 * 1000) continue;
+        final c = contactOf(to);
+        if (c == null || truthy(c.request)) continue;
+        if (neighborOf(to, null) == null) {
+          keep.add(p);
+          continue;
+        }
+        try {
+          final r = await sendDevLog(to, p['text'] as String);
+          if (!r.ok) keep.add(p);
+        } on RipploError {
+          // too big or contact gone: retrying cannot help
+        } catch (_) {
+          keep.add(p);
+        }
+      }
+      final done = {for (final x in snap) x['id']};
+      pendingLogs = [...keep, ...pendingLogs.where((x) => !done.contains(x['id']))];
+      await db.put('kv', 'pendingLogs', pendingLogs);
+    } finally {
+      flushingLogs = false;
+    }
+  }
+
+  @override
   void deleteDevLog(String id) {
     state.devLogs = state.devLogs.where((x) => x.id != id).toList();
     fire(

@@ -258,6 +258,9 @@ abstract class _Base {
   Set<String> unsent = {};
   List<Map<String, Object?>> unsends = [];
   bool flushing = false;
+  List<Map<String, Object?>> pendingLogs = [];
+  bool flushingLogs = false;
+  Timer? logTimer;
   bool silentNow = false;
   String searchText = '';
   ObsList<Person>? peopleBase;
@@ -540,6 +543,11 @@ abstract class _Base {
       if (un is List)
         for (final x in un) _obj(x),
     ];
+    final pl = await db.get('kv', 'pendingLogs');
+    pendingLogs = [
+      if (pl is List)
+        for (final x in pl) _obj(x),
+    ];
     final pr = await db.get('kv', 'peopleRefreshedAt');
     state.peopleRefreshedAt = pr is num ? pr.toInt() : 0;
     final profile = await db.get('kv', 'profile');
@@ -585,9 +593,17 @@ abstract class _Base {
       }
     }
     fire(flushUnsends());
+    logTimer?.cancel();
+    logTimer = Timer.periodic(
+      const Duration(seconds: 60),
+      (_) => fire(flushPendingLogs()),
+    );
+    fire(flushPendingLogs());
   }
 
   Future<void> close() async {
+    logTimer?.cancel();
+    logTimer = null;
     for (final u in unsubs) {
       u();
     }
@@ -640,6 +656,7 @@ abstract class _Base {
       );
       askCard(node, 0);
       fire(flushUnsends());
+      fire(flushPendingLogs());
     }
     fire(
       mesh.getNeighbors().then<void>((all) {
@@ -981,6 +998,9 @@ abstract class _Base {
   Map<String, Object?>? localRef(String chatId, String localId);
   Map<String, Object?>? parseRe(Object? raw);
   Future<({bool ok, int? hops})> sendDevLog(String to, String text);
+  Future<void> queueDevLog(String to, String text);
+  Future<void> flushPendingLogs();
+  int get pendingLogCount;
   void deleteDevLog(String id);
   Future<Msg> sendText(String chatId, Object? text, [String? replyTo]);
   Future<Msg> sendAttachment(

@@ -59,5 +59,6 @@ final deleteContact = core.deleteContact;
 final saveSettings = core.saveSettings;
 final restoreBackup = core.restoreBackup;
 final sendDevLog = core.sendDevLog;
+final queueDevLog = core.queueDevLog;
 final deleteDevLog = core.deleteDevLog;
 final nodeOf = core.nodeOf;

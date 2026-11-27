@@ -221,12 +221,97 @@ class _SettingsViewState extends State<SettingsView> {
       toast(t('logSent'));
       return;
     }
+    if (!mounted) return;
+    final to = await _pickLogRecipient();
+    if (to == null) return;
+    final c = _state.contact(to);
+    final near = c != null && _isNearby(to);
+    if (near) {
+      try {
+        final r = await api.sendDevLog(to, text);
+        if (r.ok) {
+          toast(t('logSent'));
+          return;
+        }
+      } catch (_) {}
+    }
     try {
-      final r = await api.sendDevLog(_devLogRecipient, text);
-      toast(t(r.ok ? 'logSent' : 'logNotSent'));
+      await api.queueDevLog(to, text);
+      toast(t('logQueued'));
     } catch (_) {
       toast(t('logNotSent'));
     }
+  }
+
+  bool _isNearby(String id) {
+    for (final n in _state.neighbors) {
+      final card = n['card'];
+      if (card is Map && card['id'] == id) return true;
+    }
+    return false;
+  }
+
+  Future<String?> _pickLogRecipient() {
+    final people = <({String id, String name, bool near})>[
+      for (final id in _state.contacts.keys.toList())
+        if (_state.contact('$id') case final c?
+            when !js.truthy(c.request))
+          (
+            id: c.id,
+            name: c.name.isNotEmpty ? c.name : c.id,
+            near: _isNearby(c.id),
+          ),
+    ]..sort((a, b) => a.near == b.near ? 0 : (a.near ? -1 : 1));
+    String? sel = people.any((p) => p.id == _devLogRecipient)
+        ? _devLogRecipient
+        : null;
+    return showDialog<String>(
+      context: context,
+      builder: (ctx) => Dialog(
+        backgroundColor: ctx.rc.bg,
+        child: StatefulBuilder(
+          builder: (ctx, set) => Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                RLabel(t('logPickTitle')),
+                const SizedBox(height: 8),
+                if (people.isEmpty)
+                  REmpty(t('logNoContacts'))
+                else
+                  Flexible(
+                    child: ListView(
+                      shrinkWrap: true,
+                      children: [
+                        for (final p in people)
+                          RRow(
+                            onTap: () => set(() => sel = p.id),
+                            children: [
+                              Expanded(child: RLabel(p.name)),
+                              RVal(
+                                sel == p.id
+                                    ? '✓'
+                                    : (p.near ? t('logNearby') : ''),
+                              ),
+                            ],
+                          ),
+                      ],
+                    ),
+                  ),
+                const SizedBox(height: 12),
+                RBtn(
+                  text: t('logSend'),
+                  block: true,
+                  onTap: sel == null ? null : () => Navigator.pop(ctx, sel),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
   }
 
   Future<void> _usbSend(DevLog l) async {
