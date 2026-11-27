@@ -65,11 +65,24 @@ internal class WifiDirectTransport(ctx: Context, engine: MeshEngine) : Transport
 
         val r = object : BroadcastReceiver() {
             override fun onReceive(c: Context?, i: Intent?) {
-                manager!!.requestConnectionInfo(channel!!) { info -> onConnectionInfo(info) }
+                when (i?.action) {
+                    WifiP2pManager.WIFI_P2P_STATE_CHANGED_ACTION -> {
+                        val on = i.getIntExtra(WifiP2pManager.EXTRA_WIFI_STATE, -1) == WifiP2pManager.WIFI_P2P_STATE_ENABLED
+                        Diag.stage("wifi-direct", "", "started", "p2p radio " + (if (on) "enabled" else "DISABLED"))
+                    }
+                    WifiP2pManager.WIFI_P2P_PEERS_CHANGED_ACTION -> logPeers()
+                    else -> manager?.let { mm -> channel?.let { cc -> mm.requestConnectionInfo(cc) { info -> onConnectionInfo(info) } } }
+                }
             }
         }
         receiver = r
-        ContextCompat.registerReceiver(ctx, r, IntentFilter(WifiP2pManager.WIFI_P2P_CONNECTION_CHANGED_ACTION), ContextCompat.RECEIVER_NOT_EXPORTED)
+        val filter = IntentFilter().apply {
+            addAction(WifiP2pManager.WIFI_P2P_CONNECTION_CHANGED_ACTION)
+            addAction(WifiP2pManager.WIFI_P2P_STATE_CHANGED_ACTION)
+            addAction(WifiP2pManager.WIFI_P2P_PEERS_CHANGED_ACTION)
+        }
+        ContextCompat.registerReceiver(ctx, r, filter, ContextCompat.RECEIVER_NOT_EXPORTED)
+        logEnvironment()
 
         val txt = hashMapOf("nt" to engine.nodeTag())
         localService = WifiP2pDnsSdServiceInfo.newInstance("ripplo-" + engine.nodeTag().substring(0, 8), "_ripplo._tcp", txt)
@@ -84,6 +97,16 @@ internal class WifiDirectTransport(ctx: Context, engine: MeshEngine) : Transport
         requestAdded = false
         setting = true
         step { setup() }
+    }
+
+    private fun logEnvironment() {
+        val loc = try {
+            val lm = ctx.getSystemService(Context.LOCATION_SERVICE) as android.location.LocationManager
+            if (Build.VERSION.SDK_INT >= 28) lm.isLocationEnabled else true
+        } catch (e: Exception) {
+            true
+        }
+        Diag.stage("wifi-direct", "", "started", "android " + Build.VERSION.SDK_INT + ", location services " + (if (loc) "on" else "OFF (Wi-Fi Direct discovery finds nothing without it on Android 12 and older)"))
     }
 
     private fun step(r: Runnable) {
