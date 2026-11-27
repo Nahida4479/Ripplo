@@ -234,7 +234,7 @@ internal class WifiDirectTransport(ctx: Context, engine: MeshEngine) : Transport
                     break
                 }
                 val now = System.currentTimeMillis()
-                if (now - lastSvc > 4000) {
+                if (now - lastSvc > 7000) {
                     lastSvc = now
                     discoverServices()
                 }
@@ -349,6 +349,25 @@ internal class WifiDirectTransport(ctx: Context, engine: MeshEngine) : Transport
             lastDiscover = now
             discover()
         }
+    }
+
+    override fun onPeerRequest(kind: Int) {
+        if (kind != 2 || manager == null || channel == null) return
+        Diag.stage("wifi-direct", "", "scanning", "other phone asked us to run Wi-Fi Direct discovery")
+        val h = Handler(Looper.getMainLooper())
+        val end = System.currentTimeMillis() + 40000
+        h.post {
+            lastDiscover = System.currentTimeMillis()
+            discover()
+        }
+        val loop = object : Runnable {
+            override fun run() {
+                if (!running || System.currentTimeMillis() > end) return
+                discoverServices()
+                h.postDelayed(this, 7000)
+            }
+        }
+        h.postDelayed(loop, 3000)
     }
 
     override fun rescan() {

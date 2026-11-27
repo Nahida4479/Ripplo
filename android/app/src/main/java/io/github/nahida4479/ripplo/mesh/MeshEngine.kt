@@ -489,6 +489,12 @@ internal class MeshEngine private constructor(internal val ctx: Context) : Route
         }
     }
 
+    internal fun askPeerWifiDirect(node: String): Boolean = try {
+        sendApp(node, byteArrayOf(0xFE.toByte(), 2))
+    } catch (e: RuntimeException) {
+        false
+    }
+
     internal fun askPeerAdvertise(node: String): Boolean = try {
         sendApp(node, byteArrayOf(0xFE.toByte(), 1))
     } catch (e: RuntimeException) {
@@ -577,6 +583,12 @@ internal class MeshEngine private constructor(internal val ctx: Context) : Route
             forceUntil = start + FORCE_HOLD_MS
         }
         Diag.stage("force", node, "attempt", "$spec: up to ${FORCE_FIND_MS / 1000} s to find the peer, then ${FORCE_MS / 1000} s to connect; links before: $before; dropping them")
+        if (p[0] == "wifi-direct") {
+            // the other phone must run Wi-Fi Direct discovery at the same time, and it can only be told over the links we are about to drop
+            val asked = askPeerWifiDirect(node)
+            Diag.stage("wifi-direct", node, "scanning", if (asked) "asked the other phone to start Wi-Fi Direct discovery" else "could not ask the other phone to start Wi-Fi Direct discovery (no link)")
+            try { Thread.sleep(700) } catch (ignored: InterruptedException) {}
+        }
         val doomed = synchronized(lock) { byNode[node]?.let { ArrayList(it) } ?: ArrayList<Link>() }
         for (l in doomed) l.close()
         val res = java.util.concurrent.atomic.AtomicReference<Boolean?>(null)
