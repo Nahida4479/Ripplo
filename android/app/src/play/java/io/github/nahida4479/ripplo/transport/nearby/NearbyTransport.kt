@@ -116,7 +116,7 @@ internal class NearbyTransport(ctx: Context, engine: MeshEngine) : Transport(ctx
             .addOnFailureListener {
                 requested.remove(id)
                 val code = (it as? ApiException)?.statusCode
-                if (code != ConnectionsStatusCodes.STATUS_ALREADY_CONNECTED_TO_ENDPOINT) Diag.stage(MEDIUM, peer, "failed", "request: $it")
+                Diag.stage(MEDIUM, peer, if (code == ConnectionsStatusCodes.STATUS_ALREADY_CONNECTED_TO_ENDPOINT) "connecting" else "failed", "request: $it")
             }
         return true
     }
@@ -144,6 +144,12 @@ internal class NearbyTransport(ctx: Context, engine: MeshEngine) : Transport(ctx
         }
         engine.forceDialing()
         engine.closeLinks(node, MEDIUM)
+        val inFlight = requested[found.key]
+        if (inFlight != null && System.currentTimeMillis() - inFlight < 25000) {
+            // a request is already being set up (Nearby takes several seconds); a second one would collide with it
+            Diag.stage(MEDIUM, node, "connecting", "connection request already in progress, waiting for it")
+            return true
+        }
         requested.remove(found.key)
         return dial(found.key, node, true)
     }
@@ -165,6 +171,7 @@ internal class NearbyTransport(ctx: Context, engine: MeshEngine) : Transport(ctx
 
     private val lifecycle = object : ConnectionLifecycleCallback() {
         override fun onConnectionInitiated(id: String, info: ConnectionInfo) {
+            Diag.stage(MEDIUM, info.endpointName, "connecting", (if (info.isIncomingConnection) "incoming" else "outgoing") + " connection initiated, accepting")
             client?.acceptConnection(id, payloads)
         }
 
@@ -174,12 +181,14 @@ internal class NearbyTransport(ctx: Context, engine: MeshEngine) : Transport(ctx
                 Diag.stage(MEDIUM, endpoints[id]?.peer ?: "", "failed", "connection result ${r.status.statusCode}")
                 return
             }
+            Diag.stage(MEDIUM, endpoints[id]?.peer ?: "", "connected", "connection established")
             val l = NearbyLink(id)
             links.put(id, l)?.close()
             engine.addLink(l)
         }
 
         override fun onDisconnected(id: String) {
+            Diag.stage(MEDIUM, endpoints[id]?.peer ?: "", "closed", "disconnected")
             links.remove(id)?.close()
         }
     }

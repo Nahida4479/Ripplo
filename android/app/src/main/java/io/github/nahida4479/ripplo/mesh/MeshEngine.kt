@@ -679,7 +679,7 @@ internal class MeshEngine private constructor(internal val ctx: Context) : Route
         private const val PROBE_TICKS = 3
         private const val LONELY_TICKS = 6
         private const val RESCAN_GAP_MS = 8000L
-        private const val FORCE_MS = 7000L
+        private const val FORCE_MS = 20000L
         private const val FORCE_FIND_MS = 15000L
         private const val FORCE_HOLD_MS = 10L * 60L * 1000L
         private const val PROBE_NANOS = 120L * 1000000000L
