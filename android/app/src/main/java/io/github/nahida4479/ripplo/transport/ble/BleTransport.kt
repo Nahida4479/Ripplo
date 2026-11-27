@@ -62,6 +62,7 @@ internal class BleTransport(ctx: Context, engine: MeshEngine) : Transport(ctx, e
     private var txChar: BluetoothGattCharacteristic? = null
     private var advertiser: BluetoothLeAdvertiser? = null
     private var scanner: BluetoothLeScanner? = null
+    @Volatile private var separateCoded = true
     private val serverLinks = ConcurrentHashMap<String, ServerLink>()
     private val mtus = ConcurrentHashMap<String, Int>()
     private val attempts = HashMap<String, Long>()
@@ -127,6 +128,7 @@ internal class BleTransport(ctx: Context, engine: MeshEngine) : Transport(ctx, e
 
     override fun stopImpl() {
         try { scanner?.stopScan(scanCb) } catch (ignored: Exception) { }
+        try { scanner?.stopScan(codedScanCb) } catch (ignored: Exception) { }
         try { advertiser?.stopAdvertising(advCb) } catch (ignored: Exception) { }
         codedAdv.stop(advertiser)
         hits.clear()
@@ -268,6 +270,7 @@ internal class BleTransport(ctx: Context, engine: MeshEngine) : Transport(ctx, e
     private fun restartScan() {
         if (!running || adapter == null) return
         try { scanner?.stopScan(scanCb) } catch (ignored: Exception) { }
+        try { scanner?.stopScan(codedScanCb) } catch (ignored: Exception) { }
         try { startScan() } catch (e: Exception) { Diag.w("ble re-scan failed $e") }
     }
 
@@ -314,10 +317,26 @@ internal class BleTransport(ctx: Context, engine: MeshEngine) : Transport(ctx, e
         if (sc == null) return
         val f = ScanFilter.Builder().setServiceUuid(ParcelUuid(SERVICE)).build()
         val boost = boostCoded
-        val b = ScanSettings.Builder().setScanMode(if (boost) ScanSettings.SCAN_MODE_LOW_LATENCY else ScanSettings.SCAN_MODE_BALANCED)
-        if (Build.VERSION.SDK_INT >= 26 && codedOn()) b.setLegacy(false).setPhy(ScanSettings.PHY_LE_ALL_SUPPORTED)
+        val mode = if (boost) ScanSettings.SCAN_MODE_LOW_LATENCY else ScanSettings.SCAN_MODE_BALANCED
+        val coded = Build.VERSION.SDK_INT >= 26 && codedOn()
+        val b = ScanSettings.Builder().setScanMode(mode)
+        // one scanner for 1M + coded splits the radio's listening time between the two PHYs, which starves
+        // coded exactly at the edge of its range; coded gets a scanner of its own instead
+        if (coded && !separateCoded) b.setLegacy(false).setPhy(ScanSettings.PHY_LE_ALL_SUPPORTED)
         sc.startScan(listOf(f), b.build(), scanCb)
-        Diag.stage("ble", "", "started", if (codedOn()) "scanning 1M + coded" else "scanning 1M")
+        var dedicated = false
+        if (coded && separateCoded) {
+            try {
+                val cs = ScanSettings.Builder().setScanMode(mode).setLegacy(false).setPhy(BluetoothDevice.PHY_LE_CODED).build()
+                sc.startScan(listOf(f), cs, codedScanCb)
+                dedicated = true
+            } catch (e: Exception) {
+                Diag.w("ble dedicated coded scan failed $e")
+                separateCoded = false
+                main.post { restartScan() }
+            }
+        }
+        Diag.stage("ble", "", "started", if (!coded) "scanning 1M" else if (dedicated) "scanning 1M + dedicated coded scanner" else "scanning 1M + coded")
     }
 
     private val advCb = object : AdvertiseCallback() {
@@ -332,11 +351,16 @@ internal class BleTransport(ctx: Context, engine: MeshEngine) : Transport(ctx, e
         }
     }
 
-    private val scanCb = ScanCb()
+    private val scanCb = ScanCb(false)
+    private val codedScanCb = ScanCb(true)
 
-    private inner class ScanCb : ScanCallback() {
+    private inner class ScanCb(val dedicated: Boolean) : ScanCallback() {
         override fun onScanFailed(errorCode: Int) {
-            Diag.w("ble scan failed $errorCode")
+            Diag.w("ble scan failed $errorCode dedicated=$dedicated")
+            if (dedicated && separateCoded) {
+                separateCoded = false
+                main.post { restartScan() }
+            }
             Diag.stage("ble", "", "failed", "scan errorCode=$errorCode")
         }
 
