@@ -254,7 +254,7 @@ class _SettingsViewState extends State<SettingsView> {
   Future<String?> _pickLogRecipient() {
     final people = <({String id, String name, bool near})>[
       for (final id in _state.contacts.keys.toList())
-        if (_state.contact('$id') case final c?
+        if (_state.contact(id) case final c?
             when !js.truthy(c.request))
           (
             id: c.id,
