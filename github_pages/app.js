@@ -110,14 +110,27 @@ $$('.card').forEach(c => c.addEventListener('pointermove', e => {
 $$('.sheet a').forEach(a => a.addEventListener('click', () => { $('.menu').open = false }))
 
 const dock = $('#dock')
-if (dock && 'IntersectionObserver' in window) {
-  const seen = new Set()
-  const io = new IntersectionObserver(es => {
-    for (const e of es) e.isIntersecting ? seen.add(e.target.id) : seen.delete(e.target.id)
-    dock.classList.toggle('on', seen.size === 0 && scrollY > 200)
-  })
-  io.observe($('#hero'))
-  io.observe($('#download'))
+if (dock) {
+  // shown only while scrolling down, once the page is scrolled a bit and the download section is not in view;
+  // any scroll up hides it (avoids it flickering on phones when the address bar resizes the viewport)
+  let lastY = Math.max(0, scrollY), shown = false, dlVisible = false, ticking = false
+  const set = on => { if (on !== shown) { shown = on; dock.classList.toggle('on', on) } }
+  const update = () => {
+    ticking = false
+    const y = Math.max(0, scrollY)
+    const dy = y - lastY
+    if (y < 300 || dlVisible) set(false)
+    else if (dy > 6) set(true)
+    else if (dy < -6) set(false)
+    if (Math.abs(dy) > 6 || y < 300) lastY = y
+  }
+  addEventListener('scroll', () => { if (!ticking) { ticking = true; requestAnimationFrame(update) } }, { passive: true })
+  if ('IntersectionObserver' in window) {
+    new IntersectionObserver(es => {
+      dlVisible = es.some(e => e.isIntersecting)
+      update()
+    }).observe($('#download'))
+  }
 }
 
 const cv = $('#mesh')
